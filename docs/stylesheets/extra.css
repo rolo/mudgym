@@ -1,0 +1,281 @@
+/* Zensical skin ported from the marimo example-notebook theme ("mudgym"
+ * palette).
+ *
+ * Wired in via extra_css in zensical.toml; activates through
+ * palette.primary/accent = "custom". Zensical sets html { font-size: 125% },
+ * so rem values from the notebook stylesheet are scaled by 0.8 here.
+ */
+
+.md-grid {
+  max-width: 64rem;
+}
+
+/* --- Palette ---------------------------------------------------------------- */
+
+:root {
+  --notebook-primary: #18352f;
+  --notebook-secondary: #244c44;
+  --notebook-accent: #b58a2a;
+  --notebook-highlight: #f6ff31;
+  --notebook-background: #ffffff;
+  --notebook-ink: #1b2825;
+  --notebook-code-background: #0b0d0c;
+  --notebook-body: color-mix(in srgb, var(--notebook-ink) 88%, var(--notebook-background));
+  --notebook-muted: color-mix(in srgb, var(--notebook-ink) 55%, var(--notebook-background));
+  --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
+  --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
+}
+
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: var(--notebook-primary);
+  --md-primary-fg-color--light: var(--notebook-secondary);
+  --md-primary-fg-color--dark: #0d201c;
+  --md-primary-bg-color: var(--notebook-background);
+  --md-primary-bg-color--light: color-mix(in srgb, var(--notebook-background) 70%, transparent);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: var(--notebook-accent);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--notebook-accent) 15%, transparent);
+}
+
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: var(--notebook-secondary);
+  --md-code-bg-color: var(--notebook-tint);
+  --md-code-fg-color: var(--notebook-secondary);
+}
+
+body {
+  background:
+    radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--notebook-secondary) 7%, transparent), transparent 24rem),
+    var(--notebook-background);
+}
+
+/* --- Header ----------------------------------------------------------------- */
+
+/* Same treatment as the notebook nav brand: small mono caps. */
+.md-header__topic {
+  font-family: var(--md-code-font-family);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* --- Prose ------------------------------------------------------------------ */
+
+.md-typeset {
+  color: var(--notebook-body);
+  font-size: 0.88rem;
+  line-height: 1.68;
+}
+
+.md-typeset h1 {
+  color: var(--notebook-ink);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  margin-bottom: 0.5em;
+}
+
+.md-typeset h2 {
+  color: var(--notebook-ink);
+  font-size: 1.32rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-top: 1.1em;
+}
+
+.md-typeset h3 {
+  color: var(--notebook-secondary);
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.md-content .md-typeset a:not(.headerlink):not(.md-button) {
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, var(--notebook-accent) 70%, transparent);
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.18em;
+}
+
+.md-typeset :not(pre) > code {
+  border-radius: 0.36rem;
+  background: var(--notebook-tint);
+  color: var(--notebook-secondary);
+  padding: 0.12em 0.38em;
+  font-size: 0.92em;
+}
+
+/* --- Code blocks -------------------------------------------------------------- */
+
+/* Fenced blocks take a dark code surface in the site palette: near-black
+ * ground, white text, gold keywords, green strings. Inline code keeps the
+ * light tint chip - scoped to div.highlight/.highlighttable so inline
+ * highlighted code (e.g. mkdocstrings signatures) is left alone. */
+.md-typeset div.highlight,
+.md-typeset .highlighttable {
+  --md-code-bg-color: var(--notebook-code-background);
+  --md-code-fg-color: #ffffff;
+  --md-code-bg-color--light: color-mix(in srgb, #ffffff 10%, var(--notebook-code-background));
+  --md-code-bg-color--lighter: color-mix(in srgb, #ffffff 5%, var(--notebook-code-background));
+  --md-code-hl-color: color-mix(in srgb, var(--notebook-accent) 24%, transparent);
+  --md-code-hl-keyword-color: #e0b455;
+  --md-code-hl-string-color: #a6d5a8;
+  --md-code-hl-number-color: #8fcfc0;
+  --md-code-hl-constant-color: #8fcfc0;
+  --md-code-hl-function-color: #ffffff;
+  --md-code-hl-name-color: #ffffff;
+  --md-code-hl-operator-color: #c2cbc6;
+  --md-code-hl-punctuation-color: #c2cbc6;
+  --md-code-hl-comment-color: #849089;
+  --md-code-hl-special-color: #e8d5a0;
+  --md-code-hl-variable-color: #e8d5a0;
+  --md-code-hl-generic-color: #ffffff;
+  /* The copy button and its .md-code__nav backing pick these up. */
+  --md-default-fg-color--lightest: color-mix(in srgb, #ffffff 45%, transparent);
+  --md-default-fg-color--light: color-mix(in srgb, #ffffff 85%, transparent);
+}
+
+.md-typeset div.highlight .c,
+.md-typeset div.highlight .c1,
+.md-typeset div.highlight .ch,
+.md-typeset div.highlight .cm,
+.md-typeset div.highlight .cs {
+  font-style: italic;
+}
+
+.md-typeset pre > code {
+  border-radius: 0.48rem;
+  padding: 0.9em 1.1em;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--notebook-primary) 10%, transparent);
+}
+
+.md-typeset table:not([class]) {
+  border: 1px solid var(--notebook-rule);
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--notebook-primary) 4%, transparent);
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background: var(--notebook-tint);
+  color: var(--notebook-secondary);
+}
+
+/* --- Admonitions ------------------------------------------------------------ */
+
+/* Zensical colours admonitions with a flat tinted box plus an icon mask; pull
+ * note onto the secondary green and tip onto the brass accent. */
+.md-typeset .admonition {
+  border-radius: 0.6rem;
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  background-color: color-mix(in srgb, var(--notebook-secondary) 10%, transparent);
+}
+
+.md-typeset .note > .admonition-title::before,
+.md-typeset .note > summary::before {
+  background-color: var(--notebook-secondary);
+}
+
+.md-typeset .note > .admonition-title::after,
+.md-typeset .note > summary::after {
+  color: var(--notebook-secondary);
+}
+
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  background-color: color-mix(in srgb, var(--notebook-accent) 10%, transparent);
+}
+
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before {
+  background-color: var(--notebook-accent);
+}
+
+.md-typeset .tip > .admonition-title::after,
+.md-typeset .tip > summary::after {
+  color: var(--notebook-accent);
+}
+
+/* Pull warning off Material's default orange and onto the brass accent. */
+.md-typeset .admonition.warning,
+.md-typeset details.warning {
+  background-color: color-mix(in srgb, var(--notebook-accent) 12%, transparent);
+}
+
+.md-typeset .warning > .admonition-title::before,
+.md-typeset .warning > summary::before {
+  background-color: var(--notebook-accent);
+}
+
+.md-typeset .warning > .admonition-title::after,
+.md-typeset .warning > summary::after {
+  color: var(--notebook-accent);
+}
+
+/* --- Content tabs -------------------------------------------------------------- */
+
+/* Give the tab labels a card ground and join them onto the code block below,
+ * instead of floating on the page background. */
+.md-typeset .tabbed-labels {
+  background: var(--notebook-tint);
+  border-radius: 0.48rem 0.48rem 0 0;
+  padding-inline: 0.3rem;
+}
+
+.md-typeset .tabbed-block > .highlight:first-child {
+  margin: 0;
+}
+
+.md-typeset .tabbed-block > .highlight:first-child > pre {
+  margin: 0;
+}
+
+.md-typeset .tabbed-block > .highlight:first-child > pre > code {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* --- Game-output frames ------------------------------------------------------ */
+
+/* Plain (```text) fences render like the notebooks' game-output frames:
+ * terminal text on near-black with a brass left border. */
+.md-typeset .language-text pre > code {
+  background: var(--notebook-code-background);
+  color: #eee;
+  border: 1px solid var(--notebook-primary);
+  border-left: 4px solid var(--notebook-accent);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
+  padding: 1.1em 1.2em;
+}
+
+
+/* Captured ANSI game screens, emitted by scripts/generate_docs_transcripts.py
+ * via mudgym.notebooks.show_ansi. The frame carries inline styles so it also
+ * survives inside marimo components; these rules only handle its place in the
+ * docs flow. */
+.md-typeset .game-frame {
+  margin: 1em 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ansi2html emits a background on the spans as well as the frame; keep long
+ * unbroken game lines from forcing the page to scroll sideways. */
+.md-typeset .game-frame span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --- Generated observation tables --------------------------------------------- */
+
+/* Observation and action transcripts are key/value tables that read better
+ * left-aligned and monospaced in the value column than as prose. */
+.md-typeset table:not([class]) td code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

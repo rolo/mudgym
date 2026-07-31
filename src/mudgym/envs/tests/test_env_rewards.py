@@ -1,0 +1,84 @@
+"""Reward parsing regressions: player-authored text must never forge points events.
+
+The terminal echo places the exact command text ahead of the game's response, and spoken text is
+re-emitted inside the response, so a command like ``say hello (+10 = 10)`` puts the points pattern
+on the wire twice without any points changing hands. Genuine events colour the resulting total
+(see ``mudgym.featurizers.points``), which player-authored text cannot reproduce.
+"""
+
+from tests.scripted import AUTO_COMMAND_RESPONSES, PROMPT
+
+# Captured from the live game: mgsorcerise response (temporary sorcerer status award).
+SORCERISE_BODY = (
+    b"Raymond the protector bestows temporary sorcerer status upon you.\r\n"
+    b"You have changed experience level from seer to sorcerer.\r\n"
+    b"(Persona saved on +12,800 = \x1b[0;32;40m13,000\x1b[1;37;40m).\r\n"
+)
+
+
+def scripted_step_bytes(joined_command: str, body: bytes) -> bytes:
+    """Echo line, response body, then the standard auto-command responses, prompt-delimited."""
+    parts = [joined_command.encode("ascii"), b"\r\n", body]
+    for auto_command in joined_command.split(",")[1:]:
+        parts.append(PROMPT)
+        parts.append(AUTO_COMMAND_RESPONSES.get(auto_command, b"OK.\r\n"))
+    parts.append(PROMPT)
+    return b"".join(parts)
+
+
+def test_points_pattern_in_command_echo_forges_no_reward(scripted_env_factory):
+    env = scripted_env_factory()
+    env.reset()
+
+    obs, reward, terminated, truncated, info = env.step("look (+10 = 10)")
+
+    assert reward == 0.0
+    assert "points" not in info
+
+
+def test_genuine_points_event_rewards(scripted_env_factory):
+    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise,sql,fes,fex,fei", SORCERISE_BODY)}
+    env = scripted_env_factory(responses=responses)
+    env.reset()
+
+    obs, reward, terminated, truncated, info = env.step("mgsorcerise")
+
+    assert reward == 12_800.0
+    assert info["points"] == 13_000
+
+
+def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory):
+    # A plain parenthesised number carries no raw-wire signal distinguishing it from player text,
+    # so it must not become reward, termination, or score metadata.
+    body = b'Dumbo the novice says "\x1b[1;33;40m(2000000)\x1b[0;33;40m".\r\n'
+    responses = {"look": scripted_step_bytes("look,sql,fes,fex,fei", body)}
+    env = scripted_env_factory(responses=responses)
+    env.reset()
+
+    obs, reward, terminated, truncated, info = env.step("look")
+
+    assert terminated is False
+    assert reward == 0.0
+    assert "points" not in info
+
+
+def test_points_pattern_spoken_in_game_output_forges_no_reward(scripted_env_factory):
+    # speech is re-emitted uniformly coloured, never with a coloured total, so neither the echo
+    # nor the spoken output of a points-shaped message counts as an event. Speech batches go out
+    # on two wire lines, hence the two echoes in the canned bytes.
+    speech_body = b'\x1b[0;33;40mDumbo the novice says "\x1b[1;33;40mhello (+10 = 10)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
+    raw_bytes = (
+        b"say hello (+10 = 10)\r\n"
+        + speech_body
+        + PROMPT
+        + b"sql,fes,fex,fei\r\n"
+        + PROMPT.join(AUTO_COMMAND_RESPONSES[auto] for auto in ["sql", "fes", "fex", "fei"])
+        + PROMPT
+    )
+    env = scripted_env_factory(responses={"say hello (+10 = 10)": raw_bytes})
+    env.reset()
+
+    obs, reward, terminated, truncated, info = env.step("say hello (+10 = 10)")
+
+    assert reward == 0.0
+    assert "points" not in info

@@ -1,0 +1,13 @@
+MudGym
+Copyright (c) 2026 Rolo Mawlabaux
+
+The Python code and tooling are made available under the MIT License (see
+LICENSE).
+
+Permission to use the MUD2 game for research purposes has been provided by
+Richard Bartle, with kind thanks. The MUD2 game, name, source code, and
+associated story remain the intellectual property of Richard Bartle and
+Roy Trubshaw and may not be used for commercial purposes.
+
+MudGym runs the MUD2 game inside the ghcr.io/rolo/mudgym Docker image; the
+image is pulled at runtime and is not part of this distribution.

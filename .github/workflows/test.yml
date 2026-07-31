@@ -1,0 +1,87 @@
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: write # the coverage comment posts to the PR
+env:
+  LOG_LEVEL: "DEBUG"
+concurrency:
+  # Key on the commit, not the branch: a push to a branch with an open PR fires both
+  # `push` and `pull_request`, and on `push` there is no head_ref to group by. Using the
+  # head SHA collapses the pair into a single run per commit. On pull_request, github.sha
+  # is the merge commit, so the head sha has to be read off the event payload.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Matrix jobs that share a Docker daemon would otherwise log the same account
+      # into one game container. A run/attempt/job namespace keeps them apart.
+      MUDGYM_DOCKER_EXEC_CONTAINER_NAME: "m${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python-version }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - '3.13'
+          - '3.14'
+    steps:
+      - uses: actions/checkout@v5
+      # The setup actions resolve releases through api.github.com with the runner's
+      # native token. Portable runners hand out their own token, which GitHub won't
+      # accept, so the GH_PAT secret stands in; on GitHub GH_PAT is absent and the
+      # native token is used. Needs setup-just v3: v2 prefers the runner's ambient
+      # GITHUB_TOKEN env var over this input, so GH_PAT never reached it.
+      - name: Install just
+        uses: extractions/setup-just@v3
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Install uv (GitHub Actions)
+        if: ${{ !env.ACT }}
+        uses: astral-sh/setup-uv@v7.1.2
+        with:
+          enable-cache: true
+          github-token: ${{ secrets.GH_PAT || github.token }}
+      - name: Install uv (act/local)
+        if: ${{ env.ACT }}
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install dependencies
+        run: just install
+      - name: Run tests (with coverage)
+        run: just test
+      # Skipped for pull requests from forks: those runs get a read-only token
+      # regardless of the permissions above, so posting a comment would 403 and
+      # fail an otherwise green run.
+      - name: Publish coverage summary (pytest-coverage-comment)
+        if: ${{ !env.ACT && !github.event.pull_request.head.repo.fork }}
+        uses: MishaKav/pytest-coverage-comment@v1.2.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pytest-coverage-path: coverage.xml
+      - name: Upload coverage data
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ matrix.python-version }}
+          path: '${{ github.workspace }}/.coverage*'
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Upload HTML coverage report
+        if: ${{ !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov
+          if-no-files-found: error

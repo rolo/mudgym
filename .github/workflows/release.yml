@@ -1,0 +1,132 @@
+name: Release
+# PyPI trusted publishing federates with GitHub Actions, and
+# build-and-inspect-python-package leans on GitHub-shaped internals (step
+# summaries, upload-artifact), so this workflow is GitHub-only by construction.
+on:
+  push:
+    tags: ['v*']
+  # Dry-run the build and smoke jobs without a tag; the publish jobs stay tag-only.
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build & inspect package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      # Builds the sdist and wheel with uv build, runs twine check --strict and
+      # check-wheel-contents, renders the file trees and metadata into the job
+      # summary, and uploads everything as the "Packages" artifact.
+      - name: Build, check, and inspect the distributions
+        id: baipp
+        uses: hynek/build-and-inspect-python-package@2abe76da66d0a6a4a227101f9348ee855797cfa5 # v3.0.1
+      # A mismatched tag is the classic bad release: v0.1.0 must equal the
+      # pyproject.toml version before anything reaches an index.
+      - name: Assert the tag matches the package version
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+          PACKAGE_VERSION: ${{ steps.baipp.outputs.package_version }}
+        run: |
+          if [ "$TAG" != "v$PACKAGE_VERSION" ]; then
+            echo "Tag $TAG does not match package version $PACKAGE_VERSION"
+            exit 1
+          fi
+
+  smoke:
+    name: Install the wheel and play an episode
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # Deliberately no checkout: everything gates on the built artifact, never
+      # the source tree.
+      - name: Download the built packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: Packages
+          path: dist
+      # Import-only smoke passes even when the environment cannot start, which
+      # is this package's most likely failure mode - so play a real episode.
+      - name: Reset, step, and close against the release image
+        run: |
+          python3 -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/python - <<'EOF'
+          import mudgym
+          from mudgym import make_env
+
+          print("mudgym", mudgym.__version__)
+          env = make_env(observation="parsed")
+          try:
+              observation, info = env.reset()
+              observation, reward, terminated, truncated, info = env.step("look")
+              print(observation["text"][:120])
+          finally:
+              env.close()
+          print("smoke OK")
+          EOF
+
+  # CI runs uv sync --frozen everywhere else, so the lower bounds in
+  # pyproject.toml are otherwise entirely untested.
+  lowest-resolution:
+    name: Test at the declared minimum versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7.1.2
+        with:
+          enable-cache: true
+      - name: Resolve the declared lower bounds and run the tests
+        run: |
+          uv sync --resolution lowest-direct
+          uv run pytest --tb=short
+
+  # Both publish jobs need a pending trusted publisher configured first - on
+  # PyPI and TestPyPI separately, they share nothing. Protect both environments
+  # with required manual approval so a tag push alone cannot publish.
+  publish-testpypi:
+    name: Upload to TestPyPI
+    needs: [build, smoke]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download the built packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: Packages
+          path: dist
+      - name: Upload to TestPyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Upload to PyPI
+    needs: [publish-testpypi, lowest-resolution]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download the built packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: Packages
+          path: dist
+      # Emits PEP 740 attestations by default.
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

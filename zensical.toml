@@ -1,0 +1,60 @@
+[project]
+site_name = "MudGym"
+site_description = "A reinforcement learning environment for MUD2"
+docs_dir = "docs"
+site_dir = "site"
+nav = [
+  { "Getting Started" = "index.md" },
+  { "Environments" = "environments.md" },
+  { "Observations" = "observations.md" },
+  { "Actions" = "actions.md" },
+  { "Rewards" = "rewards.md" },
+  { "Multi-agent" = "multiagent.md" },
+  { "API Reference" = "api.md" },
+]
+extra_css = ["stylesheets/extra.css"]
+
+[project.theme]
+font.text = "Inter"
+font.code = "JetBrains Mono"
+logo = "assets/mud2-dumbbell-logo.svg"
+favicon = "assets/mud2-dumbbell-favicon.svg"
+palette.primary = "custom"
+palette.accent = "custom"
+features = [
+  "search.highlight",
+  "navigation.tracking",
+  "navigation.expand",
+  "navigation.indexes",
+  "navigation.top",
+  "navigation.footer",
+  "content.code.copy",
+  "content.code.annotate",
+  "toc.follow",
+]
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+show_source = true
+show_root_heading = true
+heading_level = 2
+members_order = "source"
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions.pymdownx.superfences]
+
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
