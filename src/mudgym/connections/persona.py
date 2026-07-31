@@ -26,7 +26,7 @@ def parse_persona_screen(text: bytes) -> dict[int, str]:
     """Extract persona names from persona selection text."""
     text_str = decode_text_bytes(text)
     # names are only ever max 10 characters and dont include punctuation, whitespace or non alpha chars
-    # TODO: tighten up this regex to only include valid persona names and makr it operate on bytestrings
+    # TODO: tighten up this regex to only include valid persona names and make it operate on bytestrings
     pattern = r"\((\d+)\)\s+([A-Za-z][\w'-]{0,9}|\*\*Unused\*\*)(?:,|\.|$)"
     matches = re.findall(pattern, text_str)
     return {int(num): name for num, name in matches}
