@@ -53,9 +53,15 @@ def test_player_authored_control_text_does_not_close_the_command_window(connecti
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = connection.send_command([player_command, "fei"])
 
-        assert player_command.encode("ascii") in raw_bytes
-        assert b"========" in raw_bytes
-        assert terminated is False
-        assert incomplete is False
+        # debug_info names the prompt that closed the window, which is the only thing that tells
+        # these two failures apart: TIMEOUT means the marker never arrived in time, while OPTION
+        # (or any NO_LONGER_IN_GAME prompt) means the player's text beat its own echo and was read
+        # as the game asking for input. Without it a failure here says only "True is not False".
+        why = f"closed by {debug_info['matched_prompt']}, tail={raw_bytes[-160:]!r}"
+
+        assert player_command.encode("ascii") in raw_bytes, why
+        assert b"========" in raw_bytes, why
+        assert terminated is False, why
+        assert incomplete is False, why
     finally:
         connection.close()
