@@ -6,7 +6,7 @@ import numpy as np
 from gymnasium import spaces
 
 from mudgym.connections.prompts import SGR
-from mudgym.db.index import weather_count, weather_to_index
+from mudgym.db.index import indexed_discrete_size, weather_count, weather_to_index
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.db.weather import WEATHER_CODE_TO_NAME
 from mudgym.envs.specs import BIT_DTYPE, INDEX_DTYPE, INT_DTYPE, SINGLE_LINE_CHARSET
@@ -81,7 +81,7 @@ class FEScoreField(ObservationField):
             "flags": spaces.MultiBinary(4),
             "reset_minutes": spaces.Box(low=0, high=MAX_RESET_MINUTES, shape=(), dtype=INT_DTYPE),
             "weather": spaces.Text(max_length=16, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "weather_index": spaces.Discrete(weather_count),
+            "weather_index": spaces.Discrete(indexed_discrete_size(weather_count)),
         }
 
     def full_empty(self) -> dict[str, Any]:

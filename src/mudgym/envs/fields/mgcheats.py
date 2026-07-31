@@ -4,7 +4,13 @@ from typing import Any
 
 from gymnasium import spaces
 
-from mudgym.db.index import room_id_count, room_id_to_index, room_name_count, room_name_to_index
+from mudgym.db.index import (
+    indexed_discrete_size,
+    room_id_count,
+    room_id_to_index,
+    room_name_count,
+    room_name_to_index,
+)
 from mudgym.envs.specs import (
     BIT_DTYPE,
     IDENTIFIER_CHARSET,
@@ -47,9 +53,9 @@ class MGCheatsField(ObservationField):
     def full_space(self) -> dict[str, spaces.Space]:
         return {
             "room_id": spaces.Text(max_length=ROOM_ID_MAX_LENGTH, min_length=0, charset=IDENTIFIER_CHARSET),
-            "room_id_index": spaces.Discrete(room_id_count),
+            "room_id_index": spaces.Discrete(indexed_discrete_size(room_id_count)),
             "room_name": spaces.Text(max_length=ROOM_NAME_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "room_name_index": spaces.Discrete(room_name_count),
+            "room_name_index": spaces.Discrete(indexed_discrete_size(room_name_count)),
             "fighting": spaces.Discrete(2),
             "dark": spaces.Discrete(2),
             "glowing": spaces.Discrete(2),

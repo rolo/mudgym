@@ -5,7 +5,7 @@ from typing import Any
 from gymnasium import spaces
 
 from mudgym.connections.prompts import SGR_ONE_PLUS_STR
-from mudgym.db.index import room_name_count, room_name_to_index
+from mudgym.db.index import indexed_discrete_size, room_name_count, room_name_to_index
 from mudgym.envs.specs import INDEX_DTYPE, ITEM_SPACE, ROOM_NAME_MAX_LENGTH, SINGLE_LINE_CHARSET
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.strings import decode_text_bytes
@@ -180,7 +180,7 @@ class SuperQuickLookField(ObservationField):
     def full_space(self) -> dict[str, spaces.Space]:
         return {
             "room_name": spaces.Text(max_length=ROOM_NAME_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "room_name_index": spaces.Discrete(room_name_count),
+            "room_name_index": spaces.Discrete(indexed_discrete_size(room_name_count)),
             "here": ITEM_SPACE,
             "inventory": ITEM_SPACE,
             "features": ITEM_SPACE,
