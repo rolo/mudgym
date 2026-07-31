@@ -5,8 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 permissions:
-  contents: read
-  pull-requests: write # the coverage comment posts to the PR
+  contents: read # checkout only; nothing here writes back to the repo
 env:
   LOG_LEVEL: "DEBUG"
 concurrency:
@@ -59,18 +58,6 @@ jobs:
         run: just install
       - name: Run tests (with coverage)
         run: just test
-      # Skipped for pull requests from forks: those runs get a read-only token
-      # regardless of the permissions above, so posting a comment would 403 and
-      # fail an otherwise green run.
-      - name: Publish coverage summary (pytest-coverage-comment)
-        if: ${{ !env.ACT && !github.event.pull_request.head.repo.fork }}
-        uses: MishaKav/pytest-coverage-comment@v1.10.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # `just test` writes Cobertura XML, which is a different input from the plain-text
-          # --cov-report=term-missing one. Passing coverage.xml to pytest-coverage-path made the
-          # action parse XML as text and fail the job with "bad format or wrong data".
-          pytest-xml-coverage-path: coverage.xml
       - name: Upload coverage data
         if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v7
