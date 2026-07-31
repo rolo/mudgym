@@ -11,7 +11,7 @@ env = make_env(actions="directions")  # step(3)
 
 ## `text`
 
-`step()` takes a empty string of up to 64 characters.
+`step()` takes a non-empty string of up to 64 characters.
 
 <!-- transcript: actions-step -->
 ```text
