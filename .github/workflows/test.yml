@@ -36,10 +36,10 @@ jobs:
       # The setup actions resolve releases through api.github.com with the runner's
       # native token. Portable runners hand out their own token, which GitHub won't
       # accept, so the GH_PAT secret stands in; on GitHub GH_PAT is absent and the
-      # native token is used. Needs setup-just v3: v2 prefers the runner's ambient
+      # native token is used. Not below v3: v2 prefers the runner's ambient
       # GITHUB_TOKEN env var over this input, so GH_PAT never reached it.
       - name: Install just
-        uses: extractions/setup-just@v3
+        uses: extractions/setup-just@v4
         with:
           github-token: ${{ secrets.GH_PAT || github.token }}
       - uses: actions/setup-python@v6
@@ -64,13 +64,16 @@ jobs:
       # fail an otherwise green run.
       - name: Publish coverage summary (pytest-coverage-comment)
         if: ${{ !env.ACT && !github.event.pull_request.head.repo.fork }}
-        uses: MishaKav/pytest-coverage-comment@v1.2.0
+        uses: MishaKav/pytest-coverage-comment@v1.10.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          pytest-coverage-path: coverage.xml
+          # `just test` writes Cobertura XML, which is a different input from the plain-text
+          # --cov-report=term-missing one. Passing coverage.xml to pytest-coverage-path made the
+          # action parse XML as text and fail the job with "bad format or wrong data".
+          pytest-xml-coverage-path: coverage.xml
       - name: Upload coverage data
         if: ${{ !env.ACT }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-data-${{ matrix.python-version }}
           path: '${{ github.workspace }}/.coverage*'
@@ -78,7 +81,7 @@ jobs:
           if-no-files-found: error
       - name: Upload HTML coverage report
         if: ${{ !env.ACT }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report-${{ matrix.python-version }}
           path: |
