@@ -1,7 +1,4 @@
 name: Release
-# PyPI trusted publishing federates with GitHub Actions, and
-# build-and-inspect-python-package leans on GitHub-shaped internals (step
-# summaries, upload-artifact), so this workflow is GitHub-only by construction.
 on:
   push:
     tags: ['v*']
@@ -12,6 +9,7 @@ permissions:
 jobs:
   build:
     name: Build & inspect package
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,10 +32,10 @@ jobs:
             echo "Tag $TAG does not match package version $PACKAGE_VERSION"
             exit 1
           fi
-
   smoke:
     name: Install the wheel and play an episode
     needs: build
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -70,11 +68,11 @@ jobs:
               env.close()
           print("smoke OK")
           EOF
-
   # CI runs uv sync --frozen everywhere else, so the lower bounds in
   # pyproject.toml are otherwise entirely untested.
   lowest-resolution:
     name: Test at the declared minimum versions
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -88,14 +86,10 @@ jobs:
         run: |
           uv sync --resolution lowest-direct
           uv run pytest --tb=short
-
-  # Both publish jobs need a pending trusted publisher configured first - on
-  # PyPI and TestPyPI separately, they share nothing. Protect both environments
-  # with required manual approval so a tag push alone cannot publish.
   publish-testpypi:
     name: Upload to TestPyPI
     needs: [build, smoke]
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: testpypi
@@ -111,11 +105,10 @@ jobs:
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
-
   publish-pypi:
     name: Upload to PyPI
     needs: [publish-testpypi, lowest-resolution]
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi

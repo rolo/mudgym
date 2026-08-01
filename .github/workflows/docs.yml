@@ -1,7 +1,4 @@
 name: Docs
-# Build the zensical docs site and deploy it to GitHub Pages. The in-page
-# transcripts are executed against a live MUD2 Docker image at build time, so
-# the published docs show real game output.
 on:
   push:
     branches: ['main']
@@ -16,6 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,12 +27,6 @@ jobs:
           enable-cache: true
       - name: Install docs dependencies
         run: uv sync --group docs
-      # Re-capture the in-page transcripts against the live game so the
-      # published pages show current output. They are committed too, so a local
-      # `zensical build` still works without Docker - this just refreshes them.
-      # Not diffed against the committed copies on purpose: the world has
-      # weather, wandering mobiles, and other players, so runs likely won't match
-      # (until we get seeding working).
       - name: Capture docs transcripts from the live game
         run: uv run python scripts/generate_docs_transcripts.py
       - name: Build docs site
@@ -45,6 +37,7 @@ jobs:
           path: site
   deploy:
     needs: build
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
