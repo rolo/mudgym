@@ -218,6 +218,12 @@ class ConnectionState:
         matched_index = self.child.expect(pattern_values, timeout=timeout)
         matched_pattern = pattern_values[matched_index]
 
+        # remember what each real match consumed so timeout/EOF errors can show what led up to them
+        if matched_pattern not in (pexpect.TIMEOUT, pexpect.EOF):
+            consumed = (self.child.before or b"") + (self.child.after if isinstance(self.child.after, bytes) else b"")
+            if consumed:
+                self.chunk_history.append(consumed)
+
         # map back to Prompt enum if possible
         matched_prompt = pattern_to_enum.get(matched_pattern)
 

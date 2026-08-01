@@ -62,6 +62,16 @@ PROMPT_CORE = rb"(?:" + STARLINE + rb"|" + DASHES + rb")"
 PROMPT_PATTERN = rb"^" + SGR + PROMPT_CORE + SGR + rb"$"
 PROMPT_RE = re.compile(PROMPT_PATTERN, re.MULTILINE)
 
+# Possessive so a trailing colour code cannot be given back to sneak the boundary's
+# not-a-complete-line lookahead past a \r\n
+SGR_POSSESSIVE = rb"(?:\x1b\[[0-9;]*m)*+"
+
+# A genuine input prompt on the wire starts a physical line and is never a complete line: it
+# dangles awaiting input, or continues with the echo of whatever the player types next. Spoken
+# copies sit mid-line behind the speech quoting and narrative copies end in \r\n, so the two
+# anchors together reject both.
+NEXT_PROMPT_BOUNDARY = rb"(?m:^)" + SGR + PROMPT_CORE + SGR_POSSESSIVE + rb"(?![\r\n])"
+
 TEAROOM_PROMPT_PATTERN = (
     rb"^"
     + SGR
@@ -73,11 +83,9 @@ TEAROOM_PROMPT_PATTERN = (
     + SGR
     + rb"\r?\n"
     + rb"(?P<players>.*?)"
-    + rb"(?=^"
-    + SGR
-    + PROMPT_CORE
-    + SGR
-    + rb"$)"
+    + rb"(?="
+    + NEXT_PROMPT_BOUNDARY
+    + rb")"
 )
 
 TEAROOM_PROMPT = re.compile(TEAROOM_PROMPT_PATTERN, re.DOTALL | re.MULTILINE)
@@ -85,12 +93,15 @@ TEAROOM_PROMPT = re.compile(TEAROOM_PROMPT_PATTERN, re.DOTALL | re.MULTILINE)
 
 def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
     """
-    Return a regex that matches up to the next game prompt marker beyond the given match.
+    Return a regex that matches up to the next game prompt beyond the given match.
 
-    This should give us an easy and conssitent way to match game responses of the form "any stuff in a response matching this but then up to the next prompt"
+    This should give us an easy and consistent way to match game responses of the form "any stuff
+    in a response matching this but then up to the next prompt". The terminator stops at the first
+    genuine prompt, so responses that ran ahead of the reader don't swallow the following
+    command's echo and marker.
     """
     return re.compile(
-        needle + rb".*?" + SGR + PROMPT_CORE + SGR + rb"$",
+        needle + rb".*?" + NEXT_PROMPT_BOUNDARY,
         re.MULTILINE | re.DOTALL | extra_flags,
     )
 

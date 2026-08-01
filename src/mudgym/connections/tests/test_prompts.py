@@ -2,7 +2,73 @@ import re
 
 import pytest
 
-from mudgym.connections.prompts import Prompt, marker_up_to_next_prompt
+from mudgym.connections.prompts import Prompt, marker_up_to_next_prompt, regex_up_to_next_prompt
+
+# the game prompt as captured from the wire: blue star, then the colour the input echo will use
+GAME_PROMPT = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+
+
+class TestUpToNextPromptStopsAtAMidStreamPrompt:
+    """A genuine prompt is never a complete line: it dangles awaiting input, or continues with the
+    echo of whatever the player types next. When responses run ahead of the reader, the terminator
+    must stop at the first such prompt rather than extending to the end of the received data and
+    swallowing the following command's echo and marker."""
+
+    # captured from a flaky docker_run send_command window: the rejection of the first line, its
+    # prompt, and the whole fei exchange all arrived in one read
+    RUN_AHEAD = (
+        b'I made no sense of that: "not updating persona", but it\'s an excluding preposition.\r\n'
+        + GAME_PROMPT
+        + b"fei\r\n"
+        + b"\x1b[0;37;40m========\r\n"
+        + b"tea\r\n"
+        + b"\x1b[1;37;40m"
+        + GAME_PROMPT
+    )
+
+    def test_a_rejection_stops_at_its_own_prompt_not_at_the_end_of_data(self):
+        pattern = regex_up_to_next_prompt(b"I made no sense of that:")
+
+        match = pattern.search(self.RUN_AHEAD)
+
+        assert match
+        assert match.end() <= self.RUN_AHEAD.index(b"fei")
+
+    def test_a_dangling_prompt_at_the_end_of_the_data_still_terminates(self):
+        pattern = regex_up_to_next_prompt(rb"You watch the world go by\.")
+
+        assert pattern.search(b"sip t\r\nYou watch the world go by.\r\n" + GAME_PROMPT)
+
+    def test_a_response_followed_by_the_next_echo_still_terminates(self):
+        pattern = regex_up_to_next_prompt(rb"You watch the world go by\.")
+        wire = b"You watch the world go by.\r\n(Persona saved on +200 = 200).\r\n" + GAME_PROMPT + b"fscore\r\n"
+
+        assert pattern.search(wire)
+
+    def test_a_prompt_shaped_narrative_line_is_not_a_terminator(self):
+        pattern = regex_up_to_next_prompt(rb"You watch the world go by\.")
+
+        assert pattern.search(b"You watch the world go by.\r\n*\r\nmore narrative\r\n") is None
+
+    def test_a_narrative_line_split_before_its_line_feed_is_not_a_terminator(self):
+        pattern = regex_up_to_next_prompt(rb"You watch the world go by\.")
+
+        assert pattern.search(b"You watch the world go by.\r\n*\r") is None
+
+
+class TestTearoomScreenToleratesRunAheadOutput:
+    SCREEN = (
+        b"\x1b[32mElizabethan tearoom\x1b[37m.\r\n"
+        b"\x1b[0;32;40mThis cosy, Tudor period room is where all MUD adventures start. \x1b[1;37;40m\r\n"
+        b"Players:\r\n"
+        b"\x1b[0;37;40m\x1b[31mAlexis\x1b[37m\r\n"
+    )
+
+    def test_the_screen_matches_with_its_prompt_at_the_end_of_the_data(self):
+        assert Prompt.TEAROOM.value.search(self.SCREEN + GAME_PROMPT)
+
+    def test_the_screen_matches_when_the_sip_echo_already_arrived(self):
+        assert Prompt.TEAROOM.value.search(self.SCREEN + GAME_PROMPT + b"sip t\r\n")
 
 
 def test_marker_up_to_next_prompt_preserves_the_marker_flags():
