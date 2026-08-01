@@ -8,6 +8,40 @@ from mudgym.connections.prompts import Prompt, marker_up_to_next_prompt, regex_u
 GAME_PROMPT = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 
 
+class TestGamePromptShapes:
+    @pytest.mark.parametrize(
+        "wire",
+        [
+            b"\r\n" + GAME_PROMPT,  # bold mortal star as captured, dangling
+            b"\r\n" + GAME_PROMPT + b"fei\r\n",  # continuing with the echo of the next command
+            GAME_PROMPT,  # at the very start of a read window
+            b"\r\n(*)",  # invisible mortal
+            b"\r\n\x1b[1;34;40m((*))\x1b[0;34;40m",  # colour-wrapped double invisibility
+            b"\r\n(((*)))",
+            b"\r\n----*",  # wiz
+            b"\r\n(----*)",
+            b"\r\n((----*))",
+            b"\r\n(((----*)))",  # triple invisible wiz
+        ],
+    )
+    def test_genuine_prompt_shapes_match(self, wire):
+        assert Prompt.GAME.value.search(wire)
+
+    @pytest.mark.parametrize(
+        "wire",
+        [
+            b"\r\n\x1b[34m*\x1b[37mAlexis\r\n",  # login menu reprint: a plain star, not in game
+            b"say ----*\r\n",  # command echo puts the shape mid-line
+            b'Dumbo the novice says "\x1b[1;33;40m----*\x1b[0;33;40m".\r\n',  # spoken copy
+            b"\r\n----------\r\n",  # a complete divider line
+            b"\r\n---- Welcome to MUD ----\r\n",  # a banner rule
+            b"\r\n((*))\r\n",  # prompt-shaped narrative: a complete line is never a prompt
+        ],
+    )
+    def test_menu_reprints_echoes_and_narrative_do_not_match(self, wire):
+        assert Prompt.GAME.value.search(wire) is None
+
+
 class TestUpToNextPromptStopsAtAMidStreamPrompt:
     """A genuine prompt is never a complete line: it dangles awaiting input, or continues with the
     echo of whatever the player types next. When responses run ahead of the reader, the terminator

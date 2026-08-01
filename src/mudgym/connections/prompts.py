@@ -112,10 +112,36 @@ class Prompt(enum.Enum):
 
     OPTION = trusted_input_prompt(rb"Option\s*(\(H for help\))?\s*:")
     TEAROOM = TEAROOM_PROMPT
+
+    # where we chop the text at episode start upon entering The Land
     ENTERED_LAND = re.compile(rb"nothingness...")
-    # Game prompts: parens with dashes+asterisk, multiple dashes, parens with asterisk,
-    # or colored asterisk with multiple ANSI codes (game prompt, not persona input)
-    GAME = re.compile(rb"\(\(-+\*\)\)|----+|\(\(\*\)\)|(?:\x1b\[1;[0-9;]*m\*\x1b\[[0-9;]*m)")
+
+    # * - mortal
+    # (*) - invisible mortal
+    # ((*)) - double invisible mortal (is this possible?)
+    # ----* - wizard
+    # (----*) - invisible wizard
+    # ((----*)) - double invisible wizard
+    # (((----*))) - triple invisible wizard
+    # we anchor them like NEXT_PROMPT_BOUNDARY (line start, never a complete line).
+    # A bare star stays bold-only because the login menus reprint a plain star ahead of
+    # each echoed answer, which must not read as being in game. Possessive repeats so a spoof
+    # can't shed its own trailing characters to satisfy the lookahead.
+    GAME = re.compile(
+        rb"(?m:^)"
+        + SGR
+        + rb"(?:"
+        + rb"\({1,3}+"
+        + SGR
+        + rb"(?:-{4,}+)?\*"
+        + SGR
+        + rb"\){1,3}+"  # (*), ((----*)), ...
+        + rb"|-{4,}+\*"  # ----*
+        + rb"|\x1b\[1;[0-9;]*m\*\x1b\[[0-9;]*m"  # bold coloured mortal star
+        + rb")"
+        + SGR_POSSESSIVE
+        + rb"(?![\r\n])"
+    )
 
     TEA_SIPPED = regex_up_to_next_prompt(rb"You watch the world go by\.")
 
