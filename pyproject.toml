@@ -52,6 +52,7 @@ Issues = "https://github.com/rolo/mudgym/issues"
 docs = [
   "zensical>=0.0.44",
   "mkdocstrings-python>=2.0.4",
+  "markdown-exec>=1.12.3",
 ]
 dev = [
   "ruff>=0.14.3",

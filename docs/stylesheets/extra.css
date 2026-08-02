@@ -254,8 +254,8 @@ body {
 }
 
 
-/* Captured ANSI game screens, emitted by scripts/generate_docs_transcripts.py
- * via mudgym.notebooks.show_ansi. The frame carries inline styles so it also
+/* ANSI game screens, emitted by the pages' own code blocks via
+ * mudgym.notebooks.show_ansi. The frame carries inline styles so it also
  * survives inside marimo components; these rules only handle its place in the
  * docs flow. */
 .md-typeset .game-frame {

@@ -10,49 +10,60 @@ observation, info = env.reset()
 env.close()
 ```
 
+```python exec="true" session="observations"
+import numpy as np
+
+from mudgym import make_env
+from mudgym.notebooks import show_ansi
+
+
+def format_value(value):
+    if isinstance(value, np.ndarray):
+        return f"`{np.array2string(value, separator=', ', threshold=24)}`"
+    if isinstance(value, tuple):
+        return ", ".join(f"`{item}`" for item in value) if value else "_empty_"
+    return f"`{value}`"
+
+
+def print_observation_table(observation):
+    print("| Key | Value |")
+    print("|---|---|")
+    for key, value in observation.items():
+        if key != "text":
+            print(f"| `{key}` | {format_value(value)} |")
+```
+
 ## `text`
 
 Just `{"text": str}`.
 
-<!-- transcript: observation-text -->
-```text
-Dally Lane.
-You are standing on a dusty road with rising ground both to the north and south. Though dilapidated and disused, the route north of where you stand, with a building at the far end, looks as if it once formed a grand driveway. To the south, the road twists up the hill where, at the summit, an ancient walled monastery dominates the scene. Open fields lie to the west, and east is a flat area of lawn.
+```python exec="true" result="text" session="observations"
+env = make_env(observation="text")
+observation, info = env.reset()
+env.close()
+
+print(observation["text"])
 ```
 
-<div class="game-frame" style="background:var(--notebook-code-background,#0b0d0c);color:#eee;font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:1.1em 1.2em;margin:0;white-space:pre-wrap;border:1px solid var(--notebook-primary,#18352f);border-left:4px solid var(--notebook-accent,#b58a2a);border-radius:12px;box-shadow:0 12px 28px rgba(24,53,47,0.12);max-height:60vh;overflow:auto;"><span style="color: #00aa00">Dally Lane</span><span style="color: #F5F1DE">.
-</span><span style="color: #00aa00; background-color: #000316">You are standing on a dusty road with rising ground both to the north and south. Though dilapidated and disused, the route north of where you stand, with a building at the far end, looks as if it once formed a grand driveway. To the south, the road twists up the hill where, at the summit, an ancient walled monastery dominates the scene. Open fields lie to the west, and east is a flat area of lawn. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316">
-</span></div>
-<!-- /transcript: observation-text -->
+```python exec="true" html="true" session="observations"
+print(show_ansi(info["render_bytes"]).data)
+```
 
 ## `parsed`
 
 Adds keyed data parsed from game output.
 
-<!-- transcript: observation-parsed -->
-| Key | Value |
-|---|---|
-| `room_name` | `badly-paved road` |
-| `room_name_index` | `25` |
-| `here` | `road`, `wall`, `Stephen the protector`, `gap` |
-| `features` | `road`, `wall`, `gap` |
-| `mobiles` | _empty_ |
-| `players` | `Stephen the protector` |
-| `points` | `200` |
-| `vitals` | `[54, 54, 61, 61, 65, 65,  0, 54]` |
-| `flags` | `[0, 0, 0, 0]` |
-| `reset_minutes` | `105` |
-| `weather` | `fair` |
-| `weather_index` | `1` |
-| `available_exits` | `[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]` |
-| `available_exit_names` | `north`, `east`, `south`, `west`, `northeast`, `southeast`, `southwest`, `northwest`, `up`, `down`, `in`, `out`, `swampward` |
-| `portables` | _empty_ |
-| `inventory` | _empty_ |
+```python exec="true" session="observations"
+env = make_env(observation="parsed")
+observation, info = env.reset()
+env.close()
 
-<div class="game-frame" style="background:var(--notebook-code-background,#0b0d0c);color:#eee;font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:1.1em 1.2em;margin:0;white-space:pre-wrap;border:1px solid var(--notebook-primary,#18352f);border-left:4px solid var(--notebook-accent,#b58a2a);border-radius:12px;box-shadow:0 12px 28px rgba(24,53,47,0.12);max-height:60vh;overflow:auto;"><span style="color: #00aa00">Badly-paved road</span><span style="color: #F5F1DE">.
-</span><span style="color: #00aa00; background-color: #000316">You are standing on a badly-paved road, which runs from the east to stop at a large wall constructed to the west. There is a narrow gap in this blockage, but it is so tight that if you wanted to go that way you'd have to drop everything to get through. North and south are the foothills of a pair of majestic mountains, and northeast is a deep valley. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316">
-</span></div>
-<!-- /transcript: observation-parsed -->
+print_observation_table(observation)
+```
+
+```python exec="true" html="true" session="observations"
+print(show_ansi(info["render_bytes"]).data)
+```
 
 `available_exit_names` is the available subset of `DIRECTIONS`, in the same game-native order as the set bits in `available_exits`.
 `over` and `swampward` are MudGym's public names for the game's internal `jump` and `swamp` directions.
@@ -63,35 +74,17 @@ Adds keyed data parsed from game output.
 
 Adds hidden state output from the `mgcheats` command, some of which wouldn't typically be known to a player. Most notably `room_id`.
 
-<!-- transcript: observation-cheats -->
-| Key | Value |
-|---|---|
-| `points` | `200` |
-| `vitals` | `[52, 52, 65, 65, 63, 63,  0, 52]` |
-| `flags` | `[0, 0, 0, 0]` |
-| `reset_minutes` | `105` |
-| `weather` | `fair` |
-| `weather_index` | `1` |
-| `available_exits` | `[1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1]` |
-| `available_exit_names` | `north`, `east`, `south`, `west`, `northeast`, `southeast`, `southwest`, `northwest`, `out`, `swampward` |
-| `room_id` | `mroad2` |
-| `room_id_index` | `596` |
-| `room_name` | `narrow road` |
-| `room_name_index` | `344` |
-| `fighting` | `0` |
-| `dark` | `0` |
-| `glowing` | `0` |
-| `asleep` | `0` |
-| `gifted` | `0` |
-| `here` | `road` |
-| `ticks` | `0` |
-| `portables` | _empty_ |
-| `inventory` | _empty_ |
+```python exec="true" session="observations"
+env = make_env(observation="cheats")
+observation, info = env.reset()
+env.close()
 
-<div class="game-frame" style="background:var(--notebook-code-background,#0b0d0c);color:#eee;font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:1.1em 1.2em;margin:0;white-space:pre-wrap;border:1px solid var(--notebook-primary,#18352f);border-left:4px solid var(--notebook-accent,#b58a2a);border-radius:12px;box-shadow:0 12px 28px rgba(24,53,47,0.12);max-height:60vh;overflow:auto;"><span style="color: #00aa00">Narrow road</span><span style="color: #F5F1DE">.
-</span><span style="color: #00aa00; background-color: #000316">You are on a narrow east-west road with forest to the north and gorse scrub to the south. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316">
-</span></div>
-<!-- /transcript: observation-cheats -->
+print_observation_table(observation)
+```
+
+```python exec="true" html="true" session="observations"
+print(show_ansi(info["render_bytes"]).data)
+```
 
 ## `bytes`
 
@@ -103,16 +96,19 @@ raw = observation["raw_bytes"][: info["bytes_length"]].tobytes()
 
 Shown as a bytes literal here for readability:
 
-<!-- transcript: observation-bytes -->
-```python
-b'move north,fes\r\n\x1b[32mBeaten track near cliff\x1b[37m.\r\n\x1b[0;32;40mYou are at the end of a rough track. There is a dangerous cliff to the west marked "Lovers\' Leap". \x1b[1;37;40m\x1b[0;32;40mIt is raining. \x1b[1;37;40m\x1b[36mA streetsign has fallen here. \x1b[37m\r\n\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\x1b[1;32;40m63\x1b[0;37;40'
-...
+```python exec="true" result="python" session="observations"
+env = make_env(observation="bytes")
+observation, info = env.reset()
+env.close()
+
+returned_bytes = bytes(observation["raw_bytes"][: info["bytes_length"]])
+print(repr(returned_bytes[:320]))
+print("...")
 ```
 
-<div class="game-frame" style="background:var(--notebook-code-background,#0b0d0c);color:#eee;font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:1.1em 1.2em;margin:0;white-space:pre-wrap;border:1px solid var(--notebook-primary,#18352f);border-left:4px solid var(--notebook-accent,#b58a2a);border-radius:12px;box-shadow:0 12px 28px rgba(24,53,47,0.12);max-height:60vh;overflow:auto;"><span style="color: #00aa00">Beaten track near cliff</span><span style="color: #F5F1DE">.
-</span><span style="color: #00aa00; background-color: #000316">You are at the end of a rough track. There is a dangerous cliff to the west marked "Lovers' Leap". </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316"></span><span style="color: #00aa00; background-color: #000316">It is raining. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316"></span><span style="font-weight: bold; color: #00aaaa; background-color: #000316">A streetsign has fallen here. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316">
-</span></div>
-<!-- /transcript: observation-bytes -->
+```python exec="true" html="true" session="observations"
+print(show_ansi(info["render_bytes"]).data)
+```
 
 ## Creating your own keys
 

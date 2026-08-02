@@ -33,6 +33,9 @@ features = [
   "toc.follow",
 ]
 
+# Runs the pages' `exec="true"` code blocks at build time and renders what they print.
+[project.plugins.markdown-exec]
+
 [project.plugins.mkdocstrings.handlers.python]
 paths = ["src"]
 

@@ -13,41 +13,43 @@ env = make_env(actions="directions")  # step(3)
 
 `step()` takes a non-empty string of up to 64 characters.
 
-<!-- transcript: actions-step -->
-```text
-room_name  beaten track
-reward     0.0
-terminated False
-truncated  False
+```python exec="true" result="text" session="text-actions"
+from mudgym import make_env
+
+env = make_env(observation="parsed")
+env.reset()
+observation, reward, terminated, truncated, info = env.step("look")
+env.close()
+
+print(f"room_name  {observation['room_name']}")
+print(f"reward     {reward}")
+print(f"terminated {terminated}")
+print(f"truncated  {truncated}")
 ```
 
-<div class="game-frame" style="background:var(--notebook-code-background,#0b0d0c);color:#eee;font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:1.1em 1.2em;margin:0;white-space:pre-wrap;border:1px solid var(--notebook-primary,#18352f);border-left:4px solid var(--notebook-accent,#b58a2a);border-radius:12px;box-shadow:0 12px 28px rgba(24,53,47,0.12);max-height:60vh;overflow:auto;"><span style="color: #00aa00">Beaten track</span><span style="color: #F5F1DE">.
-</span><span style="color: #00aa00; background-color: #000316">You're on a rough east-west track with a dense forest to the north and pasture to the south. </span><span style="font-weight: bold; color: #F5F1DE; background-color: #000316">
-</span></div>
-<!-- /transcript: actions-step -->
+```python exec="true" html="true" session="text-actions"
+from mudgym.notebooks import show_ansi
+
+print(show_ansi(info["render_bytes"]).data)
+```
 
 ## `directions`
 
 `Discrete(14)` mapped onto `move <direction>` commands in the game's canonical exit order.
 
-<!-- transcript: actions-directions -->
-| Index | Command | Available here |
-|---|---|---|
-| 0 | `move north` | yes |
-| 1 | `move east` | yes |
-| 2 | `move south` | yes |
-| 3 | `move west` | yes |
-| 4 | `move northeast` | yes |
-| 5 | `move southeast` | yes |
-| 6 | `move southwest` | yes |
-| 7 | `move northwest` | yes |
-| 8 | `move up` | yes |
-| 9 | `move down` | yes |
-| 10 | `move in` | yes |
-| 11 | `move out` | yes |
-| 12 | `move over` | no |
-| 13 | `move swampward` | yes |
-<!-- /transcript: actions-directions -->
+```python exec="true"
+from mudgym import make_env
+
+env = make_env(observation="parsed", actions="directions")
+observation, info = env.reset()
+
+print("| Index | Command | Available here |")
+print("|---|---|---|")
+for index, (command, available) in enumerate(zip(env.commands, observation["available_exits"], strict=True)):
+    print(f"| {index} | `{command}` | {'yes' if available else 'no'} |")
+
+env.close()
+```
 
 You can use the [parsed](observations.md#parsed) `available_exits` output as an action mask to avoid directions known to be unavailable.
 

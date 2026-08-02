@@ -27,8 +27,6 @@ jobs:
           enable-cache: true
       - name: Install docs dependencies
         run: uv sync --group docs
-      - name: Capture docs transcripts from the live game
-        run: uv run python scripts/generate_docs_transcripts.py
       - name: Build docs site
         run: uv run zensical build
       - name: Upload Pages artifact

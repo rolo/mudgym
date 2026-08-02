@@ -35,13 +35,10 @@ check-dist: build
     uvx twine check --strict dist/*
     uvx check-wheel-contents dist/*.whl
 
+# The pages play the game as they build, so their transcripts are always real
+# output. Requires Docker.
 docs:
     uv run zensical serve
 
 build-docs:
     uv run zensical build
-
-# The results are committed, so building the docs itself does not need Docker.
-# Re-capture the docs transcripts by running the game. Requires Docker.
-docs-transcripts:
-    uv run python scripts/generate_docs_transcripts.py
