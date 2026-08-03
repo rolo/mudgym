@@ -1,3 +1,5 @@
+import pytest
+
 from mudgym.envs.fields.mgcheats import MGCheatsField
 
 MGCHEATS_BEATEN_TRACK = (
@@ -26,9 +28,16 @@ def test_missing_mgcheats_returns_empty_defaults():
     assert out["here"] == ()
 
 
-def test_extracts_mgcheats_chunk():
+@pytest.mark.parametrize(
+    "raw",
+    [
+        pytest.param(MGCHEATS_BEATEN_TRACK, id="ticks-present"),
+        pytest.param(MGCHEATS_BEATEN_TRACK.replace(b"ticks=0; ", b""), id="ticks-absent"),
+    ],
+)
+def test_extracts_mgcheats_chunk_with_or_without_ticks(raw):
     field = MGCheatsField()
-    out = field.extract([MGCHEATS_BEATEN_TRACK])
+    out = field.extract([raw])
 
     assert out["room_id"] == "mtrack2"
     assert out["room_name"] == "beaten track"
