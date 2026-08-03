@@ -63,7 +63,6 @@ PRESET_KEYS = {
         "asleep",
         "gifted",
         "here",
-        "ticks",
     },
 }
 
@@ -169,14 +168,14 @@ def test_fields_providing_the_same_key_raise(scripted_env_factory):
 def test_include_keys_resolves_duplicate_keys(scripted_env_factory):
     """Restricting one field's keys lets overlapping fields coexist."""
     env = scripted_env_factory(
-        field_parsers=[SuperQuickLookField, MGCheatsField(include_keys=("room_id", "ticks"))],
+        field_parsers=[SuperQuickLookField, MGCheatsField(include_keys=("room_id", "fighting"))],
     )
 
     keys = observation_keys(env)
     assert "room_name" in keys
     assert "room_id" in keys
-    assert "ticks" in keys
-    assert "fighting" not in keys
+    assert "fighting" in keys
+    assert "dark" not in keys
 
 
 def test_explicit_fields_with_exclude(scripted_env_factory):

@@ -16,7 +16,6 @@ from mudgym.envs.specs import (
     IDENTIFIER_CHARSET,
     IDENTIFIER_SPACE,
     INDEX_DTYPE,
-    INT_DTYPE,
     ROOM_ID_MAX_LENGTH,
     ROOM_NAME_MAX_LENGTH,
     SINGLE_LINE_CHARSET,
@@ -26,13 +25,6 @@ from mudgym.featurizers.strings import decode_text_bytes
 from .field import ObservationField
 
 MGCHEATS_BLOCK = re.compile(rb"\[mgcheats\](.*?)\[/mgcheats\]", re.DOTALL)
-
-
-def safe_int(val: Any, default: int = 0) -> int:
-    try:
-        return int(val)
-    except (TypeError, ValueError):
-        return default
 
 
 class MGCheatsField(ObservationField):
@@ -62,7 +54,6 @@ class MGCheatsField(ObservationField):
             "asleep": spaces.Discrete(2),
             "gifted": spaces.Discrete(2),
             "here": IDENTIFIER_SPACE,
-            "ticks": spaces.Box(low=0, high=3500, shape=(), dtype=INT_DTYPE),
         }
 
     def full_empty(self) -> dict[str, Any]:
@@ -73,7 +64,6 @@ class MGCheatsField(ObservationField):
             "room_name_index": INDEX_DTYPE(0),
             **{k: BIT_DTYPE(0) for k in self.BIT_KEYS},
             "here": (),
-            "ticks": INT_DTYPE(0),
         }
 
     def matches(self, chunk: bytes) -> bool:
@@ -120,5 +110,4 @@ class MGCheatsField(ObservationField):
             "room_name_index": INDEX_DTYPE(room_name_to_index(room_name) if room_name else 0),
             **{key: BIT_DTYPE(int(parsed.get(key, 0))) for key in self.BIT_KEYS},
             "here": tuple(str(item) for item in (parsed.get("here") or [])),
-            "ticks": INT_DTYPE(safe_int(parsed.get("ticks", 0))),
         }

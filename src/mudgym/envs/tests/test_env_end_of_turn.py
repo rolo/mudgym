@@ -269,5 +269,5 @@ def test_mgcheats_terminates_the_batch_when_listed_last():
     assert env.unwrapped.final_command == "mgcheats"
     assert connection.commands[-1] == "look,fes,fex,fei,mgcheats"
     assert obs["room_id"] == "groad3"
-    assert obs["ticks"] == 125
+    assert "ticks" not in obs
     assert "[/mgcheats]" not in info["text"]

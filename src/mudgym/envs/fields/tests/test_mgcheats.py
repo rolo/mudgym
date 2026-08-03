@@ -1,4 +1,4 @@
-from mudgym.envs.fields.mgcheats import MGCheatsField, safe_int
+from mudgym.envs.fields.mgcheats import MGCheatsField
 
 MGCHEATS_BEATEN_TRACK = (
     b"[mgcheats]room_id=mtrack2; room_name=beaten track; fighting=0; dark=0; glowing=0; "
@@ -33,6 +33,7 @@ def test_extracts_mgcheats_chunk():
     assert out["room_id"] == "mtrack2"
     assert out["room_name"] == "beaten track"
     assert out["here"] == ("necklace0", "road")
+    assert "ticks" not in out
     assert field.full_space()["here"].contains(out["here"])
 
 
@@ -50,11 +51,6 @@ def test_empty_returns_valid_defaults_cheats():
 
     assert "room_name" in defaults
     assert "room_id" in defaults
-
-
-def test_safe_int_handles_invalid_values():
-    assert safe_int("not-an-int") == 0
-    assert safe_int(None) == 0
 
 
 def test_end_of_turn_marker_matches_the_closing_tag():
