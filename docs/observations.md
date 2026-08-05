@@ -37,16 +37,12 @@ def print_observation_table(observation):
 
 Just `{"text": str}`.
 
-```python exec="true" result="text" session="observations"
+```python exec="true" source="material-block" result="text" session="observations"
 env = make_env(observation="text")
 observation, info = env.reset()
 env.close()
 
 print(observation["text"])
-```
-
-```python exec="true" html="true" session="observations"
-print(show_ansi(info["render_bytes"]).data)
 ```
 
 ## `parsed`

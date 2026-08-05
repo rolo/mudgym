@@ -13,7 +13,7 @@ env = make_env(actions="directions")  # step(3)
 
 `step()` takes a non-empty string of up to 64 characters.
 
-```python exec="true" result="text" session="text-actions"
+```python exec="true" source="material-block" result="text" session="text-actions"
 from mudgym import make_env
 
 env = make_env(observation="parsed")
