@@ -35,12 +35,12 @@ INVENTORY_RE = re.compile(
 THE_PREFIX_RE = re.compile(r"^the\s+", re.IGNORECASE)
 CLASSIFIED_KEYS = ("features", "portables", "mobiles", "players")
 
+# the ANSI colours the game uses tell us what they are
 FG_TO_CATEGORY: dict[int, str] = {
     32: "features",  # green - feature / hereobj
-    31: "players",  # red - player
-    33: "mobiles",  # yellow - mobile
-    36: "portables",  # cyan - portable
-    35: "access",  # magenta - doors, grates, etc.
+    31: "players",  # red - player (including wizzes)
+    35: "mobiles",  # magenta - normal and wiz-level creatures
+    36: "portables",  # cyan - non-treasure, trinkets and treasure
 }
 
 

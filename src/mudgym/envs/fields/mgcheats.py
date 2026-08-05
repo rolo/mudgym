@@ -32,7 +32,7 @@ class MGCheatsField(ObservationField):
     Reads the mgcheats block.
 
     Sample game response:
-    `[mgcheats]room_id=mnatcav; room_name=natural cavern; fighting=0; dark=0; glowing=0; here=[goblin10, Keyser, bedrock, path]; ticks=125; inventory=[][/mgcheats]`
+    `[mgcheats]room_id=mtrack1; room_name=beaten track near cliff; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; here=[rain, cliff, road]; inventory=[][/mgcheats]`
     """
 
     command = "mgcheats"
