@@ -1,6 +1,6 @@
 import os
 
-DOCKER_IMAGE = os.getenv("DOCKER_IMAGE", "ghcr.io/rolo/mudgym:v0.1")
+DOCKER_IMAGE = os.getenv("DOCKER_IMAGE", "ghcr.io/rolo/mudgym:v0.2.1")
 CONTAINER_PREFIX = "mudgym"
 DEFAULT_DOCKER_EXEC_CONTAINER_NAME = "mud2-boot"
 
