@@ -7,7 +7,7 @@
 | `here` | `road`, `wall`, `Karen the protector`, `gap` |
 | `features` | `road`, `wall`, `gap` |
 | `mobiles` | _empty_ |
-| `players` | `Karen the protector` |
+| `players` | _empty_ |
 | `points` | `200` |
 | `vitals` | `[69, 69, 56, 56, 55, 55,  0, 69]` |
 | `flags` | `[0, 0, 0, 0]` |
