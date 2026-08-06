@@ -5,22 +5,25 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build:
     if: >-
-      github.server_url == 'https://github.com' &&
-      (github.event.repository.visibility == 'public' ||
+      github.server_url == 'https://github.com' && (github.event.repository.visibility == 'public' ||
+
+
        github.event.repository.has_pages == true)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/configure-pages@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - name: Install uv
@@ -32,7 +35,7 @@ jobs:
       - name: Build docs site
         run: uv run python docs/build.py
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
   deploy:
@@ -44,4 +47,8 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+        with:
+          # increasing from the default of 10 minutes, although github is having an incident
+          # with pages right now so this may be temporary
+          timeout: 1800000
