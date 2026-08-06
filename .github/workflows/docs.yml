@@ -12,7 +12,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.server_url == 'https://github.com'
+    if: >-
+      github.server_url == 'https://github.com' &&
+      (github.event.repository.visibility == 'public' ||
+       github.event.repository.has_pages == true)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,7 +37,6 @@ jobs:
           path: site
   deploy:
     needs: build
-    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
