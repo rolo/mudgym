@@ -14,10 +14,11 @@ from mudgym.featurizers.strings import decode_text_bytes
 
 QUICKSCORE_COMMAND = "qs"  # qs or quickscore
 
-GAP = SGR + rb" +" + SGR
+# The FE expands tab-separated columns to spaces so accept either
+COLUMN_GAP = SGR + rb"[ \t]+" + SGR
 VALUE = rb"\d+" + SGR
 STAMINA = VALUE + rb"/" + SGR + rb"\d+"
-STATS_LINE = GAP.join([rb"eff str", VALUE, rb"eff dex", VALUE, rb"sta", STAMINA])
+STATS_LINE = COLUMN_GAP.join([rb"eff str", VALUE, rb"eff dex", VALUE, rb"sta", STAMINA])
 
 QUICKSCORE_NAME_PATTERN = re.compile(rb"(?m)^" + SGR + rb"(?P<name>[A-Za-z]+)[^\r\n]*\r?\n" + SGR + STATS_LINE)
 
