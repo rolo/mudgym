@@ -10,6 +10,7 @@ from mudgym.connections.recording import (
     RecordingProvider,
     ReplayConnection,
     ReplayProvider,
+    StaleCaptureError,
     read_capture,
 )
 from mudgym.envs.factory import make_env
@@ -59,7 +60,7 @@ def test_replay_rejects_diverged_wire_lines(tmp_path):
 
     replay = ReplayConnection(path)
     replay.reset()
-    with pytest.raises(RuntimeError, match="diverged"):
+    with pytest.raises(StaleCaptureError, match="diverged"):
         replay.send_command("dance,sql,fes,fex,fei")
 
 
@@ -69,12 +70,12 @@ def test_replay_rejects_out_of_order_and_exhausted_use(tmp_path):
     drive_conversation(recording)
     recording.close()
 
-    with pytest.raises(RuntimeError, match="out of order"):
+    with pytest.raises(StaleCaptureError, match="out of order"):
         ReplayConnection(path).send_command("look,sql,fes,fex,fei")
 
     replay = ReplayConnection(path)
     drive_conversation(replay)
-    with pytest.raises(RuntimeError, match="exhausted"):
+    with pytest.raises(StaleCaptureError, match="exhausted"):
         replay.send_command("look,sql,fes,fex,fei")
 
 

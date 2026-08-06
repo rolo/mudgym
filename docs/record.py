@@ -20,6 +20,7 @@ Run through the justfile:
     just docs-record                  # play the examples against the live game, rewrite captures + fragments
     just docs-record actions-text     # ... for a subset by name
     just docs-derive                  # rewrite fragments from the committed captures; no Docker
+    just docs-watch                   # serve the docs, refreshing whichever example is saved as you edit
 """
 
 import argparse
@@ -29,6 +30,8 @@ import io
 import itertools
 import subprocess
 import sys
+import time
+import traceback
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -41,6 +44,7 @@ from mudgym.connections.recording import (
     RecordingProvider,
     ReplayConnection,
     ReplayProvider,
+    StaleCaptureError,
     read_capture,
 )
 
@@ -184,25 +188,31 @@ def record(name: str, version: str) -> None:
     ``version`` is captured by the caller before any recording is touched, so rewriting captures
     does not mark the run's own provenance dirty.
     """
-    for stale in session_capture_paths(name):
-        stale.unlink()
-
     metadata = {"recorded_by": f"just docs-record {name}", "mudgym": version}
     live_connection = registry.default_connection
     env_counter = itertools.count()
+    written: list[Path] = []
 
     def connection_factory():
-        return RecordingConnection(live_connection(), single_env_capture_path(name, next(env_counter)), metadata)
+        path = single_env_capture_path(name, next(env_counter))
+        written.append(path)
+        return RecordingConnection(live_connection(), path, metadata)
+
+    def agent_capture_path_written(env_index: int) -> Path:
+        path = agent_capture_path(name, env_index)
+        written.append(path)
+        return path
 
     def provider_factory(**provider_kwargs):
-        return RecordingProvider(
-            DockerExecProvider(**provider_kwargs),
-            lambda env_index: agent_capture_path(name, env_index),
-            metadata,
-        )
+        return RecordingProvider(DockerExecProvider(**provider_kwargs), agent_capture_path_written, metadata)
 
     with swapped_default_backends(connection_factory, provider_factory):
         EXAMPLES[name](FragmentWriters(RECORDINGS_DIR, RECORDINGS_DIR))
+
+    # only after a successful run: captures the example no longer produces (a removed agent, fewer
+    # envs) must not linger, but a failed run must not have deleted the previous good captures either
+    for stale in set(session_capture_paths(name)) - set(written):
+        stale.unlink()
     for path in session_capture_paths(name):
         print(f"wrote {describe_path(path)}")
 
@@ -237,10 +247,68 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
     for connection in replays + [replay for provider in providers for replay in provider.connections]:
         remaining = connection.remaining_events()
         if remaining:
-            raise RuntimeError(
+            raise StaleCaptureError(
                 f"Replaying {name} left {remaining} unconsumed event(s) in {connection.path.name}: "
                 f"the example no longer matches its capture; run `just docs-record {name}`."
             )
+
+
+def refresh_example(name: str) -> None:
+    """Derive one example's fragments, recording it live first when its capture is stale or missing.
+
+    Presentation edits keep the recorded world: derivation alone answers them. The live game is only
+    contacted when the example has no capture yet, or replay proves its commands have changed.
+    """
+    if not session_capture_paths(name):
+        print(f"{name}: no capture yet; recording against the live game")
+        record(name, describe_repository())
+        derive(name)
+        return
+    try:
+        derive(name)
+    except StaleCaptureError as error:
+        print(f"{name}: {error}")
+        print(f"{name}: commands changed; re-recording against the live game")
+        record(name, describe_repository())
+        derive(name)
+
+
+def snapshot_mtimes() -> dict[Path, int]:
+    mtimes = {}
+    for path in sorted(DOCS_CODE_DIR.glob("*.py")):
+        with contextlib.suppress(FileNotFoundError):  # an editor save racing the scan; settled next poll
+            mtimes[path] = path.stat().st_mtime_ns
+    return mtimes
+
+
+def watch(poll_seconds: float = 0.5) -> None:
+    """Watch docs/code/, refreshing an example's recording and fragments whenever its file is saved.
+
+    A failed refresh (a half-saved file, the game unreachable, a bug in the example) is reported and
+    watching continues; the next save retries. Pair with `just docs`: zensical's server watches
+    docs/code/ and docs/recordings/ too, so the browser reloads with whatever a refresh writes.
+    """
+    global EXAMPLES
+    print(f"Watching {describe_path(DOCS_CODE_DIR)} (Ctrl-C to stop)")
+    seen = snapshot_mtimes()
+    try:
+        while True:
+            time.sleep(poll_seconds)
+            current = snapshot_mtimes()
+            for path in sorted(set(seen) - set(current)):
+                print(f"{path.name} was removed; its captures and fragments remain until deleted")
+            changed = [path for path, mtime in current.items() if seen.get(path) != mtime]
+            seen = current
+            for path in changed:
+                name = path.stem.replace("_", "-")
+                print(f"{path.name} changed; refreshing {name}")
+                try:
+                    EXAMPLES = discover_examples()
+                    refresh_example(name)
+                except (Exception, SystemExit):  # one save must not end the watch; the next retries
+                    traceback.print_exc()
+    except KeyboardInterrupt:
+        print("Stopped watching.")
 
 
 def main(argv: list[str]) -> None:
@@ -251,7 +319,19 @@ def main(argv: list[str]) -> None:
         action="store_true",
         help="Skip the live game and rewrite fragments from the committed session captures.",
     )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch docs/code/ and refresh an example whenever its file changes.",
+    )
     args = parser.parse_args(argv)
+
+    if args.watch:
+        if args.names or args.derive_only:
+            parser.error("--watch watches every example and decides record vs derive itself; use it alone.")
+        RECORDINGS_DIR.mkdir(exist_ok=True)
+        watch()
+        return
 
     names = args.names or list(EXAMPLES)
     unknown = [name for name in names if name not in EXAMPLES]

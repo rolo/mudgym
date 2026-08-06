@@ -15,6 +15,9 @@ nav = [
   { "API Reference" = "api.md" },
 ]
 extra_css = ["stylesheets/extra.css"]
+# Extra rebuild triggers for `zensical serve`: the pages pull example code from docs/code and
+# recorded fragments from docs/recordings via `--8<--`, so changes there reload the browser too.
+watch = ["docs/code", "docs/recordings"]
 
 [project.theme]
 font.text = "Inter"

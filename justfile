@@ -48,5 +48,17 @@ docs-derive *names:
 docs: docs-derive
     uv run zensical serve
 
+# serve the docs while watching docs/code/: saving an example re-derives its fragments (recording it
+# live first when its commands changed or it is new), and zensical reloads the browser with the result
+docs-watch: docs-derive
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # the watcher runs without the `uv run` wrapper (the docs-derive dependency already synced .venv)
+    # so the trap's kill reaches the actual process instead of orphaning it when serve exits
+    .venv/bin/python docs/record.py --watch &
+    watcher_pid=$!
+    trap 'kill "$watcher_pid" 2>/dev/null || true' EXIT
+    uv run zensical serve
+
 build-docs: docs-derive
     uv run zensical build --strict

@@ -26,6 +26,10 @@ CAPTURE_FORMAT = "mudgym-session-capture"
 CAPTURE_VERSION = 1
 
 
+class StaleCaptureError(RuntimeError):
+    """The caller's conversation no longer matches the capture; re-recording is the only fix."""
+
+
 def bytes_to_capture_text(raw_bytes: bytes) -> str:
     return bytes(raw_bytes).decode("latin-1")
 
@@ -138,10 +142,10 @@ class ReplayConnection(MudConnection):
 
     def _next_event(self, expected: str) -> dict[str, Any]:
         if self.cursor >= len(self.events):
-            raise RuntimeError(f"Replay of {self.path} exhausted: no event left to answer a {expected!r}.")
+            raise StaleCaptureError(f"Replay of {self.path} exhausted: no event left to answer a {expected!r}.")
         event = self.events[self.cursor]
         if event["event"] != expected:
-            raise RuntimeError(
+            raise StaleCaptureError(
                 f"Replay of {self.path} out of order at event {self.cursor}: "
                 f"expected a {expected!r}, capture has a {event['event']!r}."
             )
@@ -158,7 +162,7 @@ class ReplayConnection(MudConnection):
         lines = [command] if isinstance(command, str) else list(command)
         event = self._next_event("step")
         if lines != event["lines"]:
-            raise RuntimeError(
+            raise StaleCaptureError(
                 f"Replay of {self.path} diverged at event {self.cursor - 1}: "
                 f"sent {lines!r} but the capture recorded {event['lines']!r}. "
                 f"The capture is stale for this code; re-record it."
