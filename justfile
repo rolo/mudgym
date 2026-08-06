@@ -35,7 +35,7 @@ check-dist: build
     uvx twine check --strict dist/*
     uvx check-wheel-contents dist/*.whl
 
-# run the docs code snippets against the live game to record sessions in docs/recordings/
+# play the docs examples against the live game to record sessions in docs/recordings/
 docs-record *names:
     uv run python docs/record.py {{names}}
 
@@ -43,8 +43,10 @@ docs-record *names:
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
 
-docs:
+# both docs recipes re-derive the fragments first (fast, no Docker), so editing pages or the
+# fragment-writing code in docs/code/ never needs a separate derive step
+docs: docs-derive
     uv run zensical serve
 
-build-docs:
+build-docs: docs-derive
     uv run zensical build --strict
