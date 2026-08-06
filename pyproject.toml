@@ -81,6 +81,10 @@ extend-select = ["PLC0415", "I", "UP", "SIM", "C4", "PIE", "RET"]
 # assertions read better as expected-then-actual, which SIM300 calls a Yoda condition
 ignore = ["SIM300"]
 
+# added to prevent tools which like to auto format with black
+[tool.black]
+line-length = 120
+
 [tool.coverage.run]
 branch = true
 source = ["src"]
