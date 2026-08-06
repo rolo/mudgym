@@ -44,6 +44,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         *,
         field_parsers: Sequence[FieldSpec] | None = None,
         auto_commands: Sequence[str] | None = None,
+        tearoom_commands: str | None = None,
         connection: MudConnection | Callable[[], MudConnection] = default_connection,
         render_mode: str | None = None,
     ):
@@ -98,6 +99,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             fields_by_command[command] for command in self.auto_commands if command in fields_by_command
         ]
 
+        self.tearoom_commands = tearoom_commands
         self.env_id = uuid.uuid4()
         self.episode_id: uuid.UUID | None = None
         self.render_mode: str | None = render_mode
@@ -248,8 +250,17 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.episode_id = uuid.uuid4()
         logger.debug("env.reset", env_id=str(self.env_id), episode_id=str(self.episode_id))
 
-        # reset the session which takes us to the tearoom and sets the person name via quickscore
+        # reset the session which takes us to the tearoom and sets the persona name via quickscore
         self.session.reset()
+
+        # tearoom commands are episode setup, issued before the exit step
+        if self.tearoom_commands:
+            raw_bytes, terminated, incomplete, _ = self.session.send_command(self.tearoom_commands)
+            if terminated or incomplete:
+                raise RuntimeError(
+                    f"tearoom commands {self.tearoom_commands!r} failed during reset "
+                    f"(terminated={terminated}, incomplete={incomplete}); raw_bytes={raw_bytes!r}"
+                )
 
         # step out of the tearoom and into The Land
         command = "move north"

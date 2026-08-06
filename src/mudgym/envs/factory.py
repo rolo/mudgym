@@ -75,6 +75,7 @@ def make_env(
     connection_kwargs: Mapping[str, Any] | None = None,
     wrappers: Sequence[Callable[[gym.Env], gym.Env]] | None = None,
     auto_commands: Sequence[str] | None = None,
+    tearoom_commands: str | None = None,
 ) -> gym.Env:
     """Build a single MUD2 environment, applying observation parsing, action wrapping, and rendering.
 
@@ -91,11 +92,13 @@ def make_env(
         wrappers: Extra Gymnasium wrappers applied last, in order.
         auto_commands: Commands appended after the action each step to populate fields; defaults to the
             configured fields' commands.
+        tearoom_commands: Command line issued once per ``reset()`` while still in the tearoom
     """
     env_kwargs: dict[str, Any] = {}
     # field_parsers replaces the observation preset when given (full control); otherwise the named preset.
     env_kwargs["field_parsers"] = _resolve_field_parsers(observation, field_parsers)
     env_kwargs["auto_commands"] = auto_commands
+    env_kwargs["tearoom_commands"] = tearoom_commands
     env_kwargs["render_mode"] = render_mode
     exclude_list = [exclude_keys] if isinstance(exclude_keys, str) else list(exclude_keys or [])
 
