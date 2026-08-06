@@ -20,7 +20,7 @@ The presets are also registered with Gymnasium on import: `MUD2/Parsed-v0`, `MUD
 
 Games of MUD2 begin in The Elizabethan Tearoom. MudGym spins up a Docker container running the game, navigates the menus, and chooses a random name for your persona.
 
-`reset()` begins a new episode by issuing a "north" command to step out of the tearoom into The Land. All bytes up to and including the tearoom exit message are trimmed and then everythig which follows belongs to the episode's first observation.
+`reset()` begins a new episode by issuing a "north" command to step out of the tearoom into The Land. All bytes up to and including the tearoom exit message are trimmed and then everything which follows belongs to the episode's first observation.
 
 !!! note "Seeding"
 
