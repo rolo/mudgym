@@ -41,6 +41,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
       # Deliberately no checkout: everything gates on the built artifact, never
       # the source tree.
       - name: Download the built packages
@@ -52,7 +55,7 @@ jobs:
       # is this package's most likely failure mode - so play a real episode.
       - name: Reset, step, and close against the release image
         run: |
-          python3 -m venv /tmp/smoke
+          python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
           /tmp/smoke/bin/python - <<'EOF'
           import mudgym
@@ -82,6 +85,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7.1.2
         with:
           enable-cache: true
+          python-version: '3.13'
       - name: Resolve the declared lower bounds and run the tests
         run: |
           uv sync --resolution lowest-direct
