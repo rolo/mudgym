@@ -4,6 +4,7 @@ from typing import Any
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.prompts import INVENTORY_DIVIDER
 from mudgym.envs.factory import make_env
+from mudgym.featurizers.quickscore import QUICKSCORE_COMMAND
 
 PROMPT = b"\r\n*"
 
@@ -35,6 +36,13 @@ SQL_RESPONSE = (
     b"\x1b[32mthe road\x1b[37m.\r\n"
     b"You are carrying the following:\r\n"
     b"        nothing.\r\n"
+)
+# Captured shape of the quickscore reply reset uses as its tearoom identity probe: the name line
+# (with the level title the game appends) then the stats line, whose values mirror FES_RESPONSE.
+QS_RESPONSE = (
+    b"\x1b[0;37;40mAlexander the protector\r\n"
+    b"eff str 52      eff dex 53      sta \x1b[1;32;40m75\x1b[0;37;40m/\x1b[1;32;40m75\x1b[0;37;40m"
+    b"       pts 200 gam 1\x1b[1;37;40m\r\n"
 )
 FES_RESPONSE = b"75 75 52 52 53 53 0 75 0200 N N N N 53 R\r\n"
 FEX_RESPONSE = b"up out swampward southwest south west east north\r\n"
@@ -73,7 +81,9 @@ def scripted_response(command: str | Sequence[str], *, reset_step: bool = False)
     if reset_step:
         parts.append(TEAROOM_EXIT_TEXT)
 
-    if reset_step or user_command == "look":
+    if user_command == QUICKSCORE_COMMAND:
+        parts.append(QS_RESPONSE)
+    elif reset_step or user_command == "look":
         parts.append(ROOM_TEXT)
     elif user_command.startswith("say "):
         # the game re-emits your speech in the third person, uniformly coloured
@@ -126,10 +136,14 @@ class ScriptedConnection(MudConnection):
         joined = ",".join(lines)
         self.commands.append(joined)
         self.sent_lines.append(lines)
-        reset_step = not self.stepped_since_reset
-        self.stepped_since_reset = True
+        user_command = lines[0].split(",", 1)[0]
+        # reset's identity quickscore happens in the tearoom, before the exit step, so it must not
+        # consume the tearoom-exit narration that belongs to the following "move north"
+        reset_step = not self.stepped_since_reset and user_command != QUICKSCORE_COMMAND
+        if user_command != QUICKSCORE_COMMAND:
+            self.stepped_since_reset = True
 
-        response = self.responses.get(lines[0].split(",", 1)[0])
+        response = self.responses.get(user_command)
         if response is None:
             return (
                 scripted_response(lines, reset_step=reset_step),
