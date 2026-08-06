@@ -28,6 +28,7 @@ import contextlib
 import importlib.util
 import io
 import itertools
+import re
 import subprocess
 import sys
 import time
@@ -58,6 +59,13 @@ def discover_examples() -> dict[str, Callable]:
     examples: dict[str, Callable] = {}
     for path in sorted(DOCS_CODE_DIR.glob("*.py")):
         name = path.stem.replace("_", "-")
+        # editor duplicates like "index_single copy.py" would otherwise record under a name no
+        # ownership glob or dash-prefix check can see
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", name):
+            raise SystemExit(
+                f"{path.name} yields recording name {name!r}; example file stems must use only "
+                f"lowercase letters, digits and underscores."
+            )
         spec = importlib.util.spec_from_file_location(f"docs_code_{path.stem}", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
