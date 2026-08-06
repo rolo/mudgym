@@ -8,7 +8,7 @@ INDEX_DTYPE = np.int64
 INT_DTYPE = np.int32
 FLOAT_DTYPE = np.float32
 BYTE_DTYPE = np.uint8
-BIT_DTYPE = np.uint8
+BIT_DTYPE = np.int8  # Gymnasium's MultiBinary space and discrete action masks use int8.
 
 # game specific
 # The game's text is 7-bit: printable ASCII plus ANSI escapes and line breaks (the entire muddle

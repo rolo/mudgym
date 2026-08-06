@@ -37,6 +37,14 @@ def test_single_exit():
     assert np.sum(obs["available_exits"]) == 1
 
 
+def test_available_exits_is_a_gymnasium_action_mask():
+    obs = FEXitsField().extract([b"north"])
+    action_space = gym_spaces.Discrete(direction_count)
+
+    assert obs["available_exits"].dtype == np.dtype(np.int8)
+    assert action_space.sample(mask=obs["available_exits"]) == direction_to_bit("north")
+
+
 def test_all_exits():
     obs = FEXitsField().extract([" ".join(DIRECTIONS).encode()])
 
@@ -121,6 +129,7 @@ def test_space_types():
     spaces = FEXitsField().space()
 
     assert isinstance(spaces["available_exits"], gym_spaces.MultiBinary)
+    assert spaces["available_exits"].dtype == np.dtype(np.int8)
     assert isinstance(spaces["available_exit_names"], gym_spaces.Sequence)
 
 
