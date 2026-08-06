@@ -13,24 +13,18 @@ env = make_env(actions="directions")  # step(3)
 
 `step()` takes a non-empty string of up to 64 characters.
 
-```python exec="true" source="material-block" result="text" session="text-actions"
-from mudgym import make_env
-
-env = make_env(observation="parsed")
-env.reset()
-observation, reward, terminated, truncated, info = env.step("look")
-env.close()
-
-print(f"room_name  {observation['room_name']}")
-print(f"reward     {reward}")
-print(f"terminated {terminated}")
-print(f"truncated  {truncated}")
+```python
+--8<-- "docs/code/actions_text.py:actions-text"
 ```
 
-```python exec="true" html="true" session="text-actions"
+--8<-- "docs/recordings/actions-text.md"
+
+```python exec="true" html="true"
+from pathlib import Path
+
 from mudgym.notebooks import show_ansi
 
-print(show_ansi(info["render_bytes"]).data)
+print(show_ansi(Path("docs/recordings/actions-text.ansi").read_bytes()).data)
 ```
 
 ## `directions`
@@ -38,20 +32,15 @@ print(show_ansi(info["render_bytes"]).data)
 `Discrete(14)` mapped onto `move <direction>` commands in the game's canonical exit order.
 
 ```python exec="true"
-from mudgym import make_env
+from mudgym.actions import DIRECTIONS
 
-env = make_env(observation="parsed", actions="directions")
-observation, info = env.reset()
-
-print("| Index | Command | Available here |")
-print("|---|---|---|")
-for index, (command, available) in enumerate(zip(env.commands, observation["available_exits"], strict=True)):
-    print(f"| {index} | `{command}` | {'yes' if available else 'no'} |")
-
-env.close()
+print("| Index | Command |")
+print("|---|---|")
+for index, direction in enumerate(DIRECTIONS):
+    print(f"| {index} | `move {direction}` |")
 ```
 
-You can use the [parsed](observations.md#parsed) `available_exits` output as an action mask to avoid directions known to be unavailable.
+`observation["available_exits"][index]` says whether the corresponding command is not known to be blocked in the current room, so you can use the [parsed](observations.md#parsed) output as an action mask to avoid directions known to be unavailable.
 
 ```python
 import numpy as np

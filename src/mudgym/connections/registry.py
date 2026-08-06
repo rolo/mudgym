@@ -4,6 +4,7 @@ from mudgym.connections.config import AVAILABLE_CONNECTIONS
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
 from mudgym.connections.docker_run import DockerRunConnection
+from mudgym.connections.provider import DockerExecProvider
 from mudgym.logs import get_logger
 
 logger = get_logger(__name__)
@@ -57,6 +58,11 @@ def list_connections() -> list[dict[str, str | bool]]:
             }
         )
     return result
+
+
+# The env factory resolves both defaults through this module at call time rather than import so we can swap them out
+# at runtime for the docs builder
+default_provider_factory = DockerExecProvider
 
 
 def show_connections() -> None:

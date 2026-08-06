@@ -7,9 +7,10 @@ import gymnasium as gym
 from gymnasium.vector import AutoresetMode, SyncVectorEnv
 from gymnasium.wrappers import FilterObservation
 
+from mudgym.connections import registry
 from mudgym.connections.connection import MudConnection
-from mudgym.connections.provider import ConnectionProvider, DockerExecProvider
-from mudgym.connections.registry import connections, default_connection
+from mudgym.connections.provider import ConnectionProvider
+from mudgym.connections.registry import connections
 from mudgym.envs.actions.discrete import DiscreteDirectionsWrapper
 from mudgym.envs.env import MudEnv
 from mudgym.envs.fields import (
@@ -71,7 +72,7 @@ def make_env(
     field_parsers: Sequence[FieldSpec] | None = None,
     actions: str = "text",
     render_mode: RenderMode | None = None,
-    connection: str | type[MudConnection] | Callable[..., MudConnection] | MudConnection = default_connection,
+    connection: str | type[MudConnection] | Callable[..., MudConnection] | MudConnection | None = None,
     connection_kwargs: Mapping[str, Any] | None = None,
     wrappers: Sequence[Callable[[gym.Env], gym.Env]] | None = None,
     auto_commands: Sequence[str] | None = None,
@@ -88,6 +89,7 @@ def make_env(
             breaks are not (the env appends its own auto-command line each step).
         render_mode: ``None``, ``"human"``, or ``"ansi"``.
         connection: Connection backend -- a registry slug, a class, an instance, or any zero-arg callable.
+            ``None`` (default) resolves the registry's ``default_connection`` at call time.
         connection_kwargs: Kwargs bound to the connection class/callable; not valid with an instance.
         wrappers: Extra Gymnasium wrappers applied last, in order.
         auto_commands: Commands appended after the action each step to populate fields; defaults to the
@@ -101,6 +103,10 @@ def make_env(
     env_kwargs["tearoom_commands"] = tearoom_commands
     env_kwargs["render_mode"] = render_mode
     exclude_list = [exclude_keys] if isinstance(exclude_keys, str) else list(exclude_keys or [])
+
+    # resolved through the registry module at call time so tooling can swap the default
+    if connection is None:
+        connection = registry.default_connection
 
     # resolve string slugs to a connection class
     if isinstance(connection, str):
@@ -157,7 +163,7 @@ def make_vector_env(
     *,
     worlds: int | None = None,
     make_env_kwargs: Mapping[str, Any] | None = None,
-    provider_factory: Callable[..., ConnectionProvider] = DockerExecProvider,
+    provider_factory: Callable[..., ConnectionProvider] | None = None,
     provider_kwargs: Mapping[str, Any] | None = None,
     wrappers: Sequence[Callable[[gym.Env], gym.Env]] | None = None,
     autoreset_mode: AutoresetMode = AutoresetMode.DISABLED,
@@ -169,7 +175,8 @@ def make_vector_env(
         envs: Number of environments.
         worlds: Number of game world instances. Defaults to `envs` (one world per env).
         make_env_kwargs: Keyword args to pass to `make_env()`.
-        provider_factory: Callable that creates a ConnectionProvider. Defaults to DockerExecProvider.
+        provider_factory: Callable that creates a ConnectionProvider. Defaults to the registry's
+            ``default_provider_factory`` (DockerExecProvider) resolved at call time.
         provider_kwargs: Keyword args to pass to `provider_factory`.
         autoreset_mode: Defaults to `AutoresetMode.DISABLED`; `NEXT_STEP` and `SAME_STEP` are also supported.
     """
@@ -177,6 +184,9 @@ def make_vector_env(
     # default to one game world per env if not specified
     if worlds is None:
         worlds = envs
+
+    if provider_factory is None:
+        provider_factory = registry.default_provider_factory
 
     make_env_kwargs = dict(make_env_kwargs or {})
 
@@ -210,7 +220,7 @@ def make_parallel_env(
     agents: int = 2,
     *,
     make_env_kwargs: Mapping[str, Any] | None = None,
-    provider_factory: Callable[..., ConnectionProvider] = DockerExecProvider,
+    provider_factory: Callable[..., ConnectionProvider] | None = None,
     provider_kwargs: Mapping[str, Any] | None = None,
     render_mode: RenderMode | None = None,
     step_order: StepOrder = "rotate",
@@ -220,7 +230,8 @@ def make_parallel_env(
     Args:
         agents: Number of agents.
         make_env_kwargs: Keyword args passed to `make_env()` for each agent.
-        provider_factory: Callable that creates a ConnectionProvider.
+        provider_factory: Callable that creates a ConnectionProvider. Defaults to the registry's
+            ``default_provider_factory`` (DockerExecProvider) resolved at call time.
         provider_kwargs: Keyword args for provider_factory.
         render_mode: Top-level PettingZoo render mode. When set, child envs default to
             ``ansi`` so the wrapper labels each frame rather than children printing on their own.
@@ -228,6 +239,9 @@ def make_parallel_env(
             agent always going first, "fixed" keeps a stable order, and "shuffle"
             randomises the order each step.
     """
+    if provider_factory is None:
+        provider_factory = registry.default_provider_factory
+
     make_env_kwargs = dict(make_env_kwargs or {})
     if render_mode is not None:
         child_render_mode = make_env_kwargs.setdefault("render_mode", "ansi")

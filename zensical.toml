@@ -1,7 +1,9 @@
 [project]
 site_name = "MudGym"
 site_description = "A reinforcement learning environment for MUD2"
-docs_dir = "docs"
+# Pages only: docs/code (example sources) and docs/recordings (captures and derived fragments)
+# sit outside the site build, and are pulled in via `--8<--` includes.
+docs_dir = "docs/pages"
 site_dir = "site"
 nav = [
   { "Getting Started" = "index.md" },
@@ -56,6 +58,13 @@ permalink = true
 anchor_linenums = true
 line_spans = "__span"
 pygments_lang_class = true
+
+# Includes (`--8<--`) for example regions and recorded game output.
+# Will flip check_paths to true once the examples/*.py notebooks are restored, so a missing or renamed include fails
+# the build otherwise it will silently drop the block.
+[project.markdown_extensions.pymdownx.snippets]
+check_paths = false
+dedent_subsections = true
 
 [project.markdown_extensions.pymdownx.superfences]
 
