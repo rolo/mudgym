@@ -4,7 +4,7 @@ The example code shown on the docs pages lives in `docs/code/`, one file per exa
 `--8<--` snippet regions the pages include -- so the code a reader sees is exactly the code that
 runs. Each example runs in two phases:
 
-- capture: the example plays the live game once (requires Docker) and the wire conversation is
+- record: the example plays the live game once (requires Docker) and the wire conversation is
   written to `docs/recordings/<name>*.session.jsonl` -- the committed source of truth.
 - derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
   fragments (`docs/recordings/*.md`, `*.ansi`) are rewritten from the replayed session.
@@ -17,7 +17,7 @@ re-recording.
 
 Run through the justfile:
 
-    just docs-record                  # replay against the live game, rewrite captures + fragments
+    just docs-record                  # play the examples against the live game, rewrite captures + fragments
     just docs-record actions-text     # ... for a subset by name
     just docs-derive                  # rewrite fragments from the committed captures; no Docker
 """
