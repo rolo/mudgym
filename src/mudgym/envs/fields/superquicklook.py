@@ -204,7 +204,7 @@ class SuperQuickLookField(ObservationField):
     def matches(self, chunk: bytes) -> bool:
         return ROOM_MARKER_BYTES in chunk or b"It's too dark for you to see anything." in chunk
 
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def full_extract(self, chunks: Sequence[bytes], *, persona: str | None = None, **context: Any) -> dict[str, Any]:
         """Parse the latest superquicklook room view, or the empty default if none is present."""
         raw_bytes = b"".join(chunks)
         if ROOM_MARKER_BYTES not in raw_bytes:
@@ -227,6 +227,9 @@ class SuperQuickLookField(ObservationField):
 
         _, inventory = parse_carrying_and_inventory(clean_text, block_start)
 
+        # exclude the current persona from the players list, since we don't want to include ourselves in the observation
+        players = tuple(name for name in classified["players"] if persona is None or name.split(" ", 1)[0] != persona)
+
         return {
             "room_name": room_name,
             "room_name_index": INDEX_DTYPE(room_name_to_index(room_name) if room_name else 0),
@@ -235,5 +238,5 @@ class SuperQuickLookField(ObservationField):
             "features": tuple(classified["features"]),
             "portables": tuple(classified["portables"]),
             "mobiles": tuple(classified["mobiles"]),
-            "players": tuple(classified["players"]),
+            "players": players,
         }

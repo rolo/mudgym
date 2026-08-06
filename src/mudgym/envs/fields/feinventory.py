@@ -56,7 +56,7 @@ class FEInventoryField(ObservationField):
     def matches(self, chunk: bytes) -> bool:
         return INVENTORY_DIVIDER in chunk
 
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Find the fei response chunk and split it on the divider into portables / inventory."""
         chunk = next(
             (c for c in reversed(chunks) if INVENTORY_DIVIDER in c),

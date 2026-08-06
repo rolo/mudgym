@@ -92,7 +92,7 @@ class MGCheatsField(ObservationField):
                 parsed_values[key] = int(lowered) if lowered in ("0", "1") else lowered
         return parsed_values
 
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Parse the latest ``[mgcheats]`` block, or the empty default if none is present."""
         payloads = MGCHEATS_BLOCK.findall(b"".join(chunks))
         if not payloads:

@@ -149,7 +149,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         # anchor its patterns on what players cannot type (line-exact matches, the ANSI colour
         # around a points total) rather than on the words alone.
         for field in [field for field in self.fields if field.command is None]:
-            obs.update(field.extract([raw_bytes]))
+            obs.update(field.extract([raw_bytes], persona=self.persona))
 
         # fields with a command are extracted from the post-echo chunks, claiming in batch order
         info["auto_command_fields"] = self.auto_command_fields
@@ -166,14 +166,13 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             for position, chunk in enumerate(chunks):
                 field = pending_fields[0] if pending_fields else None
                 if field is not None and field.is_refusal(chunk):
-                    # a player-state refusal (unconscious, asleep, ...) is the game's real answer to
-                    # the auto command: it claims the slot but carries no field data.
+                    # a player-state refusal (unconscious, asleep, etc)
                     info.setdefault("field_refusals", {})[field.__class__.__name__] = chunk
                     payload_text_chunks.append(chunk)
                     auto_command_chunks.append(chunk)
                     pending_fields.pop(0)
                 elif field is not None and field.matches(chunk):
-                    obs.update(field.extract([chunk]))
+                    obs.update(field.extract([chunk], persona=self.persona))
                     if not field.remove_on_match:
                         payload_text_chunks.append(chunk)
                     auto_command_chunks.append(chunk)

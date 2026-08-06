@@ -75,9 +75,9 @@ class ObservationField(ABC):
         """Default values for the contributed keys: ``full_empty()`` restricted to include_keys."""
         return self.filter_keys(self.full_empty())
 
-    def extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """This field's observation contribution for a turn: ``full_extract()`` restricted to include_keys."""
-        return self.filter_keys(self.full_extract(chunks))
+        return self.filter_keys(self.full_extract(chunks, **context))
 
     @abstractmethod
     def full_space(self) -> dict[str, spaces.Space]:
@@ -90,8 +90,12 @@ class ObservationField(ABC):
         ...
 
     @abstractmethod
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
-        """Parse the turn's response ``chunks`` into every parser key. Pure: no side effects."""
+    def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
+        """Parse the turn's response ``chunks`` into every parser key. Pure: a function of its inputs alone.
+
+        ``context`` carries observer facts the env supplies each call (currently ``persona``, the
+        observing persona's bare name); a parser names what it consumes and ignores the rest.
+        """
         ...
 
     def matches(self, chunk: bytes) -> bool:

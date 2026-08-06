@@ -79,6 +79,18 @@ def test_classifies_both_mortals_as_players():
     assert obs["portables"] == ("door", "coal")
 
 
+def test_players_excludes_the_observing_persona():
+    obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK], persona="David")
+    assert obs["players"] == ("Jessica the protector",)
+    # the here listing stays the room's full contents, self included
+    assert "David the sorcerer" in obs["here"]
+
+
+def test_persona_exclusion_matches_the_bare_name_not_the_title():
+    obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK], persona="Jessica")
+    assert obs["players"] == ("David the sorcerer",)
+
+
 def test_classifies_every_category_in_one_line():
     obs = SuperQuickLookField().extract([ARCANE_FOREST_CHUNK])
     assert obs["room_name"] == "arcane forest"

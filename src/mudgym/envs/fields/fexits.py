@@ -73,7 +73,7 @@ class FEXitsField(ObservationField):
                 raise ValueError(f"Unknown direction in fex output: {d!r}") from None
         return vector
 
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Parse the latest FEX exits line.
 
         When no exits line is recognised (e.g. a dark room returns a blank exits response), default to all

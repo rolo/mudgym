@@ -35,7 +35,7 @@ class RawBytesField(ObservationField):
             "raw_bytes": np.zeros(self.max_bytes, dtype=BYTE_DTYPE),
         }
 
-    def full_extract(self, chunks: Sequence[bytes]) -> dict[str, Any]:
+    def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         # raw bytes wants the exact wire output, so re-join the per-command chunks
         payload = b"".join(chunks)
 
