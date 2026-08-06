@@ -60,5 +60,7 @@ docs-watch: docs-derive
     trap 'kill "$watcher_pid" 2>/dev/null || true' EXIT
     uv run zensical serve
 
+# docs/build.py wraps `zensical build --strict` and then scans the built pages: a failed exec code
+# block renders its traceback into the page instead of failing zensical, so the scan fails it loudly
 build-docs: docs-derive
-    uv run zensical build --strict
+    uv run python docs/build.py
