@@ -117,12 +117,23 @@ def describe_path(path: Path) -> str:
 class FragmentWriters:
     """Writes an example's displayed fragments, tying each one to its session capture."""
 
-    def __init__(self, fragments_dir: Path, captures_dir: Path):
+    def __init__(self, example_name: str, fragments_dir: Path, captures_dir: Path):
+        self.example_name = example_name
         self.fragments_dir = fragments_dir
         self.captures_dir = captures_dir
 
-    def provenance(self, name: str) -> str:
+    def validated_fragment_name(self, name: str) -> str:
+        """Fragments must glob under their example's name, or stale-cleanup and ownership fall apart."""
+        if name != self.example_name and not name.startswith(f"{self.example_name}-"):
+            raise SystemExit(
+                f"Fragment {name!r} does not belong to example {self.example_name!r}; "
+                f"name it {self.example_name!r} or prefix it with '{self.example_name}-'."
+            )
+        return name
+
+    def provenance(self) -> str:
         """An HTML comment tying the fragment to its capture, invisible in the rendered docs."""
+        name = self.example_name
         patterns = (f"{name}.session.jsonl", f"{name}.env*.session.jsonl", f"{name}.player_*.session.jsonl")
         paths = sorted(path for pattern in patterns for path in self.captures_dir.glob(pattern))
         header, _ = read_capture(paths[0])
@@ -132,15 +143,15 @@ class FragmentWriters:
         )
 
     def write_fragment(self, name: str, body: str) -> None:
-        path = self.fragments_dir / f"{name}.md"
-        path.write_text(f"{self.provenance(name)}\n\n{body.rstrip()}\n", encoding="utf-8")
+        path = self.fragments_dir / f"{self.validated_fragment_name(name)}.md"
+        path.write_text(f"{self.provenance()}\n\n{body.rstrip()}\n", encoding="utf-8")
         print(f"wrote {describe_path(path)}")
 
     def write_fenced(self, name: str, output: str, language: str = "text") -> None:
         self.write_fragment(name, f"```{language}\n{output.rstrip()}\n```")
 
     def write_ansi(self, name: str, render_bytes: bytes) -> None:
-        path = self.fragments_dir / f"{name}.ansi"
+        path = self.fragments_dir / f"{self.validated_fragment_name(name)}.ansi"
         path.write_bytes(bytes(render_bytes))
         print(f"wrote {describe_path(path)}")
 
@@ -207,7 +218,7 @@ def record(name: str, version: str) -> None:
         return RecordingProvider(DockerExecProvider(**provider_kwargs), agent_capture_path_written, metadata)
 
     with swapped_default_backends(connection_factory, provider_factory):
-        EXAMPLES[name](FragmentWriters(RECORDINGS_DIR, RECORDINGS_DIR))
+        EXAMPLES[name](FragmentWriters(name, RECORDINGS_DIR, RECORDINGS_DIR))
 
     # only after a successful run: captures the example no longer produces (a removed agent, fewer
     # envs) must not linger, but a failed run must not have deleted the previous good captures either
@@ -242,7 +253,7 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
         return provider
 
     with swapped_default_backends(connection_factory, provider_factory):
-        EXAMPLES[name](FragmentWriters(fragments_dir, RECORDINGS_DIR))
+        EXAMPLES[name](FragmentWriters(name, fragments_dir, RECORDINGS_DIR))
 
     for connection in replays + [replay for provider in providers for replay in provider.connections]:
         remaining = connection.remaining_events()
