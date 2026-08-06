@@ -90,7 +90,7 @@ def choose_or_create_persona(sm: "ConnectionState") -> None:
             slot = min(actual_personas.keys())
         else:
             slot = preferred_slot
-        logger.info("transition.persona.select_existing", slot=slot, persona_name=actual_personas[slot])
+        logger.info("transition.persona.select_existing", slot=slot, persona=actual_personas[slot])
         sm.send(str(slot))
     else:
         # Create new persona - select first slot or generate name
@@ -114,7 +114,7 @@ def send_persona_name(sm: "ConnectionState") -> None:
     sm.send(name)
 
 
-def _sip_tea(sm: "ConnectionState") -> None:
+def sip_tea(sm: "ConnectionState") -> None:
     """Transition action: automatically sip tea in the tearoom."""
     logger.debug("transition.sip_tea")
     sm.send(b"sip t")
@@ -150,7 +150,7 @@ GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
 
 TRANSITIONS: MutableMapping[State, dict[Prompt, Transition]] = {
     State.INITIAL: {
-        Prompt.TEAROOM: T(State.TEAROOM, _sip_tea),
+        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.EOF: T(State.DEAD),
         **LOGIN_TRANSITIONS,
     },
@@ -173,7 +173,7 @@ TRANSITIONS: MutableMapping[State, dict[Prompt, Transition]] = {
         Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
         Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
         Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
-        Prompt.TEAROOM: T(State.TEAROOM, _sip_tea),
+        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.GAME: T(State.GAME),
         Prompt.OPTION: T(State.OPTION, send_db_slot),
         Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
@@ -182,15 +182,15 @@ TRANSITIONS: MutableMapping[State, dict[Prompt, Transition]] = {
     State.PERSONA_NAME_INPUT: {
         Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
         Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
-        Prompt.TEAROOM: T(State.TEAROOM, _sip_tea),
+        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.OPTION: T(State.OPTION, send_db_slot),
         Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
         Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
     },
     State.PERSONA_SEX_INPUT: {
         Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
-        Prompt.TEAROOM: T(State.TEAROOM, _sip_tea),
-        Prompt.GAME: T(State.GAME, _sip_tea),
+        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
+        Prompt.GAME: T(State.GAME, sip_tea),
         Prompt.OPTION: T(State.OPTION, send_db_slot),
     },
     State.CLOSING: {
@@ -206,7 +206,7 @@ TRANSITIONS: MutableMapping[State, dict[Prompt, Transition]] = {
         # After reset completes, Option: may come without DATABASE_FINISHED_INITIALIZING
         Prompt.OPTION: T(State.OPTION, send_db_slot),
         Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
-        Prompt.TEAROOM: T(State.TEAROOM, _sip_tea),
+        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
     },
 }
 

@@ -110,6 +110,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             end_of_turn_marker=self.end_of_turn_marker,
         )
 
+    @property
+    def persona(self) -> str | None:
+        """The persona name of the current player. Set during session reset."""
+        return self.session.persona
+
     def bytes_to_observation(self, raw_bytes: bytes, info: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Turn a step's game bytes into an observation dictionary.
@@ -217,6 +222,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             "bytes_length": len(raw_bytes),
         }
         info["step"] = debug_info.get("step")
+        info["persona"] = self.persona
         return info
 
     def render(self) -> str | None:
@@ -242,7 +248,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.episode_id = uuid.uuid4()
         logger.debug("env.reset", env_id=str(self.env_id), episode_id=str(self.episode_id))
 
-        # reset the session which takes us to the tearoom
+        # reset the session which takes us to the tearoom and sets the person name via quickscore
         self.session.reset()
 
         # step out of the tearoom and into The Land

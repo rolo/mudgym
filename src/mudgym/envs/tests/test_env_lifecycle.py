@@ -31,6 +31,8 @@ def test_env_lifecycle(live_env_factory, maker_kwarg_set, subtests):
             obs, info = env.reset()
             assert obs is not None
             assert isinstance(info, dict)
+            persona = info["persona"]
+            assert persona.isalpha()
 
         with subtests.test(f"step-{label}"):
             action = 0
@@ -41,6 +43,7 @@ def test_env_lifecycle(live_env_factory, maker_kwarg_set, subtests):
             assert isinstance(truncated, bool)
             assert isinstance(info, dict)
             assert info["last_command"] is not None
+            assert info["persona"] == persona
 
 
 def test_env_reset(live_env_factory):

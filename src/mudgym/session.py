@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.prompts import FINAL_COMMAND, FINAL_COMMAND_MARKER
 from mudgym.connections.registry import available_connections_dict, default_connection
+from mudgym.featurizers.quickscore import parse_quickscore_name
 from mudgym.featurizers.strings import decode_text_bytes
 from mudgym.logs import get_logger, setup_logging
 
@@ -116,16 +117,28 @@ class MudSession:
         self.connection.end_of_turn_marker = end_of_turn_marker
 
         self.step_count = 0
+        self.persona: str | None = None
         self.last_raw_bytes: bytes = b""
         self.last_debug_info: dict = {}
 
     def reset(self) -> None:
         """
-        Reset the session: connect, enter the tearoom.
+        Reset the session: connect, enter the tearoom, and learn which persona we are playing.
         """
         logger.debug("session.reset", session_id=str(self.session_id))
-        self.step_count = 0
         self.connection.reset()
+
+        # use quickscore to find out the current persona name, regardless of connection type or how we got here
+        raw_bytes, terminated, incomplete, _ = self.send_command("qs")
+        if terminated or incomplete:
+            raise RuntimeError(
+                f"quickscore failed during reset (terminated={terminated}, incomplete={incomplete}): {raw_bytes!r}"
+            )
+        self.persona = parse_quickscore_name(raw_bytes)
+
+        # the name probe speaks the step protocol but is not a step of play
+        self.step_count = 0
+        logger.debug("session.reset.complete", session_id=str(self.session_id), persona=self.persona)
 
     def send_command(
         self,
