@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
@@ -36,6 +37,19 @@ def test_empty_values_satisfy_spaces(field):
     for key, space in spaces.items():
         value = defaults[key]
         assert space.contains(value), f"{key}: {value!r} not in {space}"
+
+
+@pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)
+def test_empty_numeric_dtypes_match_spaces(field):
+    """Every NumPy-valued default must use its declared space dtype."""
+    spaces = field.space()
+    defaults = field.empty()
+
+    for key, space in spaces.items():
+        value = defaults[key]
+        if not isinstance(value, np.ndarray | np.generic):
+            continue
+        assert value.dtype == space.dtype, f"{key}: emitted {value.dtype}, declared {space.dtype}"
 
 
 FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 F"

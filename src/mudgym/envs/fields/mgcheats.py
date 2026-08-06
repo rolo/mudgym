@@ -48,11 +48,11 @@ class MGCheatsField(ObservationField):
             "room_id_index": spaces.Discrete(indexed_discrete_size(room_id_count)),
             "room_name": spaces.Text(max_length=ROOM_NAME_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
             "room_name_index": spaces.Discrete(indexed_discrete_size(room_name_count)),
-            "fighting": spaces.Discrete(2),
-            "dark": spaces.Discrete(2),
-            "glowing": spaces.Discrete(2),
-            "asleep": spaces.Discrete(2),
-            "gifted": spaces.Discrete(2),
+            "fighting": spaces.Discrete(2, dtype=BIT_DTYPE),
+            "dark": spaces.Discrete(2, dtype=BIT_DTYPE),
+            "glowing": spaces.Discrete(2, dtype=BIT_DTYPE),
+            "asleep": spaces.Discrete(2, dtype=BIT_DTYPE),
+            "gifted": spaces.Discrete(2, dtype=BIT_DTYPE),
             "here": IDENTIFIER_SPACE,
         }
 
