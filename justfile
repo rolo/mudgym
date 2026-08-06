@@ -37,11 +37,11 @@ check-dist: build
 
 # run the docs code snippets against the live game to record sessions in docs/recordings/
 docs-record *names:
-    uv run python scripts/record_docs.py {{names}}
+    uv run python docs/record.py {{names}}
 
 # replay committed session captures through the env stack to rewrite the docs displayed fragments
 docs-derive *names:
-    uv run python scripts/record_docs.py --derive-only {{names}}
+    uv run python docs/record.py --derive-only {{names}}
 
 docs:
     uv run zensical serve
