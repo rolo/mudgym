@@ -48,7 +48,7 @@ class ObservationField(ABC):
         """
         Args:
             include_keys: restrict this field's observation contribution to the given space() keys.
-            None (default) keeps every key. An empty sequence keeps none, useful for using as an end of step marker.
+                None (default) keeps every key. An empty sequence keeps none, useful for using as an end of step marker.
         """
         if include_keys is None:
             self.include_keys: tuple[str, ...] | None = None
