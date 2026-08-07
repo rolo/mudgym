@@ -1,3 +1,5 @@
+import pytest
+
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
 
 COAL_BUNKER_CHUNK = (
@@ -89,6 +91,21 @@ def test_players_excludes_the_observing_persona():
 def test_persona_exclusion_matches_the_bare_name_not_the_title():
     obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK], persona="Jessica")
     assert obs["players"] == ("David the sorcerer",)
+
+
+REVERSED_TITLES_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
+    b"\x1b[36mthe door\x1b[37m, \x1b[31mSir David\x1b[37m and \x1b[31mSister Jessica\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
+
+
+@pytest.mark.parametrize("persona, remaining", [("David", "Sister Jessica"), ("Jessica", "Sir David")])
+def test_persona_exclusion_handles_titles_that_come_before_the_name(persona, remaining):
+    # Sir/Lady and Brother/Sister are rendered title-first, so the leading word is not the persona
+    obs = SuperQuickLookField().extract([REVERSED_TITLES_CHUNK], persona=persona)
+    assert obs["players"] == (remaining,)
 
 
 def test_classifies_every_category_in_one_line():

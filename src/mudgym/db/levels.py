@@ -1,5 +1,7 @@
 WIZARD_POINTS = 204800
 
+PREFIX_FORMAT_LEVELS = frozenset({"sir", "lady", "brother", "sister"})
+
 LEVELS = [
     "novice",
     "protector",

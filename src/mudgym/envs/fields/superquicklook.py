@@ -8,6 +8,7 @@ from mudgym.connections.prompts import SGR_ONE_PLUS_STR
 from mudgym.db.index import indexed_discrete_size, room_name_count, room_name_to_index
 from mudgym.envs.specs import INDEX_DTYPE, ITEM_SPACE, ROOM_NAME_MAX_LENGTH, SINGLE_LINE_CHARSET
 from mudgym.featurizers.ansi import strip_ansi
+from mudgym.featurizers.persona_names import bare_persona_name
 from mudgym.featurizers.strings import decode_text_bytes
 
 from .field import ObservationField
@@ -227,8 +228,9 @@ class SuperQuickLookField(ObservationField):
 
         _, inventory = parse_carrying_and_inventory(clean_text, block_start)
 
-        # exclude the current persona from the players list, since we don't want to include ourselves in the observation
-        players = tuple(name for name in classified["players"] if persona is None or name.split(" ", 1)[0] != persona)
+        # exclude the current persona from the players list, since we don't want to include ourselves in the
+        # observation. the listing gives name with level (which isn't always first, eg, Sir Dave)
+        players = tuple(name for name in classified["players"] if persona is None or bare_persona_name(name) != persona)
 
         return {
             "room_name": room_name,
