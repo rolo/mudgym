@@ -1,4 +1,5 @@
 import importlib
+import re
 
 import pytest
 
@@ -9,6 +10,7 @@ from mudgym.notebooks import (
     notebook_palette,
     show_ansi,
     show_game_tabs,
+    show_room_map,
     show_table,
     show_text,
     show_turn_bars,
@@ -130,6 +132,64 @@ def test_show_table_right_aligns_numbers_and_reads_booleans_as_words():
 
 def test_show_table_without_rows_reads_no_rows():
     assert "No rows." in show_table([]).data
+
+
+ROOM_MAP_EDGES = [
+    ("mud garden", "swampward", "mud path"),
+    ("mud path", "north", "mud garden"),
+    ("mud path", "in", "gatehouse"),
+    ("gatehouse", "out", "mud path"),
+    ("mud garden", "west", "orchard"),
+    ("orchard", "east", "mud garden"),
+    ("gatehouse", "over", "battlement"),
+    ("battlement", "down", "gatehouse"),
+]
+
+
+def to_floats(boxes):
+    return [tuple(float(value) for value in box) for box in boxes]
+
+
+def map_boxes(svg):
+    """The room rectangles and edge-label plates of a rendered map."""
+    rooms = re.findall(
+        r'<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="\d+" style="fill:color-mix', svg
+    )
+    plates = re.findall(
+        r'<rect class="edge-label-plate" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"', svg
+    )
+    return to_floats(rooms), to_floats(plates)
+
+
+def boxes_overlap(first, second):
+    return (
+        first[0] < second[0] + second[2]
+        and second[0] < first[0] + first[2]
+        and first[1] < second[1] + second[3]
+        and second[1] < first[1] + first[3]
+    )
+
+
+def test_show_room_map_puts_every_edge_label_on_its_own_plate():
+    svg = show_room_map(ROOM_MAP_EDGES).data
+
+    assert svg.count('class="edge-label"') == len(ROOM_MAP_EDGES)
+    assert svg.count('class="edge-label-plate"') == len(ROOM_MAP_EDGES)
+
+
+def test_show_room_map_keeps_edge_labels_off_the_rooms_and_each_other():
+    rooms, plates = map_boxes(show_room_map(ROOM_MAP_EDGES).data)
+
+    assert len(plates) == len(ROOM_MAP_EDGES)
+    for index, plate in enumerate(plates):
+        for room in rooms:
+            assert not boxes_overlap(plate, room), f"label {index} sits on a room"
+        for other in plates[index + 1 :]:
+            assert not boxes_overlap(plate, other), f"label {index} sits on another label"
+
+
+def test_show_room_map_without_edges_says_so():
+    assert "No rooms discovered yet." in show_room_map([]).data
 
 
 def test_game_accordion_starts_expanded_and_can_start_collapsed():

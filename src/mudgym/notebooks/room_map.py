@@ -2,6 +2,7 @@
 
 import html as html_lib
 import itertools
+import math
 from collections.abc import Iterable, Mapping, Sequence
 
 from mudgym.db.directions import DIRECTION_INDEX_BY_NAME
@@ -181,8 +182,10 @@ def show_room_map(
     room_font = 13 - 3 * density
     small_font = 10.5 - 1.5 * density
     corner = round(12 - 4 * density)
-    column_pitch = room_width + round(50 - 14 * density)
-    row_pitch = room_height + round(54 - 14 * density)
+    # The gap between rooms is where the edge labels sit, so it has to hold the
+    # longest direction word rather than just separate two boxes.
+    column_pitch = room_width + round(64 - 16 * density)
+    row_pitch = room_height + round(66 - 16 * density)
     side_padding = 40
     top_padding = 78
 
@@ -220,9 +223,31 @@ def show_room_map(
 
     map_id = f"room-map-{next(MAP_IDS)}"
     line_style = f"stroke:{SECONDARY};stroke-opacity:0.5;stroke-width:2;"
-    label_style = (
-        f"font-family:{MONO};fill:{SECONDARY};paint-order:stroke;stroke:{PAGE};stroke-width:4px;stroke-linejoin:round;"
-    )
+    label_style = f"font-family:{MONO};fill:{SECONDARY};"
+
+    # Each label sits on an opaque plate, so it stays readable where the gap
+    # between two rooms is narrower than the word. MONO advances 0.6em per
+    # character, which is enough to size the plate without measuring text.
+    label_padding_x = 5
+    label_padding_y = 2.5
+    label_height = small_font + 2 * label_padding_y
+    label_separation = label_height + 3
+
+    # Labels collide when a pair is walked both ways, and again when two
+    # unrelated edges cross near the same point. Both are answered by stepping
+    # the label off its line until it finds clear space; the rooms count as
+    # taken, so a label prefers a gap to a room it would otherwise sit on.
+    taken = [(x, y, room_width, room_height) for x, y in positions.values()]
+
+    def clear_of_taken(box) -> bool:
+        return not any(
+            box[0] < other[0] + other[2]
+            and other[0] < box[0] + box[2]
+            and box[1] < other[1] + other[3]
+            and other[1] < box[1] + box[3]
+            for other in taken
+        )
+
     edge_elements = []
     edge_captions = []
     for (source, destination), pair_labels in sorted(labels_by_pair.items()):
@@ -240,17 +265,49 @@ def show_room_map(
             pair_labels[direction]
             for direction in sorted(pair_labels, key=lambda name: DIRECTION_INDEX_BY_NAME.get(name, 99))
         )
-        # Nudge the two labels of a mapped pair apart so they never collide.
-        label_offset = -8 if ordered_rooms.index(source) < ordered_rooms.index(destination) else 14
         edge_elements.append(
             f'<line x1="{start[0]:.1f}" y1="{start[1]:.1f}" x2="{end[0]:.1f}" y2="{end[1]:.1f}" '
             f'style="{line_style}" marker-end="url(#{map_id}-arrow)" />'
         )
+
+        # Step off the line perpendicularly until the plate lands clear, then
+        # give up and take the midpoint rather than push the label somewhere it
+        # no longer reads as belonging to this arrow.
+        plate_width = 0.62 * small_font * len(label) + 2 * label_padding_x
+        span = math.hypot(end[0] - start[0], end[1] - start[1]) or 1.0
+        step_x = -(end[1] - start[1]) / span * label_separation
+        step_y = (end[0] - start[0]) / span * label_separation
+        midpoint = ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
+        plate = None
+        for stride in (0, 1, -1, 2, -2, 3, -3):
+            centre_x = midpoint[0] + step_x * stride
+            centre_y = midpoint[1] + step_y * stride
+            candidate = (
+                centre_x - plate_width / 2,
+                centre_y - label_height / 2,
+                plate_width,
+                label_height,
+            )
+            if clear_of_taken(candidate):
+                plate = candidate
+                break
+        if plate is None:
+            plate = (
+                midpoint[0] - plate_width / 2,
+                midpoint[1] - label_height / 2,
+                plate_width,
+                label_height,
+            )
+        taken.append(plate)
+
         # Captions are drawn after the rooms: a label longer than the gap
         # between two rooms would otherwise be painted over by the room it
         # reaches into and read as a truncated word.
         edge_captions.append(
-            f'<text x="{(start[0] + end[0]) / 2:.1f}" y="{(start[1] + end[1]) / 2 + label_offset:.1f}" '
+            f'<rect class="edge-label-plate" x="{plate[0]:.1f}" y="{plate[1]:.1f}" '
+            f'width="{plate[2]:.1f}" height="{plate[3]:.1f}" rx="4" style="fill:{PAGE};" />'
+            f'<text class="edge-label" x="{plate[0] + plate_width / 2:.1f}" '
+            f'y="{plate[1] + label_height / 2 + 0.36 * small_font:.1f}" '
             f'text-anchor="middle" font-size="{small_font:.1f}" style="{label_style}">'
             f"{html_lib.escape(label)}</text>"
         )
