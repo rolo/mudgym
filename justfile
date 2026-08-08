@@ -35,6 +35,10 @@ check-dist: build
     uvx twine check --strict dist/*
     uvx check-wheel-contents dist/*.whl
 
+# validate, version, commit, tag, and push a release; GitHub Actions publishes it via OIDC
+release version:
+    uv run python scripts/release.py {{version}}
+
 # play the docs examples against the live game to record sessions in docs/recordings/
 docs-record *names:
     uv run python docs/record.py {{names}}
