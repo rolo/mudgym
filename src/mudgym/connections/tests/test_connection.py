@@ -1,7 +1,7 @@
 import pytest
 
 from mudgym.connections.prompts import State
-from mudgym.connections.registry import available_connections_dict
+from mudgym.connections.registry import available_connections_dict, default_connection
 
 
 @pytest.mark.parametrize("connection_key", available_connections_dict)
@@ -63,5 +63,60 @@ def test_player_authored_control_text_does_not_close_the_command_window(connecti
         assert b"========" in raw_bytes, why
         assert terminated is False, why
         assert incomplete is False, why
+    finally:
+        connection.close()
+
+
+def test_rejection_before_final_line_echo_is_reported_after_marker_arrives():
+    """A rejected first line stays visible after a split batch reaches its final marker."""
+    connection = default_connection()
+    try:
+        connection.reset()
+        raw_bytes, terminated, incomplete, debug_info = connection.send_command(["xyzzyfrobnicate", "fei"])
+
+        assert b"xyzzyfrobnicate" in raw_bytes
+        assert b"========" in raw_bytes
+        assert debug_info["rejected"] is True
+        assert debug_info["marker_arrived"] is True
+        assert terminated is False
+        assert incomplete is False
+    finally:
+        connection.close()
+
+
+def test_spoken_rejection_text_is_not_reported_as_a_rejected_command():
+    """A rejection phrase quoted in player speech is not a front-end response."""
+    connection = default_connection()
+    try:
+        connection.reset()
+        raw_bytes, terminated, incomplete, debug_info = connection.send_command(
+            ['say I don\'t know the word "frobnicate".', "fei"]
+        )
+
+        assert b"says" in raw_bytes
+        assert b"========" in raw_bytes
+        assert debug_info["rejected"] is False
+        assert debug_info["marker_arrived"] is True
+        assert terminated is False
+        assert incomplete is False
+    finally:
+        connection.close()
+
+
+def test_command_with_too_many_parts_is_reported_as_rejected():
+    """The parser rejects the whole line before its final observation command can run."""
+    command_line = ",".join(["n"] * 25 + ["sql", "fes", "fex", "fei"])
+
+    connection = default_connection()
+    try:
+        connection.reset()
+        raw_bytes, terminated, incomplete, debug_info = connection.send_command(command_line)
+
+        assert b"Your command is too long for me, sorry!" in raw_bytes
+        assert b"========" not in raw_bytes
+        assert debug_info["rejected"] is True
+        assert debug_info["marker_arrived"] is False
+        assert terminated is False
+        assert incomplete is False
     finally:
         connection.close()

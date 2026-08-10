@@ -38,6 +38,7 @@ def test_capture_round_trips_every_byte_value(tmp_path):
     assert events[1]["lines"] == ["look"]
     assert events[1]["raw_bytes"] == bytes(range(256))
     assert events[1]["incomplete"] is True
+    assert "rejected" not in events[1]
 
 
 def test_recorded_conversation_replays_identically(tmp_path):
@@ -50,6 +51,22 @@ def test_recorded_conversation_replays_identically(tmp_path):
     assert replay.header["connection"] == "ScriptedConnection"
     assert drive_conversation(replay) == live_results
     assert replay.remaining_events() == 0
+
+
+def test_replay_preserves_rejected_outcome_and_completed_marker(tmp_path):
+    path = tmp_path / "capture.jsonl"
+    response = (b"rejected\r\n", False, False, {"rejected": True, "marker_arrived": True})
+    recording = RecordingConnection(ScriptedConnection(responses={"xyzzyfrobnicate": response}), path)
+    recording.reset()
+    recording.send_command("xyzzyfrobnicate")
+    recording.close()
+
+    replay = ReplayConnection(path)
+    replay.reset()
+    _, _, _, debug_info = replay.send_command("xyzzyfrobnicate")
+
+    assert debug_info["rejected"] is True
+    assert debug_info["marker_arrived"] is True
 
 
 def test_replay_rejects_diverged_wire_lines(tmp_path):

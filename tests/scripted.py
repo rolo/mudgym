@@ -81,7 +81,9 @@ def scripted_response(command: str | Sequence[str], *, reset_step: bool = False)
     if reset_step:
         parts.append(TEAROOM_EXIT_TEXT)
 
-    if user_command == QUICKSCORE_COMMAND:
+    if user_command in AUTO_COMMAND_RESPONSES:
+        parts.append(AUTO_COMMAND_RESPONSES[user_command])
+    elif user_command == QUICKSCORE_COMMAND:
         parts.append(QS_RESPONSE)
     elif reset_step or user_command == "look":
         parts.append(ROOM_TEXT)

@@ -167,7 +167,39 @@ class MudSession:
         raw_bytes, terminated, incomplete, debug_info = self.connection.send_command(
             lines[0] if len(lines) == 1 else lines
         )
-        debug_info["wire_lines"] = lines
+        sent_lines = list(lines)
+        command_rejected = bool(debug_info.get("rejected", False))
+        marker_arrived = bool(debug_info.get("marker_arrived", False))
+
+        # A rejection aborts the rest of its comma-chained line, including the auto commands.
+        # Once the rejection prompt has returned us safely to the game, send those commands again
+        # so this step still has a marker-bounded observation of the state the player can now see.
+        if (
+            command_rejected
+            and not marker_arrived
+            and self.auto_commands
+            and add_auto_commands
+            and not (terminated or incomplete)
+        ):
+            auto_command_line = ",".join(self.auto_commands)
+            follow_up_bytes, follow_up_terminated, follow_up_incomplete, follow_up_debug_info = (
+                self.connection.send_command(auto_command_line)
+            )
+            follow_up_rejected = bool(follow_up_debug_info.get("rejected", False))
+            if follow_up_rejected:
+                logger.error(
+                    "session.send_command.auto_refresh_rejected",
+                    auto_commands=self.auto_commands,
+                    debug_info=follow_up_debug_info,
+                )
+                follow_up_incomplete = True
+            raw_bytes += follow_up_bytes
+            terminated = terminated or follow_up_terminated
+            incomplete = incomplete or follow_up_incomplete
+            sent_lines.append(auto_command_line)
+            debug_info["auto_command_follow_up"] = follow_up_debug_info
+
+        debug_info["wire_lines"] = sent_lines
 
         # an unlisted speech verb swallows the comma-chained auto commands into the spoken text, so
         # the tail shows up twice: once in our echo and once quoted back in the speech output

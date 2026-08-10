@@ -427,8 +427,11 @@ class ConnectionState:
         buffer = bytearray()
         terminated = False
         incomplete = False
+        rejected = False
+        marker_arrived = False
         prompt_enum: Prompt | None = None
-        seen_echo = False
+        seen_any_command_echo = False
+        seen_final_command_echo = False
 
         # Every sent line's echo is a trust boundary. Put echo patterns first so a line whose
         # literal command text is also a prompt (eg, "Option:" or "Cheerio!") is consumed as
@@ -466,25 +469,29 @@ class ConnectionState:
                 buffer += self.child.after
 
             if any(matched_pattern is pattern for pattern in echo_patterns):
+                seen_any_command_echo = True
                 if matched_pattern is final_echo_pattern:
-                    seen_echo = True
+                    seen_final_command_echo = True
                 continue
 
             # our batch's end of turn marker closes the read window. A marker seen before our echo is stale output
             # from an earlier desynchronised window (eg, a timeout-cut step's responses arriving late): it is
             # buffered like any other pre-echo content and the read continues until our own marker.
-            if matched_pattern is self.end_of_turn_marker_pattern and seen_echo:
+            if matched_pattern is self.end_of_turn_marker_pattern and seen_final_command_echo:
+                marker_arrived = True
                 break
 
-            # a rejection aborts the rest of its own line only. Before the anchoring echo it
-            # belongs to an earlier line of a split batch, or to stale/ambient output (another
-            # player speaking a rejection phrase), so the read continues to the marker.
-            rejection_closes_window = matched_pattern in INVALID_COMMAND_PROMPTS and seen_echo
+            # A rejection after any command echo belongs to this batch. It closes the window only
+            # after the final line's echo because an earlier rejected line in a split batch does
+            # not prevent the already-sent final auto-command line from reaching its marker.
+            command_rejected = matched_pattern in INVALID_COMMAND_PROMPTS and seen_any_command_echo
+            rejected = rejected or command_rejected
+            rejection_closes_window = command_rejected and seen_final_command_echo
             if prompt_enum in GAME_OVER_PROMPTS or prompt_enum in TRANSPORT_BREAK_PROMPTS or rejection_closes_window:
                 # the death/rejection text is already buffered above, keep it and return what we have.
                 terminated = prompt_enum in GAME_OVER_PROMPTS
                 incomplete = prompt_enum in TRANSPORT_BREAK_PROMPTS
-                if incomplete and seen_echo:
+                if incomplete and seen_final_command_echo:
                     logger.warning(
                         "sm.send_command.marker_missing",
                         state=self.state.name,
@@ -492,7 +499,11 @@ class ConnectionState:
                     )
                 break
 
-        debug_info: dict[str, Any] = {"matched_prompt": prompt_enum.name if prompt_enum else None}
+        debug_info: dict[str, Any] = {
+            "matched_prompt": prompt_enum.name if prompt_enum else None,
+            "rejected": rejected,
+            "marker_arrived": marker_arrived,
+        }
         logger.debug(
             "sm.send_command.complete",
             state=self.state.name,

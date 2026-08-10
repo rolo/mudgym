@@ -79,16 +79,27 @@ class CaptureWriter:
     def record_reset(self) -> None:
         self._write_line({"event": "reset"})
 
-    def record_step(self, lines: list[str], raw_bytes: bytes, terminated: bool, incomplete: bool) -> None:
-        self._write_line(
-            {
-                "event": "step",
-                "lines": lines,
-                "raw_text": bytes_to_capture_text(raw_bytes),
-                "terminated": bool(terminated),
-                "incomplete": bool(incomplete),
-            }
-        )
+    def record_step(
+        self,
+        lines: list[str],
+        raw_bytes: bytes,
+        terminated: bool,
+        incomplete: bool,
+        rejected: bool = False,
+        marker_arrived: bool = False,
+    ) -> None:
+        event = {
+            "event": "step",
+            "lines": lines,
+            "raw_text": bytes_to_capture_text(raw_bytes),
+            "terminated": bool(terminated),
+            "incomplete": bool(incomplete),
+        }
+        if rejected:
+            event["rejected"] = True
+            if marker_arrived:
+                event["marker_arrived"] = True
+        self._write_line(event)
 
     def close(self) -> None:
         if not self.handle.closed:
@@ -121,7 +132,14 @@ class RecordingConnection(MudConnection):
     def send_command(self, command: str | Sequence[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
         lines = [command] if isinstance(command, str) else list(command)
         raw_bytes, terminated, incomplete, debug_info = self.connection.send_command(command)
-        self.writer.record_step(lines, raw_bytes, terminated, incomplete)
+        self.writer.record_step(
+            lines,
+            raw_bytes,
+            terminated,
+            incomplete,
+            rejected=bool(debug_info.get("rejected", False)),
+            marker_arrived=bool(debug_info.get("marker_arrived", False)),
+        )
         return raw_bytes, terminated, incomplete, debug_info
 
     def close(self) -> None:
@@ -171,7 +189,12 @@ class ReplayConnection(MudConnection):
             event["raw_bytes"],
             event["terminated"],
             event["incomplete"],
-            {"replayed": True, "capture": str(self.path)},
+            {
+                "rejected": bool(event.get("rejected", False)),
+                "marker_arrived": bool(event.get("marker_arrived", False)),
+                "replayed": True,
+                "capture": str(self.path),
+            },
         )
 
     def close(self) -> None:

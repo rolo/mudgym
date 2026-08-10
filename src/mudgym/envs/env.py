@@ -131,7 +131,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         # remove the echoes from the text observation. The batch goes out on one wire line, or two
         # when the command speaks (the same assembly as the session used), and each line is echoed
         # separately. The splits are stored in the info dict for anything that may need them later.
-        echo_lines = wire_lines(info["last_command"], self.auto_commands)
+        echo_lines = info.get("wire_lines") or wire_lines(info["last_command"], self.auto_commands)
         segments = split_on_echo_lines(raw_bytes, echo_lines)
         if segments is not None:
             # everything before the final echo (async events, plus the speech response when the
@@ -224,6 +224,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         }
         info["step"] = debug_info.get("step")
         info["persona"] = self.persona
+        info["wire_lines"] = debug_info.get("wire_lines")
+        info["action_rejected"] = bool(debug_info.get("rejected", False))
         return info
 
     def render(self) -> str | None:

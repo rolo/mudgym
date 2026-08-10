@@ -2,7 +2,12 @@ import re
 
 import pytest
 
-from mudgym.connections.prompts import Prompt, marker_up_to_next_prompt, regex_up_to_next_prompt
+from mudgym.connections.prompts import (
+    INVALID_COMMAND_PROMPTS,
+    Prompt,
+    marker_up_to_next_prompt,
+    regex_up_to_next_prompt,
+)
 
 # the game prompt as captured from the wire: blue star, then the colour the input echo will use
 GAME_PROMPT = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
@@ -88,6 +93,24 @@ class TestUpToNextPromptStopsAtAMidStreamPrompt:
         pattern = regex_up_to_next_prompt(rb"You watch the world go by\.")
 
         assert pattern.search(b"You watch the world go by.\r\n*\r") is None
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        b"I made sense of some of that:",
+        b"I made no sense of that:",
+        b'I don\'t know the word "frobnicate".',
+        b"I don't know to what \"goat\" you're referring.",
+        b"Your command is too long for me, sorry!",
+    ],
+)
+def test_invalid_command_prompts_match_system_lines_but_not_spoken_copies(message):
+    genuine_response = b"\x1b[0;37;40m" + message + b"\r\n" + GAME_PROMPT
+    spoken_copy = b'Raymond the protector says "' + message + b'".\r\n' + GAME_PROMPT
+
+    assert any(pattern.search(genuine_response) for pattern in INVALID_COMMAND_PROMPTS)
+    assert not any(pattern.search(spoken_copy) for pattern in INVALID_COMMAND_PROMPTS)
 
 
 class TestTearoomScreenToleratesRunAheadOutput:
