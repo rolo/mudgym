@@ -9,10 +9,7 @@ permissions:
 env:
   LOG_LEVEL: "DEBUG"
 concurrency:
-  # Key on the commit, not the branch: a push to a branch with an open PR fires both
-  # `push` and `pull_request`, and on `push` there is no head_ref to group by. Using the
-  # head SHA collapses the pair into a single run per commit. On pull_request, github.sha
-  # is the merge commit, so the head sha has to be read off the event payload.
+  # Deduplicate push and pull-request runs for the same commit.
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 jobs:
@@ -21,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      UV_PYTHON: ${{ matrix.python-version }}
       # Matrix jobs that share a Docker daemon would otherwise log the same account
       # into one game container. A run/attempt/job namespace keeps them apart.
       MUDGYM_DOCKER_EXEC_CONTAINER_NAME: "m${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python-version }}"
@@ -32,11 +30,7 @@ jobs:
           - '3.14'
     steps:
       - uses: actions/checkout@v5
-      # The setup actions resolve releases through api.github.com with the runner's
-      # native token. Portable runners hand out their own token, which GitHub won't
-      # accept, so the GH_PAT secret stands in; on GitHub GH_PAT is absent and the
-      # native token is used. Not below v3: v2 prefers the runner's ambient
-      # GITHUB_TOKEN env var over this input, so GH_PAT never reached it.
+      # Forgejo uses GH_PAT; GitHub falls back to its job token.
       - name: Install just
         uses: extractions/setup-just@v4
         with:
@@ -56,6 +50,15 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Install dependencies
         run: just install
+      - name: Verify matrix Python
+        run: |
+          uv run python - <<'PY'
+          import os
+          import sys
+
+          expected = tuple(map(int, os.environ["UV_PYTHON"].split(".")))
+          assert sys.version_info[:2] == expected, f"expected Python {expected}, got {sys.version}"
+          PY
       - name: Run tests (with coverage)
         run: just test
       - name: Upload coverage data
