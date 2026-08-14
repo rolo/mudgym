@@ -157,6 +157,17 @@ class TestGameOverPromptsRejectPlayerAuthoredText:
         )
         assert Prompt.GAME_OVER_KILLED_FOR_SWEARING.value.search(raw_bytes)
 
+    def test_the_real_combat_death_matches(self):
+        raw_bytes = (
+            b"\x1b[0;30;41mYou feel your very existence severed from you...\r\n"
+            b"You have been killed by the vampire.\x1b[1;37;40m\r\n"
+            b"\x1b[0;31;40mNot updating persona.\x1b[1;37;40m\r"
+        )
+        assert Prompt.GAME_OVER_NOT_UPDATING_PERSONA.value.search(raw_bytes)
+
+    def test_plain_not_updating_persona_does_not_match(self):
+        assert Prompt.GAME_OVER_NOT_UPDATING_PERSONA.value.search(b"Not updating persona.\r\n") is None
+
     def test_spoken_cheerio_does_not_match(self):
         spoken = b'\x1b[0;33;40mBriana the protector says "\x1b[1;33;40mCheerio!\x1b[0;33;40m".\x1b[1;37;40m\r\n'
         assert Prompt.GAME_OVER_QUIT_CHEERIO.value.search(spoken) is None

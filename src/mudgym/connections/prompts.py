@@ -31,6 +31,7 @@ SGR_ONE_PLUS_STR = r"(?:\x1b\[[0-9;]*m)+"
 
 # Optional ANSI SGR (bytes version for binary patterns)
 SGR = rb"(?:\x1b\[[0-9;]*m)*"
+SGR_ONE_PLUS_BYTES = rb"(?:\x1b\[[0-9;]*m)+"
 
 # Optional terminal CSI controls at the start of a raw wire line. Besides colour changes, menu
 # redraws can emit screen-clear and cursor-positioning controls before their input prompt.
@@ -176,7 +177,9 @@ class Prompt(enum.Enum):
         rb"(?m)^" + SGR + rb"Overall, you (?:scored|lost) [\d,]+ points this game\." + SGR + rb"\r?$"
     )
     GAME_OVER_QUIT_CHEERIO = re.compile(rb"(?m)^" + SGR + rb"Cheerio!" + SGR + rb"\r?$")
-    GAME_OVER_NOT_UPDATING_PERSONA = re.compile(rb"(?m)^" + SGR + rb"Not updating persona\." + SGR + rb"\r?$")
+    GAME_OVER_NOT_UPDATING_PERSONA = re.compile(
+        rb"(?m)^" + SGR_ONE_PLUS_BYTES + rb"Not updating persona\." + SGR_ONE_PLUS_BYTES + rb"\r?$"
+    )
     GAME_OVER_KILLED_FOR_SWEARING = re.compile(
         rb"(?m)^" + SGR + rb"In order to keep the game uncorrupted,\s+you have been killed\.\s*"
         rb"\(Persona saved on\s+[+-][\d,]+\s*=\s*(?:\x1b\[[0-9;]*m)+\d[\d,]*(?:\x1b\[[0-9;]*m)*\)\."
