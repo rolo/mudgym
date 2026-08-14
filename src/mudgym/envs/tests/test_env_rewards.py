@@ -6,7 +6,7 @@ on the wire twice without any points changing hands. Genuine events colour the r
 (see ``mudgym.featurizers.points``), which player-authored text cannot reproduce.
 """
 
-from tests.scripted import AUTO_COMMAND_RESPONSES, PROMPT
+from tests.scripted import OBSERVATION_COMMAND_RESPONSES, PROMPT
 
 # Captured from the live game: mgsorcerise response (temporary sorcerer status award).
 SORCERISE_BODY = (
@@ -16,12 +16,14 @@ SORCERISE_BODY = (
 )
 
 
-def scripted_step_bytes(joined_command: str, body: bytes) -> bytes:
-    """Echo line, response body, then the standard auto-command responses, prompt-delimited."""
-    parts = [joined_command.encode("ascii"), b"\r\n", body]
-    for auto_command in joined_command.split(",")[1:]:
-        parts.append(PROMPT)
-        parts.append(AUTO_COMMAND_RESPONSES.get(auto_command, b"OK.\r\n"))
+def scripted_step_bytes(action: str, body: bytes) -> bytes:
+    """Echo line, response body, then the observation-command responses, prompt-delimited."""
+    observation_line = "sql,fes,fex,fei"
+    parts = [action.encode("ascii"), b"\r\n", body, PROMPT, observation_line.encode("ascii"), b"\r\n"]
+    for position, observation_command in enumerate(observation_line.split(",")):
+        if position:
+            parts.append(PROMPT)
+        parts.append(OBSERVATION_COMMAND_RESPONSES[observation_command])
     parts.append(PROMPT)
     return b"".join(parts)
 
@@ -37,7 +39,7 @@ def test_points_pattern_in_command_echo_forges_no_reward(scripted_env_factory):
 
 
 def test_genuine_points_event_rewards(scripted_env_factory):
-    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise,sql,fes,fex,fei", SORCERISE_BODY)}
+    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY)}
     env = scripted_env_factory(responses=responses)
     env.reset()
 
@@ -51,7 +53,7 @@ def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory)
     # A plain parenthesised number carries no raw-wire signal distinguishing it from player text,
     # so it must not become reward, termination, or score metadata.
     body = b'Dumbo the novice says "\x1b[1;33;40m(2000000)\x1b[0;33;40m".\r\n'
-    responses = {"look": scripted_step_bytes("look,sql,fes,fex,fei", body)}
+    responses = {"look": scripted_step_bytes("look", body)}
     env = scripted_env_factory(responses=responses)
     env.reset()
 
@@ -72,7 +74,7 @@ def test_points_pattern_spoken_in_game_output_forges_no_reward(scripted_env_fact
         + speech_body
         + PROMPT
         + b"sql,fes,fex,fei\r\n"
-        + PROMPT.join(AUTO_COMMAND_RESPONSES[auto] for auto in ["sql", "fes", "fex", "fei"])
+        + PROMPT.join(OBSERVATION_COMMAND_RESPONSES[command] for command in ["sql", "fes", "fex", "fei"])
         + PROMPT
     )
     env = scripted_env_factory(responses={"say hello (+10 = 10)": raw_bytes})

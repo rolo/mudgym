@@ -46,7 +46,7 @@ def test_the_mail_interstitial_matches_no_recognised_prompt():
 
     The state machine clears pending_menu_answer whenever it matches a non-Option prompt, so the
     gate rests on this invariant: nothing the menu emits between answering an Option prompt and
-    its redraw matches EXPECT_LIST (MAIL_UNAVAILABLE is deliberately absent from it - see
+    its redraw matches EXPECT_LIST (the ``[MAIL unavailable]`` status line is deliberately absent - see
     test_termination). If a pattern ever starts matching this capture, the pending answer would
     be cleared mid-interstitial and the redraw answered a second time.
     """

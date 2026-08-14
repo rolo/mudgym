@@ -53,7 +53,7 @@ class TestUpToNextPromptStopsAtAMidStreamPrompt:
     must stop at the first such prompt rather than extending to the end of the received data and
     swallowing the following command's echo and marker."""
 
-    # captured from a flaky docker_run send_command window: the rejection of the first line, its
+    # captured from a flaky docker_run read window: the rejection of the first line, its
     # prompt, and the whole fei exchange all arrived in one read
     RUN_AHEAD = (
         b'I made no sense of that: "not updating persona", but it\'s an excluding preposition.\r\n'

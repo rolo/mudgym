@@ -5,8 +5,6 @@ their own line for speech actions. The step must come back complete, with the fi
 claimed positionally and both echo lines removed from the text observation.
 """
 
-import pytest
-
 
 def test_say_step_completes_with_fields_populated(scripted_env_factory):
     env = scripted_env_factory()
@@ -34,19 +32,7 @@ def test_speech_response_lands_in_the_text_observation(scripted_env_factory):
     assert 'says "hello"' in obs["text"]
 
 
-def test_converse_actions_are_rejected(scripted_env_factory):
-    # converse mode would turn every later line into speech, autos included, desynchronising the
-    # transport for the rest of the episode
-    env = scripted_env_factory()
-    env.reset()
-
-    with pytest.raises(ValueError, match="converse"):
-        env.step("converse rat")
-    with pytest.raises(ValueError, match="converse"):
-        env.step("get sword,converse rat")
-
-
-def test_plain_commands_still_use_the_single_line_wire_format(scripted_env_factory):
+def test_plain_commands_use_separate_action_and_observation_lines(scripted_env_factory):
     env = scripted_env_factory()
     env.reset()
 
@@ -54,5 +40,4 @@ def test_plain_commands_still_use_the_single_line_wire_format(scripted_env_facto
 
     assert truncated is False
     connection = env.unwrapped.session.connection
-    assert connection.sent_lines[-1] == ["look,sql,fes,fex,fei"]
-    assert connection.commands[-1] == "look,sql,fes,fex,fei"
+    assert connection.sent_lines[-1] == ["look", "sql,fes,fex,fei"]

@@ -20,4 +20,4 @@ Agents are named `player_0`, `player_1`, and so on. Finished agents are removed 
 
 !!! note "Parallel API, serial game"
 
-    Actions arrive together, but MUD2 processes them one at a time. `step_order` controls the order: `"rotate"` (default) rotates the first mover each step, `"fixed"` keeps the same order, and `"shuffle"` randomises it.
+    Although MUD2 processes input serially, each parallel step has a joint action phase followed by a joint observation phase. Every live player acts in stable `env.agents` order before any player gathers the observation for that step.

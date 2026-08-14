@@ -1,7 +1,7 @@
 """An action is one logical game input line.
 
-A line break inside an action would smuggle an extra wire command past the batch assembly (the
-env appends its own auto-command line), so the action charset excludes CR and LF while the
+A line break inside an action would smuggle an extra wire command past Session's line framing (the
+observation-command line is sent separately), so the action charset excludes CR and LF while the
 observation text charset keeps its line-break support.
 """
 
@@ -36,34 +36,10 @@ def test_ordinary_and_speech_actions_remain_valid(scripted_env, action):
     assert scripted_env.action_space.contains(action) is True
 
 
-@pytest.mark.parametrize("action", ["look\nnorth", "look\rnorth", "look\r\nnorth"])
-def test_step_rejects_line_breaks_before_any_transport_send(scripted_env, action):
-    scripted_env.reset()
-    connection = scripted_env.unwrapped.session.connection
-    commands_before = list(connection.commands)
-
-    with pytest.raises(ValueError, match="single logical input line"):
-        scripted_env.step(action)
-
-    assert connection.commands == commands_before
-
-
-@pytest.mark.parametrize("action", ["say hello\nCheerio!", "moan hello\nCheerio!"])
-def test_line_break_cannot_manufacture_a_game_over_wire_line(scripted_env, action):
-    scripted_env.reset()
-    connection = scripted_env.unwrapped.session.connection
-    commands_before = list(connection.commands)
-
-    with pytest.raises(ValueError, match="single logical input line"):
-        scripted_env.step(action)
-
-    assert connection.commands == commands_before
-
-
 def test_a_high_wire_byte_in_game_text_fails_loudly(scripted_env_factory):
     # bytes above 0x7F are protocol codes, never text; silently decoding one would mask the leak
     body_env = scripted_env_factory(
-        responses={"look": scripted_response("look,sql,fes,fex,fei").replace(b"dusty road", b"caf\xe9 road")}
+        responses={"look": scripted_response(["look", "sql,fes,fex,fei"]).replace(b"dusty road", b"caf\xe9 road")}
     )
     body_env.reset()
 

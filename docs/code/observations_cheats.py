@@ -5,9 +5,10 @@
 def example(fragments) -> None:
     from mudgym import make_env
 
-    env = make_env(observation="cheats")
+    env = make_env(observation="cheats", render_mode="ansi")
     observation, info = env.reset()
+    rendered = env.render()
     env.close()
 
     fragments.write_fragment("observations-cheats", fragments.observation_table(observation))
-    fragments.write_ansi("observations-cheats", info["render_bytes"])
+    fragments.write_ansi("observations-cheats", rendered.encode("latin-1"))

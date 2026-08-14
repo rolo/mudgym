@@ -5,77 +5,31 @@ from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
 from mudgym.connections.docker_run import DockerRunConnection
 from mudgym.connections.provider import DockerExecProvider
-from mudgym.logs import get_logger
-
-logger = get_logger(__name__)
 
 connections: dict[str, type[MudConnection]] = {
     "docker_run": DockerRunConnection,
     "docker_exec": DockerExecConnection,
 }
 
-# connections available in the current environment
-connection_slugs = [conn.strip() for conn in AVAILABLE_CONNECTIONS.split(",")]
-available_connections: list[type[MudConnection]] = []
+# Connections enabled in the current environment, preserving configured order.
 available_connections_dict: dict[str, type[MudConnection]] = {}
-
-for slug in connection_slugs:
+for configured_slug in AVAILABLE_CONNECTIONS.split(","):
+    slug = configured_slug.strip()
     conn_cls = connections.get(slug)
-    if conn_cls is not None and conn_cls.is_available():
-        available_connections.append(conn_cls)
+    if conn_cls is not None:
         available_connections_dict[slug] = conn_cls
 
-# default connection can be specified as slug via env var, or defaults to first in available_connections
+# default connection can be specified as a slug, or defaults to the first configured connection
 _default_slug = os.getenv("MUDGYM_DEFAULT_CONNECTION")
-if _default_slug:
-    default_connection = available_connections_dict.get(_default_slug, available_connections[0])
-else:
-    default_connection = available_connections[0]
+default_connection = available_connections_dict.get(_default_slug) if _default_slug else None
+if default_connection is None:
+    default_connection = next(iter(available_connections_dict.values()))
 
 
-def list_connections() -> list[dict[str, str | bool]]:
-    """
-    Get information about all registered connections.
-
-    Returns:
-        A list of dictionaries containing:
-            - name: Connection slug/name
-            - class_name: Connection class name
-            - available: Whether the connection is available
-            - is_default: Whether this is the default connection
-    """
-    result = []
-    requested = {slug: idx for idx, slug in enumerate(connection_slugs)}
-
-    for slug, conn_class in connections.items():
-        is_requested = slug in requested
-        result.append(
-            {
-                "name": slug,
-                "class_name": conn_class.__name__,
-                "available": is_requested and conn_class.is_available(),
-                "is_default": conn_class == default_connection,
-            }
-        )
-    return result
-
-
-# The env factory resolves both defaults through this module at call time rather than import so we can swap them out
-# at runtime for the docs builder
+# The env factory resolves both defaults through this module at call time so tooling can replace them.
 default_provider_factory = DockerExecProvider
 
 
-def show_connections() -> None:
-    """Display a structured list of all connections and their status."""
-    conn_list = list_connections()
-
-    logger.info("connections.list")
-    for conn in conn_list:
-        default_text = " (default)" if conn["is_default"] else ""
-        print(
-            f"{conn['name']}: {conn['class_name']} ({'available' if conn['available'] else 'unavailable'}){default_text}"
-        )
-
-
-if __name__ == "__main__":
-    show_connections()
+def default_parallel_provider_factory() -> DockerExecProvider:
+    """Create the default provider for players who have explicitly asked to share one world."""
+    return DockerExecProvider(worlds=1)

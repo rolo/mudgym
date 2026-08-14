@@ -37,7 +37,7 @@ class MGCheatsField(ObservationField):
 
     command = "mgcheats"
 
-    # the closing tag closes the read window when mgcheats terminates the auto-command batch
+    # the closing tag closes the read window when mgcheats is the final observation command
     end_of_turn_marker = re.compile(rb"\[/mgcheats\]\r?\n")
 
     BIT_KEYS = ("fighting", "dark", "glowing", "asleep", "gifted")

@@ -1,7 +1,7 @@
 import pytest
 
 FORD_COLLAPSE_BYTES = (
-    b"\x1b[1;37;40mmove swampward,sql,fes,fex,fei\r\n"
+    b"\x1b[1;37;40mmove swampward\r\n"
     b"\x1b[32mFord across river\x1b[37m.\r\n"
     b"\x1b[0;32;40mYou are standing on a ford across a fast-flowing river. To the west is a badly-paved "
     b"road, which carries on into the distance. Northwest is a ramshackle old building, and southwest "
@@ -13,7 +13,7 @@ FORD_COLLAPSE_BYTES = (
     b"You feel unbearably giddy.\r\n"
     b"You collapse, unconscious.\r\n"
     b"Your stamina has fallen from \x1b[0;33;40m11\x1b[1;37;40m to \x1b[31m1\x1b[37m.\r\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei\r\n"
     b"You can't wake yourself up yet!\r\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
     b"\x1b[1;31;40m1\x1b[0;37;40m \x1b[1;32;40m51\x1b[0;37;40m 33 47 39 52 0 51 075 N N N N 52 R\r\n"
@@ -26,30 +26,32 @@ FORD_COLLAPSE_BYTES = (
 
 
 def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_env_factory):
-    """A player-state refusal in an auto-command slot must not crash the parse.
+    """A player-state refusal in an observation-command slot must not crash the parse.
 
     The refusal chunk occupies the field's position in the tail split, so alignment holds;
     the field keeps its empty defaults for the turn, the refusal is recorded in the info
     dict, and the player-visible line stays in the text observation.
     """
     env = scripted_env_factory(observation="parsed")
-    info = {"last_command": "move swampward"}
-
-    obs = env.bytes_to_observation(FORD_COLLAPSE_BYTES, info)
+    obs, _, field_refusals = env.bytes_to_observation(
+        FORD_COLLAPSE_BYTES,
+        wire_lines=["move swampward", "sql,fes,fex,fei"],
+        response_complete=True,
+    )
 
     # sql was refused: its keys stay at the empty defaults
     assert obs["room_name"] == ""
 
-    # the other auto commands answered normally and still extract
+    # the other observation commands answered normally and still extract
     assert obs["available_exits"].sum() == 13
 
     # the refusal is recorded explicitly, verbatim
-    assert info["field_refusals"] == {"SuperQuickLookField": b"You can't wake yourself up yet!\r\n"}
+    assert field_refusals == {"SuperQuickLookField": b"You can't wake yourself up yet!\r\n"}
 
     # the player saw the refusal and the collapse: both survive in the text observation
-    assert "You can't wake yourself up yet!" in info["text"]
-    assert "You collapse, unconscious." in info["text"]
-    assert "\x1b" not in info["text"]
+    assert "You can't wake yourself up yet!" in obs["text"]
+    assert "You collapse, unconscious." in obs["text"]
+    assert "\x1b" not in obs["text"]
 
 
 VAMPIRE_BLIND_BYTES = (
@@ -61,9 +63,9 @@ VAMPIRE_BLIND_BYTES = (
     b"\x1b[37mThe vampire makes some magical gestures.\r\n"
     b"\x1b[31mYou have suddenly and magically gone blind!\x1b[37m\r\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-    b"west,sql,fes,fex,fei\r\n"
+    b"west\r\n"
     b"You can't just leave in the middle of a fight! You have to flee!\r\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei\r\n"
     b"You can't see a thing, you're blind.\r\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
     b"\x1b[1;33;40m51\x1b[0;37;40m \x1b[1;32;40m73\x1b[0;37;40m 55 55 21 52 0 73 0200 Y N N N 52 F\r\n"
@@ -84,13 +86,15 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     above the divider. Every slot resolves and the refusal keeps sql's empty defaults.
     """
     env = scripted_env_factory(observation="parsed")
-    info = {"last_command": "west"}
-
-    obs = env.bytes_to_observation(VAMPIRE_BLIND_BYTES, info)
+    obs, _, field_refusals = env.bytes_to_observation(
+        VAMPIRE_BLIND_BYTES,
+        wire_lines=["west", "sql,fes,fex,fei"],
+        response_complete=True,
+    )
 
     # sql was refused: its keys stay at the empty defaults
     assert obs["room_name"] == ""
-    assert info["field_refusals"] == {"SuperQuickLookField": b"You can't see a thing, you're blind.\r\n"}
+    assert field_refusals == {"SuperQuickLookField": b"You can't see a thing, you're blind.\r\n"}
 
     # fes answered normally and still extracts
     assert obs["vitals"][0] == 51
@@ -103,20 +107,20 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     assert obs["inventory"] == ()
 
     # the player saw the blinding and the refusal: both survive in the text observation
-    assert "You have suddenly and magically gone blind!" in info["text"]
-    assert "You can't see a thing, you're blind." in info["text"]
-    assert "\x1b" not in info["text"]
+    assert "You have suddenly and magically gone blind!" in obs["text"]
+    assert "You can't see a thing, you're blind." in obs["text"]
+    assert "\x1b" not in obs["text"]
 
 
-def test_unknown_auto_command_chunk_still_fails_loudly(scripted_env_factory):
-    """Only recognised player-state refusals default; anything else keeps the hard assert."""
+def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_factory):
+    """Only recognised player-state refusals default; anything else raises explicitly."""
     env = scripted_env_factory(observation="parsed")
-    info = {"last_command": "look"}
     prompt = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
     raw_bytes = (
-        b"look,sql,fes,fex,fei\r\n"
+        b"look\r\n"
         b"Some narrative.\r\n"
         + prompt
+        + b"sql,fes,fex,fei\r\n"
         + b"Certainly not a super quick look.\r\n"
         + prompt
         + b"\x1b[33m11\x1b[37m \x1b[1;32;40m51\x1b[0;37;40m 38 47 43 52 0 51 075 N N N N 52 R\r\n"
@@ -127,5 +131,9 @@ def test_unknown_auto_command_chunk_still_fails_loudly(scripted_env_factory):
         + prompt
     )
 
-    with pytest.raises(AssertionError, match="SuperQuickLookField.*found no matching response"):
-        env.bytes_to_observation(raw_bytes, info)
+    with pytest.raises(RuntimeError, match="SuperQuickLookField.*found no matching response"):
+        env.bytes_to_observation(
+            raw_bytes,
+            wire_lines=["look", "sql,fes,fex,fei"],
+            response_complete=True,
+        )

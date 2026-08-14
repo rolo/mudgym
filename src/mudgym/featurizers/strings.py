@@ -49,7 +49,7 @@ def encode_command_bytes(text: str) -> bytes:
     when the text contains characters the game cannot receive.
 
     The game's text channel is 7-bit (see NON_TEXT_BYTE_RE): a high byte sent as a command is
-    transliterated rather than echoed back, so the exact-echo anchoring in send_command would
+    transliterated rather than echoed back, so the read window's exact-echo anchoring would
     wait out its timeout instead of matching.
     """
     try:

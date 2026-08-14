@@ -1,17 +1,19 @@
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
-from functools import partial
 from typing import Any
 
 import gymnasium as gym
-from gymnasium.vector import AutoresetMode, SyncVectorEnv
-from gymnasium.wrappers import FilterObservation
+from gymnasium.vector import VectorEnv
+from pettingzoo import ParallelEnv
 
 from mudgym.connections import registry
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.provider import ConnectionProvider
-from mudgym.connections.registry import connections
-from mudgym.envs.actions.discrete import DiscreteDirectionsWrapper
+from mudgym.envs.actions.discrete import (
+    DiscreteDirectionsWrapper,
+    ParallelDiscreteDirectionsWrapper,
+    VectorDiscreteDirectionsWrapper,
+)
 from mudgym.envs.env import MudEnv
 from mudgym.envs.fields import (
     FEInventoryField,
@@ -23,15 +25,13 @@ from mudgym.envs.fields import (
     SuperQuickLookField,
 )
 from mudgym.envs.vector import MudVectorEnv
-from mudgym.envs.zoo import MudParallelEnv, RenderMode, StepOrder
+from mudgym.envs.zoo import MudParallelEnv
 
-OBSERVATION_FIELDS: dict[str, tuple[FieldSpec, ...]] = {
-    # every preset needs to end with an end of turn marker capable field
+OBSERVATION_PRESETS: dict[str, tuple[FieldSpec, ...]] = {
+    # Every preset must end with a field that can tell the transport its read window is complete.
     "bytes": (RawBytesField, FEScoreField(include_keys=())),
     "text": (FEScoreField(include_keys=("points",)),),
     "parsed": (
-        # sql also parses portables/inventory from the look text, but FEInventoryField's dedicated
-        # fei response owns those keys
         SuperQuickLookField(include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")),
         FEScoreField,
         FEXitsField,
@@ -46,8 +46,8 @@ OBSERVATION_FIELDS: dict[str, tuple[FieldSpec, ...]] = {
 }
 
 
-def _close_quietly(*closeables: Any) -> None:
-    """Best-effort teardown: a failing close() must not mask the error that got us here."""
+def close_quietly(*closeables: Any) -> None:
+    """Close what we can without replacing the construction error already being raised."""
     for closeable in closeables:
         if closeable is not None:
             with suppress(Exception):
@@ -61,213 +61,155 @@ def _resolve_field_parsers(
     if field_parsers is not None:
         return tuple(field_parsers)
     try:
-        return OBSERVATION_FIELDS[observation]
+        return OBSERVATION_PRESETS[observation]
     except KeyError:
-        raise ValueError(f"observation must be one of {sorted(OBSERVATION_FIELDS)} (got {observation!r})") from None
+        raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})") from None
 
 
 def make_env(
     observation: str = "parsed",
-    exclude_keys: str | Sequence[str] | None = None,
     field_parsers: Sequence[FieldSpec] | None = None,
     actions: str = "text",
-    render_mode: RenderMode | None = None,
+    render_mode: str | None = None,
     connection: str | type[MudConnection] | Callable[..., MudConnection] | MudConnection | None = None,
     connection_kwargs: Mapping[str, Any] | None = None,
-    wrappers: Sequence[Callable[[gym.Env], gym.Env]] | None = None,
-    auto_commands: Sequence[str] | None = None,
     tearoom_commands: str | None = None,
 ) -> gym.Env:
-    """Build a single MUD2 environment, applying observation parsing, action wrapping, and rendering.
-
-    Args:
-        observation: Named observation preset -- ``"bytes"``, ``"text"``, ``"parsed"`` (default), or ``"cheats"``.
-        exclude_keys: Observation key(s) to drop from the resulting space; unknown keys raise.
-        field_parsers: Explicit observation fields; replaces the ``observation`` preset when given.
-        actions: ``"text"`` (free-form, default) or ``"directions"`` (discrete compass wrapper).
-            A text action is a single logical game input line: comma-chaining is allowed, line
-            breaks are not (the env appends its own auto-command line each step).
-        render_mode: ``None``, ``"human"``, or ``"ansi"``.
-        connection: Connection backend -- a registry slug, a class, an instance, or any zero-arg callable.
-            ``None`` (default) resolves the registry's ``default_connection`` at call time.
-        connection_kwargs: Kwargs bound to the connection class/callable; not valid with an instance.
-        wrappers: Extra Gymnasium wrappers applied last, in order.
-        auto_commands: Commands appended after the action each step to populate fields; defaults to the
-            configured fields' commands.
-        tearoom_commands: Command line issued once per ``reset()`` while still in the tearoom
-    """
-    env_kwargs: dict[str, Any] = {}
-    # field_parsers replaces the observation preset when given (full control); otherwise the named preset.
-    env_kwargs["field_parsers"] = _resolve_field_parsers(observation, field_parsers)
-    env_kwargs["auto_commands"] = auto_commands
-    env_kwargs["tearoom_commands"] = tearoom_commands
-    env_kwargs["render_mode"] = render_mode
-    exclude_list = [exclude_keys] if isinstance(exclude_keys, str) else list(exclude_keys or [])
-
-    # resolved through the registry module at call time so tooling can swap the default
-    if connection is None:
-        connection = registry.default_connection
-
-    # resolve string slugs to a connection class
-    if isinstance(connection, str):
-        connection = connections[connection]
-
-    # already instantiated
-    if isinstance(connection, MudConnection):
-        if connection_kwargs:
-            raise ValueError("connection_kwargs is not valid when passing an explicit connection instance.")
-        env_kwargs["connection"] = connection
-    else:
-        # a connection class (or any zero-arg-capable callable); bind kwargs into a factory
-        env_kwargs["connection"] = partial(connection, **connection_kwargs) if connection_kwargs else connection
-
-    # Validate configuration before acquiring resources: MudEnv owns a connection, so anything that can
-    # be rejected up front must be rejected before the env (and its connection) is constructed.
+    """Build one Gymnasium environment."""
     if actions not in {"text", "directions"}:
         raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
+    if isinstance(connection, MudConnection) and connection_kwargs:
+        raise ValueError("connection_kwargs is not valid when passing an explicit connection instance.")
+    fields = _resolve_field_parsers(observation, field_parsers)
 
-    # Once MudEnv is constructed it owns the connection; any failure while wrapping it must close the
-    # env (Gymnasium treats close() as the cleanup point for external resources) so we don't leak it.
-    env: gym.Env = MudEnv(**env_kwargs)
+    connection_factory = registry.default_connection if connection is None else connection
+    if isinstance(connection_factory, str):
+        connection_factory = registry.connections[connection_factory]
+    resolved_connection = (
+        connection_factory
+        if isinstance(connection_factory, MudConnection)
+        else connection_factory(**dict(connection_kwargs or {}))
+    )
+
     try:
-        # drop unwanted keys, failing fast on typos so callers learn about bad keys here
-        if exclude_list:
-            existing = set(env.observation_space.spaces.keys())
-            unknown = set(exclude_list) - existing
-            if unknown:
-                raise ValueError(f"Unknown exclude_keys: {sorted(unknown)}. Valid: {sorted(existing)}")
-
-            excluded = set(exclude_list)
-            final_keys = [key for key in env.observation_space.spaces if key not in excluded]
-            if not final_keys:
-                raise ValueError("exclude_keys cannot remove every observation key.")
-            if len(final_keys) != len(existing):
-                env = FilterObservation(env, filter_keys=final_keys)
-
-        # action space wrappers ("text" needs none)
-        if actions == "directions":
-            env = DiscreteDirectionsWrapper(env)
-
-        # any other wrappers
-        for wrapper in wrappers or ():
-            env = wrapper(env)
-
-        return env
+        # MudEnv owns the connection as soon as construction succeeds. Until then it is still ours to close if field validation or session setup fails.
+        env: gym.Env = MudEnv(
+            connection=resolved_connection,
+            field_parsers=fields,
+            render_mode=render_mode,
+            tearoom_commands=tearoom_commands,
+        )
     except BaseException:
-        env.close()
+        close_quietly(resolved_connection)
+        raise
+    if actions == "text":
+        return env
+
+    try:
+        return DiscreteDirectionsWrapper(env)
+    except BaseException:
+        close_quietly(env)
         raise
 
 
 def make_vector_env(
     envs: int,
     *,
-    worlds: int | None = None,
-    make_env_kwargs: Mapping[str, Any] | None = None,
-    provider_factory: Callable[..., ConnectionProvider] | None = None,
-    provider_kwargs: Mapping[str, Any] | None = None,
-    wrappers: Sequence[Callable[[gym.Env], gym.Env]] | None = None,
-    autoreset_mode: AutoresetMode = AutoresetMode.DISABLED,
-) -> MudVectorEnv:
+    observation: str = "parsed",
+    field_parsers: Sequence[FieldSpec] | None = None,
+    actions: str = "text",
+    render_mode: str | None = None,
+    tearoom_commands: str | None = None,
+    provider: ConnectionProvider | None = None,
+) -> VectorEnv:
+    """Create a Gymnasium vector env. It need not know how worlds are arranged.
+
+    The provider decides where the connections lead. Reset is deliberately all-or-nothing for now, and both reset and step finish the shared action/setup work before collecting observations. A supplied provider becomes the resulting environment's responsibility and is closed with it.
     """
-    Create a vectorized environment backed by a ConnectionProvider.
+    if envs < 1:
+        raise ValueError("envs must be at least 1.")
+    if actions not in {"text", "directions"}:
+        raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
+    fields = _resolve_field_parsers(observation, field_parsers)
 
-    Args:
-        envs: Number of environments.
-        worlds: Number of game world instances. Defaults to `envs` (one world per env).
-        make_env_kwargs: Keyword args to pass to `make_env()`.
-        provider_factory: Callable that creates a ConnectionProvider. Defaults to the registry's
-            ``default_provider_factory`` (DockerExecProvider) resolved at call time.
-        provider_kwargs: Keyword args to pass to `provider_factory`.
-        autoreset_mode: Defaults to `AutoresetMode.DISABLED`; `NEXT_STEP` and `SAME_STEP` are also supported.
-    """
+    if provider is None:
+        provider = registry.default_provider_factory()
+    connections: list[MudConnection] = []
+    children: list[MudEnv] = []
 
-    # default to one game world per env if not specified
-    if worlds is None:
-        worlds = envs
-
-    if provider_factory is None:
-        provider_factory = registry.default_provider_factory
-
-    make_env_kwargs = dict(make_env_kwargs or {})
-
-    provider_kwargs = dict(provider_kwargs or {})
-    provider_kwargs.setdefault("worlds", worlds)
-    connection_provider = provider_factory(**provider_kwargs)
-
-    # The provider owns shared infrastructure (containers) the moment it is constructed, and
-    # create_connection() / SyncVectorEnv / MudVectorEnv can all fail. Build the whole sequence inside a
-    # single cleanup scope so a failure anywhere tears down both the vector env (and its sub-env
-    # connections) and the provider, rather than leaking them.
-    venv: SyncVectorEnv | None = None
     try:
-        env_fns = [
-            partial(
-                make_env,
-                connection=connection_provider.create_connection(i),
-                wrappers=wrappers,
-                **make_env_kwargs,
+        # The provider returns the whole batch in one go so it can size any shared resources. We still check the length here: a custom provider should fail loudly rather than create a vector whose actual shape disagrees with its public shape.
+        connections = provider.create_connections(envs)
+        if len(connections) != envs:
+            raise RuntimeError(f"Provider returned {len(connections)} connections, expected {envs}.")
+
+        for connection in connections:
+            children.append(
+                MudEnv(
+                    connection=connection,
+                    field_parsers=fields,
+                    render_mode=render_mode,
+                    tearoom_commands=tearoom_commands,
+                )
             )
-            for i in range(envs)
-        ]
-        venv = SyncVectorEnv(env_fns, copy=False, autoreset_mode=autoreset_mode)
-        return MudVectorEnv(venv, provider=connection_provider)
+
+        base_env = MudVectorEnv(children, provider=provider)
+        if actions == "directions":
+            return VectorDiscreteDirectionsWrapper(base_env)
+        return base_env
     except BaseException:
-        _close_quietly(venv, connection_provider)
+        # Every successful child owns its matching connection. Anything after that prefix never made it into a MudEnv and still needs closing directly; the provider owns the resources underneath both groups. Cleanup errors are secondary to the construction failure.
+        close_quietly(*children, *connections[len(children) :], provider)
         raise
 
 
 def make_parallel_env(
     agents: int = 2,
     *,
-    make_env_kwargs: Mapping[str, Any] | None = None,
-    provider_factory: Callable[..., ConnectionProvider] | None = None,
-    provider_kwargs: Mapping[str, Any] | None = None,
-    render_mode: RenderMode | None = None,
-    step_order: StepOrder = "rotate",
-) -> MudParallelEnv:
-    """Create a PettingZoo ParallelEnv with multiple agents sharing one game world.
+    observation: str = "parsed",
+    field_parsers: Sequence[FieldSpec] | None = None,
+    actions: str = "text",
+    render_mode: str | None = None,
+    tearoom_commands: str | None = None,
+    provider: ConnectionProvider | None = None,
+) -> ParallelEnv:
+    """Create a PettingZoo environment whose players share one MUD world.
 
-    Args:
-        agents: Number of agents.
-        make_env_kwargs: Keyword args passed to `make_env()` for each agent.
-        provider_factory: Callable that creates a ConnectionProvider. Defaults to the registry's
-            ``default_provider_factory`` (DockerExecProvider) resolved at call time.
-        provider_kwargs: Keyword args for provider_factory.
-        render_mode: Top-level PettingZoo render mode. When set, child envs default to
-            ``ansi`` so the wrapper labels each frame rather than children printing on their own.
-        step_order: How same tick actions resolve in the shared world. "rotate" stops one
-            agent always going first, "fixed" keeps a stable order, and "shuffle"
-            randomises the order each step.
+    The registry supplies a one-world default. If a caller passes a provider we trust that it honours the same promise.
+    The resulting environment owns that provider, and action wrappers sit around the joint environment rather than around each player.
     """
-    if provider_factory is None:
-        provider_factory = registry.default_provider_factory
+    if agents < 1:
+        raise ValueError("agents must be at least 1.")
+    if actions not in {"text", "directions"}:
+        raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
+    fields = _resolve_field_parsers(observation, field_parsers)
+    child_render_mode = "ansi" if render_mode is not None else None
 
-    make_env_kwargs = dict(make_env_kwargs or {})
-    if render_mode is not None:
-        child_render_mode = make_env_kwargs.setdefault("render_mode", "ansi")
-        if child_render_mode != "ansi":
-            raise ValueError(
-                "make_parallel_env(render_mode=...) requires child envs with render_mode='ansi'; "
-                "omit make_env_kwargs['render_mode'] to use the default."
-            )
-
-    provider_kwargs = dict(provider_kwargs or {})
-    provider_kwargs.setdefault("worlds", 1)
-    connection_provider = provider_factory(**provider_kwargs)
-    envs: dict[str, gym.Env] = {}
+    if provider is None:
+        provider = registry.default_parallel_provider_factory()
+    connections: list[MudConnection] = []
+    children: dict[str, MudEnv] = {}
 
     try:
-        for i in range(agents):
-            envs[f"player_{i}"] = make_env(
-                connection=connection_provider.create_connection(i),
-                **make_env_kwargs,
+        # As with the vector factory, batch size is worth checking even though the protocol promises it.
+        connections = provider.create_connections(agents)
+        if len(connections) != agents:
+            raise RuntimeError(f"Provider returned {len(connections)} connections, expected {agents}.")
+
+        for index, connection in enumerate(connections):
+            children[f"player_{index}"] = MudEnv(
+                connection=connection,
+                field_parsers=fields,
+                render_mode=child_render_mode,
+                tearoom_commands=tearoom_commands,
             )
-        return MudParallelEnv(
-            envs,
-            provider=connection_provider,
-            render_mode=render_mode,
-            step_order=step_order,
-        )
+
+        base_env = MudParallelEnv(children, provider=provider, render_mode=render_mode)
+        if actions == "directions":
+            return ParallelDiscreteDirectionsWrapper(base_env)
+        return base_env
     except BaseException:
-        _close_quietly(*envs.values(), connection_provider)
+        # Dict insertion order follows the connection batch. Successful children own the prefix;
+        # the remaining connections were allocated but never made it into a MudEnv.
+        close_quietly(*children.values(), *connections[len(children) :], provider)
         raise

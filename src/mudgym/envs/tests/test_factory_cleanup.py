@@ -7,76 +7,191 @@ from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
 from tests.scripted import ScriptedConnection
 
 
+class TrackingProvider:
+    def __init__(self):
+        self.connections: list[ScriptedConnection] = []
+        self.requested_count: int | None = None
+        self.closed = False
+
+    def create_connections(self, count: int) -> list[MudConnection]:
+        self.requested_count = count
+        self.connections = [ScriptedConnection() for _ in range(count)]
+        return list(self.connections)
+
+    def reset(self, *, seed=None) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def test_make_env_invalid_actions_rejected_before_constructing_env():
-    """An invalid actions value is rejected before the env (and its connection) is acquired."""
     conn = MudConnection()
     with pytest.raises(ValueError, match="actions must be one of"):
         make_env(connection=conn, actions="sideways")
-    # Validation happened before adoption, so make_env never owned (or opened) the connection.
     assert conn.sm is None
 
 
-def test_make_env_connection_kwargs_with_instance_rejected():
-    """connection_kwargs can't be combined with an already-constructed connection instance (there's nothing
-    to bind them to), so it fails fast rather than silently ignoring them."""
+def test_make_envconnection_kwargs_with_instance_rejected():
     conn = MudConnection()
     with pytest.raises(ValueError, match="connection_kwargs is not valid"):
         make_env(connection=conn, connection_kwargs={"account_id": "x"})
-    # Rejected before adoption: the passed-in connection was never opened.
     assert conn.sm is None
 
 
-def test_make_parallel_env_teardown_does_not_mask_the_original_error():
-    """If make_env fails and the provider's own close() then fails during teardown, the caller must still
-    see the original error, not the cleanup one."""
+@pytest.mark.parametrize(
+    ("factory", "factory_kwargs"),
+    [
+        (make_vector_env, {"envs": 1}),
+        (make_parallel_env, {"agents": 1}),
+    ],
+)
+def test_invalid_observation_is_rejected_before_adopting_provider(factory, factory_kwargs):
+    provider = TrackingProvider()
+
+    with pytest.raises(ValueError, match="observation must be one of"):
+        factory(provider=provider, observation="nope", **factory_kwargs)
+
+    assert provider.requested_count is None
+    assert provider.closed is False
+
+
+@pytest.mark.parametrize(
+    ("factory", "factory_kwargs"),
+    [
+        (make_vector_env, {"envs": 1}),
+        (make_parallel_env, {"agents": 1}),
+    ],
+)
+def test_provider_teardown_does_not_mask_batch_creation_error(factory, factory_kwargs):
     closed = []
 
     class FailingCloseProvider:
-        def __init__(self, **kwargs):
-            pass
-
-        def create_connection(self, index: int) -> MudConnection:
-            return MudConnection()
+        def create_connections(self, count: int) -> list[MudConnection]:
+            raise ValueError("connection batch failed")
 
         def close(self):
             closed.append(True)
             raise RuntimeError("provider close failed")
 
-    # an invalid observation preset makes make_env raise; teardown then hits the failing close
-    with pytest.raises(ValueError, match="observation must be one of"):
-        make_parallel_env(agents=1, provider_factory=FailingCloseProvider, make_env_kwargs={"observation": "nope"})
+    with pytest.raises(ValueError, match="connection batch failed"):
+        factory(provider=FailingCloseProvider(), **factory_kwargs)
 
     assert closed == [True]
 
 
-def test_make_vector_env_teardown_does_not_mask_the_original_error():
-    closed = []
+def test_make_env_constructor_failure_closes_connection():
+    connection = ScriptedConnection()
 
-    class FailingCloseProvider:
-        def __init__(self, **kwargs):
-            pass
+    with pytest.raises(ValueError, match="declare a command"):
+        make_env(connection=connection, field_parsers=[])
 
-        def create_connection(self, index: int) -> MudConnection:
-            return MudConnection()
-
-        def close(self):
-            closed.append(True)
-            raise RuntimeError("provider close failed")
-
-    with pytest.raises(ValueError, match="observation must be one of"):
-        make_vector_env(1, provider_factory=FailingCloseProvider, make_env_kwargs={"observation": "nope"})
-
-    assert closed == [True]
+    assert connection.closed is True
 
 
-def test_make_env_closes_connection_when_wrapper_construction_fails():
-    """Once MudEnv owns a connection, wrapper failures must close it."""
-    conn = ScriptedConnection()
+@pytest.mark.parametrize(
+    ("factory", "factory_kwargs"),
+    [
+        (make_vector_env, {"envs": 3}),
+        (make_parallel_env, {"agents": 3}),
+    ],
+)
+def test_child_constructor_failure_closes_entire_batch_and_provider(factory, factory_kwargs):
+    provider = TrackingProvider()
 
-    def broken_wrapper(env):
-        raise RuntimeError("wrapper failed")
+    with pytest.raises(ValueError, match="declare a command"):
+        factory(provider=provider, field_parsers=[], **factory_kwargs)
 
-    with pytest.raises(RuntimeError, match="wrapper failed"):
-        make_env(connection=conn, wrappers=[broken_wrapper])
+    assert all(connection.closed for connection in provider.connections)
+    assert provider.closed is True
 
-    assert conn.closed is True
+
+def test_vector_constructor_failure_closes_children_and_provider(monkeypatch):
+    provider = TrackingProvider()
+
+    def failing_vector_env(children, **kwargs):
+        raise RuntimeError("vector constructor failed")
+
+    monkeypatch.setattr("mudgym.envs.factory.MudVectorEnv", failing_vector_env)
+
+    with pytest.raises(RuntimeError, match="vector constructor failed"):
+        make_vector_env(3, provider=provider)
+
+    assert all(connection.closed for connection in provider.connections)
+    assert provider.closed is True
+
+
+def test_wrapper_constructor_failure_closes_children_and_provider(monkeypatch):
+    provider = TrackingProvider()
+
+    def failing_wrapper(env):
+        raise RuntimeError("wrapper constructor failed")
+
+    monkeypatch.setattr("mudgym.envs.factory.VectorDiscreteDirectionsWrapper", failing_wrapper)
+
+    with pytest.raises(RuntimeError, match="wrapper constructor failed"):
+        make_vector_env(3, provider=provider, actions="directions")
+
+    assert all(connection.closed for connection in provider.connections)
+    assert provider.closed is True
+
+
+def test_provider_returning_wrong_batch_size_is_closed_with_its_connections():
+    provider = TrackingProvider()
+
+    with pytest.raises(RuntimeError, match="returned 2 connections, expected 3"):
+        make_vector_env(3, provider=provider_with_fixed_count(provider, count=2))
+
+    assert all(connection.closed for connection in provider.connections)
+    assert provider.closed is True
+
+
+def provider_with_fixed_count(provider: TrackingProvider, *, count: int) -> TrackingProvider:
+    def create_connections(requested_count: int) -> list[MudConnection]:
+        provider.requested_count = requested_count
+        provider.connections = [ScriptedConnection() for _ in range(count)]
+        return list(provider.connections)
+
+    provider.create_connections = create_connections
+    return provider
+
+
+@pytest.mark.parametrize(
+    ("factory", "factory_kwargs", "expected_count"),
+    [
+        (make_vector_env, {"envs": 4}, 4),
+        (make_parallel_env, {"agents": 3}, 3),
+    ],
+)
+def test_factory_requests_one_connection_batch(factory, factory_kwargs, expected_count):
+    provider = TrackingProvider()
+
+    env = factory(provider=provider, **factory_kwargs)
+    try:
+        assert provider.requested_count == expected_count
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize(
+    ("factory", "factory_kwargs", "registry_factory_name"),
+    [
+        (make_vector_env, {"envs": 2}, "default_provider_factory"),
+        (make_parallel_env, {"agents": 2}, "default_parallel_provider_factory"),
+    ],
+)
+def test_default_provider_configuration_policy(monkeypatch, factory, factory_kwargs, registry_factory_name):
+    provider = TrackingProvider()
+    calls = []
+
+    def provider_factory():
+        calls.append(True)
+        return provider
+
+    monkeypatch.setattr(f"mudgym.envs.factory.registry.{registry_factory_name}", provider_factory)
+
+    env = factory(**factory_kwargs)
+    try:
+        assert calls == [True]
+    finally:
+        env.close()

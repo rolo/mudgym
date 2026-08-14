@@ -1,8 +1,9 @@
 import os
 import subprocess
 import time
+from contextlib import suppress
 from threading import Lock
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 from uuid import uuid4
 
 from mudgym.connections.config import DOCKER_IMAGE
@@ -13,25 +14,24 @@ from mudgym.logs import get_logger
 logger = get_logger(__name__)
 
 
-@runtime_checkable
 class ConnectionProvider(Protocol):
-    """
-    Protocol for providers that create connections to the game.
+    """Provides batches of connections backed by some shared set of resources.
 
-    Manages shared infrastructure (containers, slot bootstrapping) that may be
-    needed by multiple connections.
+    The provider decides what those connections are connected to. That might be one world per
+    connection, several players sharing a world, or something else entirely - the vector env doesn't need to
+    know.
 
-    Lifecycle contract:
-    - `create_connection(env_index)` is expected to be called once per env (per process).
-      The returned connection is owned by the environment.
-    - The provider creates connections but doesn't manage their lifecycle.
-      Connections are closed by environments when `env.close()` is called.
-    - The provider must be closed after all its environments are closed, since it owns the shared infrastructure
-    (e.g. containers) they depend on.
+    Once ``create_connections`` returns, the caller owns the connections. If it fails before returning, the
+    provider cleans up whatever that call managed to create. The provider itself stays around until the owning
+    environment closes, as it may also own containers or other resources the connections depend on.
     """
 
-    def create_connection(self, env_index: int) -> MudConnection:
-        """Create a connection for the given environment index."""
+    def create_connections(self, count: int) -> list[MudConnection]:
+        """Create exactly ``count`` connections, cleaning up this call if it fails."""
+        ...
+
+    def reset(self, *, seed: int | list[int | None] | None = None) -> None:
+        """Reset managed resources, interpreting seeds according to the provider's topology."""
         ...
 
     def close(self) -> None:
@@ -40,13 +40,14 @@ class ConnectionProvider(Protocol):
 
 
 class DockerExecProvider(ConnectionProvider):
-    """
-    Uses shared containers with multiple game worlds via docker exec.
+    """Provides one fixed batch of connections backed by Docker worlds.
+
+    ``worlds`` describes the topology, while the count passed to ``create_connections`` is simply how many connections the caller needs. If ``worlds`` is omitted we use one world per connection. Docker needs the whole count up front to size its containers, so this particular provider only supplies one batch.
     """
 
     def __init__(
         self,
-        worlds: int = 128,
+        worlds: int | None = None,
         image: str = DOCKER_IMAGE,
         container_id: str | None = None,
         worlds_per_container: int = 128,
@@ -54,82 +55,47 @@ class DockerExecProvider(ConnectionProvider):
         connection_class: type[MudConnection] = DockerExecConnection,
         connection_kwargs: dict | None = None,
     ):
-        if container_id and worlds > worlds_per_container:
-            raise ValueError("Single container mode only supports up to 'worlds_per_container' worlds")
-
+        if worlds is not None and worlds < 1:
+            raise ValueError("worlds must be at least 1.")
+        if worlds_per_container < 1:
+            raise ValueError("worlds_per_container must be at least 1.")
         self.worlds = worlds
         self.image = image
-        self.worlds_per_container = max(1, worlds_per_container)
-        self._connection_class = connection_class
-        self._connection_kwargs = dict(connection_kwargs or {})
+        self.container_id = container_id
+        self.worlds_per_container = worlds_per_container
+        self.connection_class = connection_class
+        self.connection_kwargs = dict(connection_kwargs or {})
 
         reserved = {"account_id", "db_slot", "container_id"}
-        bad = reserved & set(self._connection_kwargs)
+        bad = reserved & set(self.connection_kwargs)
         if bad:
             raise ValueError(f"connection_kwargs must not set provider-managed keys: {sorted(bad)}")
+
         self._lock = Lock()
         self._closed = False
+        self._batch_created = False
         self._owner_pid = os.getpid()
 
-        self._containers: list[dict[str, object]] = []
-
-        if container_id:
-            self._containers.append(
-                {
-                    "container_id": container_id,
-                    "capacity": min(worlds, self.worlds_per_container),
-                    "start": 0,
-                    "end": min(worlds, self.worlds_per_container),
-                    "owns": False,
-                }
-            )
-        else:
-            remaining = worlds
-            start = 0
-            launch_plan: list[tuple[int, int]] = []
-            while remaining > 0:
-                capacity = min(self.worlds_per_container, remaining)
-                launch_plan.append((capacity, start))
-                start += capacity
-                remaining -= capacity
-
-            launched: list[dict[str, object]] = []
-            for index, (capacity, start_idx) in enumerate(launch_plan):
-                logger.info(
-                    "provider.container.launching",
-                    idx=index + 1,
-                    total=len(launch_plan),
-                    capacity=capacity,
-                    start=start_idx,
-                    end=start_idx + capacity,
-                )
-                container_id = self.prepare_shared_container(capacity)
-                launched.append(
-                    {
-                        "container_id": container_id,
-                        "capacity": capacity,
-                        "start": start_idx,
-                        "end": start_idx + capacity,
-                        "owns": True,
-                    }
-                )
-            self._containers.extend(launched)
-
-        if not self._containers:
-            raise RuntimeError("DockerExecProvider failed to initialise any containers")
+        self.containers: list[str] = []
+        # A supplied container belongs to its caller. Containers we start ourselves belong to us.
+        self.owns_containers = container_id is None
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        # lock cannot be pickled; rebuild it in children.
+        # Locks cannot be pickled, so an unpickled provider gets a fresh one below.
         state.pop("_lock", None)
-        # strip ownership so pickled copies don't try to stop containers
-        # that the parent process owns.
-        state["_containers"] = [dict(entry, owns=False) for entry in state["_containers"]]
+        # Once a batch exists, a pickled copy only refers to the allocating process's containers.
+        # It must not decide they are now its containers and stop them on close.
+        if self._batch_created:
+            state["owns_containers"] = False
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
         self._lock = Lock()
+        # Before allocation there is nothing to inherit. This process owns anything it starts later.
+        if not self._batch_created:
+            self._owner_pid = os.getpid()
 
     def prepare_shared_container(self, slots: int) -> str:
         """Start a new container with multiple game slots."""
@@ -138,7 +104,7 @@ class DockerExecProvider(ConnectionProvider):
 
         logger.info("provider.container.starting", container_name=container_name, slots=slots)
 
-        # run container with sleep infinity to prevent it from exiting
+        # boot prepares the worlds and exits, so sleep keeps the container around for docker exec.
         result = subprocess.run(
             [
                 "docker",
@@ -168,74 +134,105 @@ class DockerExecProvider(ConnectionProvider):
 
         container_id = result.stdout.strip()
         logger.info("provider.container.started", container_id=container_id)
-
         return container_id
 
-    def create_connection(self, env_index: int) -> MudConnection:
-        """
-        Create a connection for the given environment index.
+    def create_connections(self, count: int) -> list[MudConnection]:
+        """Start enough Docker worlds and create this provider's one connection batch."""
+        if count < 1:
+            raise ValueError("count must be at least 1.")
 
-        Connections always map env_index to world_index via `db_slot = env_index % self.worlds` to allow
-        multiple agents to exist in the same game world (when envs > worlds).
+        connections: list[MudConnection] = []
+        allocation_started = False
+        try:
+            with self._lock:
+                if self._closed:
+                    raise RuntimeError("Provider is closed.")
+                if self._batch_created:
+                    raise RuntimeError("Provider has already created its connection batch.")
+                self._batch_created = True
+                allocation_started = True
+                if self.owns_containers:
+                    # Allocation is lazy, so the process doing this work owns the containers. It
+                    # may not be the process that originally constructed or pickled the provider.
+                    self._owner_pid = os.getpid()
 
-        db_slot is the historical term to refer to the database index within the container.
+                world_count = self.worlds if self.worlds is not None else count
+                if self.container_id:
+                    if world_count > self.worlds_per_container:
+                        raise ValueError("Single container mode only supports up to 'worlds_per_container' worlds")
+                    self.containers.append(self.container_id)
+                else:
+                    starts = range(0, world_count, self.worlds_per_container)
+                    total = (world_count + self.worlds_per_container - 1) // self.worlds_per_container
+                    for index, start in enumerate(starts):
+                        slots = min(self.worlds_per_container, world_count - start)
+                        logger.info(
+                            "provider.container.launching",
+                            idx=index + 1,
+                            total=total,
+                            slots=slots,
+                            start=start,
+                        )
+                        self.containers.append(self.prepare_shared_container(slots))
 
-        world_index is a mudgym term that refers to the index of worlds this provider is creating for training.
+                for env_index in range(count):
+                    # Connections wrap around the configured worlds, which is how several players
+                    # can share one. ``world_index`` is provider-wide; ``db_slot`` is the historical
+                    # MUD2 name for the index inside one container. The distinction only matters
+                    # once we need more worlds than one MUD2 process can hold (a problem the
+                    # original authors can probably be forgiven for not anticipating).
+                    world_index = env_index % world_count
+                    container_index, db_slot = divmod(world_index, self.worlds_per_container)
 
-        This distinction is only really relevant for trying to run across multiple containers as the original
-        MUD2 engine supports up to 128 worlds, probably because it was hard to imagine that one day people from
-        the future would want to run more.
-        """
-        if self._closed:
-            raise RuntimeError("Provider is closed.")
-        with self._lock:
-            # env_index mapped to world_index via modulo (for multiple envs/agents per world)
-            world_index = env_index % self.worlds
+                    kwargs = dict(self.connection_kwargs)
+                    kwargs["account_id"] = f"W{env_index + 1:08d}"
+                    kwargs["db_slot"] = db_slot
+                    connections.append(
+                        self.connection_class(
+                            container_id=self.containers[container_index],
+                            **kwargs,
+                        )
+                    )
 
-            container = None
-            for entry in self._containers:
-                if entry["start"] <= world_index < entry["end"]:
-                    container = entry
-                    break
+            return connections
+        except BaseException:
+            # A failure after allocation starts belongs to us: close the connections we did make,
+            # then the containers beneath them. Errors here must not replace the original failure.
+            # A rejected second call never started an allocation, so it leaves the first batch alone.
+            if not allocation_started:
+                raise
+            for connection in connections:
+                with suppress(Exception):
+                    connection.close()
+            try:
+                self.close()
+            except Exception:
+                logger.error("provider.batch_cleanup_failed", exc_info=True)
+            raise
 
-            if container is None:
-                raise RuntimeError(f"No container assignment found for world index {world_index}")
-
-            # db_slot passed is container local (0..capacity-1) because each container can run up to
-            # worlds_per_container DB slots (game worlds).
-            db_slot_in_container = world_index - container["start"]
-
-            kwargs = dict(self._connection_kwargs)
-            kwargs["account_id"] = f"W{env_index + 1:08d}"
-            kwargs["db_slot"] = db_slot_in_container
-            container_id = container["container_id"]
-
-        return self._connection_class(container_id=container_id, **kwargs)
+    def reset(self, *, seed: int | list[int | None] | None = None) -> None:
+        """Docker worlds currently retain their running state across environment resets."""
 
     def close(self) -> None:
-        """Close the provider and clean up shared infrastructure (containers).
-
-        Note: This does not close connections - environments own their connections
-        and close them in env.close().
-        """
+        """Close the shared infrastructure, but not the connections owned by environments."""
         with self._lock:
             if self._closed:
                 return
             self._closed = True
-            to_stop = [entry for entry in self._containers if entry.get("owns")]
-            self._containers.clear()
+            to_stop = list(self.containers) if self.owns_containers else []
+            self.containers.clear()
 
-        # Only the creating process should stop containers (covers fork + spawn).
+        # Forked and spawned copies can close their references, but only the allocating process
+        # gets to stop the actual containers.
         if os.getpid() != self._owner_pid:
             logger.debug("provider.container.close.skip_non_owner", pid=os.getpid(), owner_pid=self._owner_pid)
             return
 
         first_exc = None
-        for entry in to_stop:
-            container_id = entry["container_id"]
+        for container_id in to_stop:
             try:
                 subprocess.run(["docker", "stop", container_id], check=True, capture_output=True)
-            except Exception as e:
+            except Exception as exc:
                 logger.error(
                     "provider.container.close.stop_failed",
                     container_id=container_id,
@@ -244,7 +241,7 @@ class DockerExecProvider(ConnectionProvider):
                     exc_info=True,
                 )
                 if first_exc is None:
-                    first_exc = e
+                    first_exc = exc
 
         if first_exc is not None:
             raise first_exc

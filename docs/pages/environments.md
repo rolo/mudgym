@@ -34,9 +34,9 @@ Every reset and step puts all three forms below in `info`, regardless of observa
 
 | Key | What it is |
 |---|---|
-| `info["raw_bytes"]` | The unmodified bytestring, including command echoes and auto-command output. |
-| `info["render_bytes"]` | Player-visible output, with ANSI retained. |
-| `info["text"]` | `render_bytes` decoded to plain text, with ANSI stripped. |
+| `info["raw_bytes"]` | The unmodified bytestring, including prompts and command echo. |
+| `env.render()` with `render_mode="ansi"` | Player visible output, with ANSI kept. |
+| `observation["text"]` | Player visible plain text, with ANSI stripped. |
 
 ## Rendering
 
@@ -46,12 +46,11 @@ Pass `render_mode="human"` to print the player-visible output after each reset a
 
 ```python
 from mudgym import make_vector_env
+from mudgym.connections.provider import DockerExecProvider
 
-envs = make_vector_env(envs=8, worlds=2)
+envs = make_vector_env(envs=8, provider=DockerExecProvider(worlds=2))
 obs, info = envs.reset()
 envs.close()
 ```
-
-`worlds` specifies how many game worlds to spread the envs across, defaulting to match `envs` if not specified.
 
 See [Multi-agent (MARL)](multiagent.md) for multi-agent support.

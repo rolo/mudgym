@@ -1,7 +1,9 @@
 from itertools import product
 
+import numpy as np
 import pytest
 
+from mudgym.connections.registry import default_connection
 from mudgym.db.rooms import ROOM_NAMES
 from mudgym.envs.env import MudEnv
 
@@ -42,7 +44,6 @@ def test_env_lifecycle(live_env_factory, maker_kwarg_set, subtests):
             assert isinstance(terminated, bool)
             assert isinstance(truncated, bool)
             assert isinstance(info, dict)
-            assert info["last_command"] is not None
             assert info["persona"] == persona
 
 
@@ -67,7 +68,7 @@ def test_env_reset(live_env_factory):
 
 def test_bare_env_runs_against_the_live_game():
     """A directly-built MudEnv(), no field_parsers and no wrappers, resets and steps with a text observation."""
-    env = MudEnv()
+    env = MudEnv(connection=default_connection())
     try:
         obs, info = env.reset()
         assert obs["text"]
@@ -81,3 +82,55 @@ def test_bare_env_runs_against_the_live_game():
         assert isinstance(truncated, bool)
     finally:
         env.close()
+
+
+def test_step_matches_act_followed_by_observe(scripted_env_factory):
+    stepped_env = scripted_env_factory()
+    split_env = scripted_env_factory()
+    stepped_env.reset()
+    split_env.reset()
+
+    stepped_transition = stepped_env.step("look")
+    split_env.act("look")
+    split_transition = split_env.observe()
+
+    stepped_observation, *stepped_rest = stepped_transition
+    split_observation, *split_rest = split_transition
+    assert set(stepped_observation) == set(split_observation)
+    for key, expected_value in stepped_observation.items():
+        actual_value = split_observation[key]
+        if isinstance(expected_value, np.ndarray):
+            assert np.array_equal(actual_value, expected_value), key
+        else:
+            assert actual_value == expected_value, key
+
+    assert split_rest[:3] == stepped_rest[:3]
+    stepped_info = stepped_rest[3]
+    split_info = split_rest[3]
+    for key in ("raw_bytes", "step", "persona", "action_rejected"):
+        assert split_info[key] == stepped_info[key], key
+
+
+def test_only_player_actions_advance_the_env_step_count(scripted_env_factory):
+    env = scripted_env_factory(tearoom_commands="dance")
+
+    _, reset_info = env.reset()
+    assert env.unwrapped.step_count == 0
+    assert reset_info["step"] == 0
+
+    _, _, _, _, refresh_info = env.unwrapped.observe()
+    assert env.unwrapped.step_count == 0
+    assert refresh_info["step"] == 0
+
+    _, _, _, _, step_info = env.step("look")
+    assert env.unwrapped.step_count == 1
+    assert step_info["step"] == 1
+    assert set(step_info) == {
+        "raw_bytes",
+        "step",
+        "persona",
+        "action_rejected",
+    }
+
+    env.reset()
+    assert env.unwrapped.step_count == 0

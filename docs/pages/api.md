@@ -44,6 +44,10 @@
 
 ::: mudgym.envs.actions.discrete.DiscreteDirectionsWrapper
 
+::: mudgym.envs.actions.discrete.ParallelDiscreteActionSpaceWrapper
+
+::: mudgym.envs.actions.discrete.ParallelDiscreteDirectionsWrapper
+
 ---
 
 ## Connections
@@ -57,5 +61,3 @@
 ::: mudgym.connections.provider.ConnectionProvider
 
 ::: mudgym.connections.provider.DockerExecProvider
-
-::: mudgym.connections.registry.list_connections

@@ -58,7 +58,7 @@ print(show_ansi(Path("docs/recordings/observations-cheats.ansi").read_bytes()).d
 Adds `raw_bytes`, a fixed-size `uint8` NumPy array, zero-padded to 16,384 bytes by default. The unpadded bytes value is available as `info["raw_bytes"]`.
 
 ```python
-raw = observation["raw_bytes"][: info["bytes_length"]].tobytes()
+raw = observation["raw_bytes"][: len(info["raw_bytes"])].tobytes()
 ```
 
 Shown as a bytes literal here for readability:
@@ -75,21 +75,23 @@ print(show_ansi(Path("docs/recordings/observations-bytes.ansi").read_bytes()).da
 
 ## Creating your own keys
 
-You can customise the observation output further with `exclude_keys`, or specify the parser components you want to include with `field_parsers`:
+Custom observations are defined by selecting fields and the keys each field contributes:
 
 ```python
 from mudgym import make_env
-from mudgym.envs.fields import FEScoreField, FEXitsField
+from mudgym.envs.fields import FEScoreField, SuperQuickLookField
 
-env = make_env(observation="parsed", exclude_keys=["weather_index"])
-env.close()
-
-env = make_env(field_parsers=[FEScoreField, FEXitsField])
+env = make_env(
+    field_parsers=(
+        SuperQuickLookField(include_keys=("room_name", "here")),
+        FEScoreField(include_keys=("points",)),
+    )
+)
 env.close()
 ```
 
 You can add your own field parsers in the same way by creating an [`ObservationField`](api.md#observation-fields) subclass. Take a look at the fields in `mudgym/envs/fields/` to use as a reference.
 
-## Auto-commands
+## Observation commands
 
-Observation fields can declare commands for output to consume. MudGym appends those commands after the player's action, and the final one also acts as an end-of-step marker, so we know when the step's response is complete.
+Observation fields can declare commands for output to consume. MudGym sends those commands on a separate line after the player's action, and the final one also acts as an end of step marker, so we know when the response is complete.

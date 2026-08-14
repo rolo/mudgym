@@ -112,7 +112,7 @@ def show_turn_bars(
             else ""
         )
         bars.append(
-            f'<g><title>Turn {index + 1} — {value}</title><rect x="'
+            f'<g><title>Turn {index + 1} - {value}</title><rect x="'
             f'{x}" y="0" width="{stride}" height="{plot_height}" fill="transparent"/>'
             f"{visible_bar}</g>"
         )

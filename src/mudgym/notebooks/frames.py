@@ -203,17 +203,23 @@ def observation_text(value: Any) -> str:
     return cell_text(value)
 
 
-def show_game_tabs(input_dict: Any, *, observation: Mapping[str, Any] | None = None, scroll: bool = True) -> HTML:
+def show_game_tabs(
+    info: Mapping[str, Any],
+    *,
+    render_bytes: bytes,
+    observation: Mapping[str, Any] | None = None,
+    scroll: bool = True,
+) -> HTML:
     """Render one game response as tabs for its display and raw protocol output.
 
-    ``display`` shows ``render_bytes`` (the game display after the action),
-    ``raw`` shows ``raw_bytes`` (the protocol output the action produced).
+    ``display`` shows the explicitly supplied rendered game display, while ``raw`` shows
+    ``info["raw_bytes"]`` (the protocol output the action produced).
     Passing ``observation`` adds a third tab listing the fields the environment
     produced for the same step.
     """
     group = f"game-tabs-{next(TAB_GROUP_IDS)}"
-    display = show_ansi(input_dict["render_bytes"], scroll=scroll).data
-    raw = show_ansi(input_dict["raw_bytes"], scroll=scroll).data
+    display = show_ansi(render_bytes, scroll=scroll).data
+    raw = show_ansi(info["raw_bytes"], scroll=scroll).data
 
     inputs = [
         f'<input type="radio" name="{group}" id="{group}-display" checked>',

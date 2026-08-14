@@ -45,7 +45,7 @@ def test_split_on_echo_preserves_pre_echo_output_before_prompt_marker():
 def test_contains_echo_stays_linear_on_many_inline_prompt_markers():
     # Regression: a plain greedy ECHO_PREFIX backtracks exponentially on a run of inline
     # prompt markers that is not followed by the command echo (~12x per marker), hanging
-    # bytes_to_observation on live payloads. The possessive quantifier keeps it linear.
+    # MudEnv's observation parser on live payloads. The possessive quantifier keeps it linear.
     marker = b"\x1b[1;34;40m*\x1b[0m"
     raw = marker * 50 + b"unrelated game text\r\n"
 

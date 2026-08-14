@@ -1,18 +1,6 @@
-"""Record and replay the wire conversation of a game session.
-
-A capture file holds one session conversation with the game at the `MudConnection.send_command` layer: the lines sent
-and the raw bytes received, in order, including the session setup steps.
-`RecordingConnection` wraps any live connection and writes a capture.
-`ReplayConnection` implements the same interface over a capture file, so recorded sessions replay through the real
-env machinery with no game engine.
-
-Captures are JSONL. Header line carries provenance; each following line is one event. Raw bytes are stored as
-latin-1-decoded JSON strings and fails loudly on anything invalid.
-"""
-
 import json
-import re
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +11,7 @@ from mudgym.logs import get_logger
 logger = get_logger(__name__)
 
 CAPTURE_FORMAT = "mudgym-session-capture"
-CAPTURE_VERSION = 1
+CAPTURE_VERSION = 2
 
 
 class StaleCaptureError(RuntimeError):
@@ -94,11 +82,9 @@ class CaptureWriter:
             "raw_text": bytes_to_capture_text(raw_bytes),
             "terminated": bool(terminated),
             "incomplete": bool(incomplete),
+            "rejected": bool(rejected),
+            "marker_arrived": bool(marker_arrived),
         }
-        if rejected:
-            event["rejected"] = True
-            if marker_arrived:
-                event["marker_arrived"] = True
         self._write_line(event)
 
     def close(self) -> None:
@@ -115,25 +101,17 @@ class RecordingConnection(MudConnection):
         self.writer = CaptureWriter(path, metadata)
         logger.debug("recording.start", path=str(path), connection=type(connection).__name__)
 
-    # the session configures its per-instance end-of-turn marker on the connection it holds, so the
-    # wrapper must hand the attribute through to the connection that actually reads the wire
-    @property
-    def end_of_turn_marker(self) -> re.Pattern:
-        return self.connection.end_of_turn_marker
-
-    @end_of_turn_marker.setter
-    def end_of_turn_marker(self, value: re.Pattern) -> None:
-        self.connection.end_of_turn_marker = value
-
     def reset(self) -> None:
         self.connection.reset()
         self.writer.record_reset()
 
-    def send_command(self, command: str | Sequence[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        lines = [command] if isinstance(command, str) else list(command)
-        raw_bytes, terminated, incomplete, debug_info = self.connection.send_command(command)
+    def send_line(self, line: str) -> None:
+        self.connection.send_line(line)
+
+    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(lines, end_of_turn_marker)
         self.writer.record_step(
-            lines,
+            list(lines),
             raw_bytes,
             terminated,
             incomplete,
@@ -141,6 +119,9 @@ class RecordingConnection(MudConnection):
             marker_arrived=bool(debug_info.get("marker_arrived", False)),
         )
         return raw_bytes, terminated, incomplete, debug_info
+
+    def invalidate(self) -> None:
+        self.connection.invalidate()
 
     def close(self) -> None:
         try:
@@ -176,8 +157,8 @@ class ReplayConnection(MudConnection):
     def reset(self) -> None:
         self._next_event("reset")
 
-    def send_command(self, command: str | Sequence[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        lines = [command] if isinstance(command, str) else list(command)
+    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        lines = list(lines)
         event = self._next_event("step")
         if lines != event["lines"]:
             raise StaleCaptureError(
@@ -190,19 +171,25 @@ class ReplayConnection(MudConnection):
             event["terminated"],
             event["incomplete"],
             {
-                "rejected": bool(event.get("rejected", False)),
-                "marker_arrived": bool(event.get("marker_arrived", False)),
+                "rejected": event["rejected"],
+                "marker_arrived": event["marker_arrived"],
                 "replayed": True,
                 "capture": str(self.path),
             },
         )
+
+    def send_line(self, line: str) -> None:
+        pass
+
+    def invalidate(self) -> None:
+        pass
 
     def close(self) -> None:
         pass
 
 
 class RecordingProvider(ConnectionProvider):
-    """Wraps a provider so every connection it creates records to its own capture file."""
+    """Wraps each connection from another provider with its own session recording."""
 
     def __init__(
         self,
@@ -214,28 +201,72 @@ class RecordingProvider(ConnectionProvider):
         self.capture_path_for_index = capture_path_for_index
         self.metadata = metadata
 
-    def create_connection(self, env_index: int) -> MudConnection:
-        return RecordingConnection(
-            self.provider.create_connection(env_index),
-            self.capture_path_for_index(env_index),
-            self.metadata,
-        )
+    def create_connections(self, count: int) -> list[MudConnection]:
+        connections: list[MudConnection] = []
+        recorded_connections: list[MudConnection] = []
+        try:
+            connections = self.provider.create_connections(count)
+            if len(connections) != count:
+                raise RuntimeError(f"Provider returned {len(connections)} connections, expected {count}.")
+            for index, connection in enumerate(connections):
+                recorded_connections.append(
+                    RecordingConnection(
+                        connection,
+                        self.capture_path_for_index(index),
+                        self.metadata,
+                    )
+                )
+            return recorded_connections
+        except BaseException:
+            # Wrappers already built own their raw connection. The unwrapped suffix does not. Close
+            # each connection exactly once, then let the underlying provider release shared state.
+            for connection in [*recorded_connections, *connections[len(recorded_connections) :]]:
+                with suppress(Exception):
+                    connection.close()
+            with suppress(Exception):
+                self.provider.close()
+            raise
+
+    def reset(self, *, seed: int | list[int | None] | None = None) -> None:
+        self.provider.reset(seed=seed)
 
     def close(self) -> None:
         self.provider.close()
 
 
 class ReplayProvider(ConnectionProvider):
-    """Creates replay connections from per-index capture files; needs no game infrastructure."""
+    """Provides one fixed batch of replay connections without needing a game behind them."""
 
     def __init__(self, capture_path_for_index: Callable[[int], Path]):
         self.capture_path_for_index = capture_path_for_index
-        self.connections: list[ReplayConnection] = []
+        self._connections: list[ReplayConnection] = []
+        self._batch_created = False
 
-    def create_connection(self, env_index: int) -> MudConnection:
-        connection = ReplayConnection(self.capture_path_for_index(env_index))
-        self.connections.append(connection)
-        return connection
+    def create_connections(self, count: int) -> list[MudConnection]:
+        if count < 1:
+            raise ValueError("count must be at least 1.")
+        if self._batch_created:
+            raise RuntimeError("Provider has already created its connection batch.")
+        self._batch_created = True
+
+        try:
+            for index in range(count):
+                self._connections.append(ReplayConnection(self.capture_path_for_index(index)))
+            return list(self._connections)
+        except BaseException:
+            # A missing or stale capture can fail halfway through the batch. Nothing was returned,
+            # so the provider still owns all replay connections created up to that point.
+            for connection in self._connections:
+                with suppress(Exception):
+                    connection.close()
+            self._connections.clear()
+            raise
+
+    def remaining_events(self) -> list[int]:
+        return [connection.remaining_events() for connection in self._connections]
+
+    def reset(self, *, seed: int | list[int | None] | None = None) -> None:
+        pass
 
     def close(self) -> None:
         pass

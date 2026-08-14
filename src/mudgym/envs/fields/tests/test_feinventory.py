@@ -1,7 +1,6 @@
 import pytest
 
-from mudgym.connections.prompts import INVENTORY_DIVIDER
-from mudgym.envs.fields.feinventory import FEInventoryField
+from mudgym.envs.fields.feinventory import INVENTORY_DIVIDER, FEInventoryField
 
 
 @pytest.mark.parametrize(

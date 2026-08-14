@@ -11,9 +11,6 @@ import re
 
 import pexpect
 
-# Optional ANSI SGR (Select Graphic Rendition) codes - string version for text patterns
-SGR_STR = r"(?:\x1b\[[0-9;]*m)*"
-
 # One-or-more variant for named-capture contexts (where matching empty is wrong)
 SGR_ONE_PLUS_STR = r"(?:\x1b\[[0-9;]*m)+"
 
@@ -57,10 +54,6 @@ DASHES = rb"-{4,}"
 
 STARLINE = rb"(?:\({1,3})?(?:" + DASHES + rb")?\*(?:\){0,3})?"
 PROMPT_CORE = rb"(?:" + STARLINE + rb"|" + DASHES + rb")"
-
-# Full prompt line (anchored), ANSI-safe
-PROMPT_PATTERN = rb"^" + SGR + PROMPT_CORE + SGR + rb"$"
-PROMPT_RE = re.compile(PROMPT_PATTERN, re.MULTILINE)
 
 # Possessive so a trailing colour code cannot be given back to sneak the boundary's
 # not-a-complete-line lookahead past a \r\n
@@ -175,8 +168,6 @@ class Prompt(enum.Enum):
     EXAMINE = trusted_input_prompt(rb"EXAMINE>")
     LIBRARY = trusted_input_prompt(rb"LIBRARY>")
     PAGER = trusted_input_prompt(rb"\[Return to continue, S to stop\]" + SGR, re.I)
-    MAIL_UNAVAILABLE = re.compile(rb"\[MAIL unavailable\]")
-
     # Prompts which explicitly mark the end of an episode. Each is anchored to a whole wire line
     # (optionally colour-wrapped) because the bare words are forgeable: a player speaking
     # "Cheerio!" puts the text mid-line inside the speech quoting, and the command echo repeats
@@ -196,24 +187,6 @@ class Prompt(enum.Enum):
 # `initial_prompt` hooks. These are passed straight through to pexpect, which is
 # happy with either one pattern or several.
 PromptSpec = Prompt | list[Prompt] | tuple[Prompt, ...]
-
-# prompts which signify that we are no longer in the game, eg, in the menu system or similar
-NON_GAME_PROMPTS = [
-    Prompt.EXAMINE,
-    Prompt.LIBRARY,
-    Prompt.PAGER,
-    Prompt.MAIL_UNAVAILABLE,
-    Prompt.SUPERSEDE,
-    Prompt.SESSION_DYING,
-    Prompt.PERSONA_SEX,
-    Prompt.PERSONA_NAME,
-    Prompt.PERSONA_AVAILABLE,
-    Prompt.RESET_IN_PROGRESS,
-    Prompt.BOOT_COMPLETE,
-    Prompt.FECODE_ZERO,
-    Prompt.DATABASE_NOT_INITIALIZED,
-    Prompt.DATABASE_FINISHED_INITIALIZING,
-]
 
 GAME_OVER_PROMPTS = [
     Prompt.GAME_OVER_EPISODE_POINTS,
@@ -267,21 +240,7 @@ class State(enum.Enum):
     DEAD = enum.auto()  # ops dead rather than game dead
 
 
-TIMEOUT_PROMPTS = [pexpect.EOF, pexpect.TIMEOUT]
-
 EXPECT_LIST = [p.value for p in PROMPTS]  # for expect()
-
-# response markers
-INVENTORY_DIVIDER = b"========"
-
-# exactly fei's eight-equals divider line, preceded by a line start or an SGR sequence (the game
-# prints it mid-line after a prompt reprint's trailing SGR); the prefix and the trailing newline
-# reject equals runs embedded in narrative or continuing past eight.
-FINAL_COMMAND_MARKER = re.compile(rb"(?m)(?:^|\x1b\[[0-9;]*m)========\r?\n")
-
-# End-of-turn marker protocol: every command batch ends with a stock fecommand whose response
-# closes the read window (fecommands answer even when the persona cannot act)
-FINAL_COMMAND = "fei"
 
 
 @functools.lru_cache
@@ -290,7 +249,6 @@ def marker_up_to_next_prompt(marker: re.Pattern) -> re.Pattern:
     return regex_up_to_next_prompt(marker.pattern, extra_flags=marker.flags)
 
 
-ASLEEP_PROMPT = regex_up_to_next_prompt(b"You can't wake yourself up yet!")
 COMMAND_REJECTION_LINE_PATTERNS = (
     b"I made sense of some of that:",
     b"I made no sense of that:",
@@ -301,9 +259,3 @@ COMMAND_REJECTION_LINE_PATTERNS = (
 INVALID_COMMAND_PROMPTS = [
     system_line_up_to_next_prompt(line_pattern) for line_pattern in COMMAND_REJECTION_LINE_PATTERNS
 ]
-
-# build the complete prompt list for the game loop
-GAME_LOOP_PROMPTS = EXPECT_LIST.copy()
-GAME_LOOP_PROMPTS.extend(INVALID_COMMAND_PROMPTS)
-GAME_LOOP_PROMPTS.append(ASLEEP_PROMPT)
-GAME_LOOP_PROMPTS.extend([p.value for p in GAME_OVER_PROMPTS])

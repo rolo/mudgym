@@ -9,7 +9,6 @@ from mudgym.envs.fields.fexits import FEXitsField
 from mudgym.envs.fields.mgcheats import MGCheatsField
 from mudgym.envs.fields.rawbytes import RawBytesField
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
-from mudgym.envs.validation import validate_field_spaces
 
 ALL_FIELDS = [
     MGCheatsField(),
@@ -24,8 +23,8 @@ ALL_FIELDS = [
 
 @pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)
 def test_space_keys_match_empty_keys(field):
-    """Every field's space() keys must match its empty() keys."""
-    validate_field_spaces([field])
+    """Every field's full space and empty defaults must declare the same keys."""
+    assert field.full_space().keys() == field.full_empty().keys()
 
 
 @pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)

@@ -5,6 +5,7 @@ from typing import Any
 
 import pexpect
 
+from mudgym.connections.errors import ConnectionClosedError
 from mudgym.connections.prompts import (
     EXPECT_LIST,
     GAME_OVER_PROMPTS,
@@ -24,7 +25,7 @@ from mudgym.connections.transitions import TRANSITIONS
 from mudgym.featurizers.strings import LINE_BREAK_RE, decode_wire_bytes, encode_command_bytes
 from mudgym.logs import get_logger
 
-# Fast lookup from matched pattern bytes -> Prompt enum
+# Fast lookup from the pattern pexpect matched back to our Prompt enum.
 PROMPTS_BY_VALUE = {p.value: p for p in PROMPTS}
 
 logger = get_logger(__name__)
@@ -56,16 +57,11 @@ class ConnectionState:
         db_slot: int | None = None,
         name_generator: Callable[[], str] | None = None,
         initial_prompt: PromptSpec | None = None,
-        *,
-        end_of_turn_marker: re.Pattern,
     ):
         self.child = child
         self.account_id = account_id or ""
         self.password = password or ""
         self.max_transition_steps = 15
-
-        # the wire form of the end of turn marker, which closes send_command's read window
-        self.end_of_turn_marker_pattern = marker_up_to_next_prompt(end_of_turn_marker)
 
         self.default_persona_slot = persona_slot
         self.default_db_slot = db_slot
@@ -120,7 +116,7 @@ class ConnectionState:
         Send data to the child process, optionally adding a carriage return.
         """
         if not self.isalive():
-            raise RuntimeError("Cannot send data to closed child process")
+            raise ConnectionClosedError("Cannot send data to closed child process")
 
         if isinstance(data, str):
             data = encode_command_bytes(data)
@@ -128,7 +124,10 @@ class ConnectionState:
         if add_cr:
             data += b"\r"
 
-        self.child.send(data)
+        try:
+            self.child.send(data)
+        except OSError as exc:
+            raise ConnectionClosedError("Child process closed while sending data") from exc
         logger.debug("sm.send", data=data.replace(b"\r", b"\\r"), state=self.state.name, add_cr=add_cr)
 
     def send_cr(self) -> None:
@@ -151,24 +150,9 @@ class ConnectionState:
             # Child may be closed, return empty
             return b""
 
-    def clear_buffer(self) -> None:
-        """Clear the output buffer from the child process.
-
-        This is useful after quit/reset operations to ensure no stale data
-        remains in the buffer for the next operation.
-        """
-        if not self.isalive():
-            return
-        try:
-            self.child.before = b""
-            self.child.after = b""
-        except (ValueError, AttributeError):
-            # Child may be closed, ignore
-            pass
-
     def expect(
         self,
-        patterns: Prompt | list[Prompt] | list = EXPECT_LIST,
+        patterns: Prompt | Sequence[Any] = EXPECT_LIST,
         timeout: float = 3.0,
         raise_on_eof_timeout: bool = True,
     ) -> tuple[int, Prompt | None]:
@@ -177,7 +161,7 @@ class ConnectionState:
         Prefer using the state machine transitions and continue_until methods when possible.
 
         Args:
-            patterns: Prompt enum, list of Prompt enums, or list of raw patterns
+            patterns: Prompt enum, or a sequence of Prompt enums or raw patterns
             timeout: Maximum time to wait
             raise_on_eof_timeout: If True (default), raise RuntimeError on EOF/TIMEOUT,
                 set to False when caller wants to handle these as normal results.
@@ -185,27 +169,10 @@ class ConnectionState:
         Returns:
             tuple[int, Prompt | None]: index of matched pattern, matched Prompt enum or None
         """
-        # standardise patterns to a list
-        if isinstance(patterns, (Prompt, State)):
+        if isinstance(patterns, Prompt):
             patterns = [patterns]
 
-        # convert patterns to values for pexpect.expect()
-        # handle both Prompt/State enums (which have .value) and raw values
-        pattern_values = []
-        pattern_to_enum = {}  # map from value to Prompt enum for return value
-
-        for p in patterns:
-            if isinstance(p, (Prompt, State)):
-                value = p.value
-                pattern_values.append(value)
-                if isinstance(p, Prompt):
-                    pattern_to_enum[value] = p
-            else:
-                # already a raw value (exception class, bytes, regex, etc.)
-                pattern_values.append(p)
-                # try to find matching Prompt enum by value
-                if p in PROMPTS_BY_VALUE:
-                    pattern_to_enum[p] = PROMPTS_BY_VALUE[p]
+        pattern_values = [pattern.value if isinstance(pattern, Prompt) else pattern for pattern in patterns]
 
         state_before = self.state
         logger.debug(
@@ -224,8 +191,7 @@ class ConnectionState:
             if consumed:
                 self.chunk_history.append(consumed)
 
-        # map back to Prompt enum if possible
-        matched_prompt = pattern_to_enum.get(matched_pattern)
+        matched_prompt = PROMPTS_BY_VALUE.get(matched_pattern)
 
         self.last_prompt = matched_prompt
         logger.debug(
@@ -340,34 +306,7 @@ class ConnectionState:
 
             # Use longer timeout after SESSION_DYING since the session takes time to die
             expect_timeout = 5.0 if last_prompt == Prompt.SESSION_DYING else timeout
-            idx, matched = self.expect(timeout=expect_timeout)
-
-            # Update last_prompt with the matched Prompt (or keep existing if None)
-            last_prompt = matched
-            prompt_enum = matched
-
-            before_buf = self.child.before or b""
-            if before_buf:
-                logger.debug(
-                    "sm.continue.before",
-                    before=before_buf.replace(b"\r", b"\\r"),
-                    state=self.state.name,
-                )
-            after_buf = self.child.after
-            if after_buf:
-                after_str = after_buf.replace(b"\r", b"\\r") if isinstance(after_buf, bytes) else after_buf
-                logger.debug(
-                    "sm.continue.after",
-                    after=after_str,
-                    state=self.state.name,
-                )
-            prompt_name = prompt_enum.name if prompt_enum else "unknown"
-            logger.debug(
-                "sm.continue.matched",
-                prompt=prompt_name,
-                pattern=EXPECT_LIST[idx],
-                state=self.state.name,
-            )
+            _, last_prompt = self.expect(timeout=expect_timeout)
 
         if self.state not in until:
             # Decode and show debug information and recent state history for troubleshooting
@@ -397,33 +336,15 @@ class ConnectionState:
 
         return last_prompt
 
-    def send_command(
+    def read(
         self,
-        command: str | Sequence[str],
+        lines: Sequence[str],
+        end_of_turn_marker: re.Pattern,
     ) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        """Read a response for command lines that have already been sent.
+
+        The lines were sent separately so a multi agent environment could let every player act first.
         """
-        Send a command batch and read output until we consider its response complete.
-
-        The batch is one wire line, or several when the caller split it (speech commands take the
-        auto commands on a separate line so they aren't spoken). The read anchors on the echo of
-        the final line - the one whose batch ends with the marker command - then completes when we
-        see the first end of turn marker. Either that marker, a game over prompt, a prompt showing
-        we are no longer in the game, transport EOF/TIMEOUT, or a command rejection that aborts
-        the rest of the final line.
-
-        Returns the raw bytes including command echoes, prompt markers and so on. Splitting and
-        interpretation is left to the caller, but we do pass back a terminated flag (a game-over
-        prompt closed the window) and an incomplete flag (the window closed without the marker:
-        left the game, or transport EOF/TIMEOUT), and debug info.
-        """
-        lines = [command] if isinstance(command, str) else list(command)
-        if not lines:
-            raise ValueError("send_command requires at least one command line; got an empty batch")
-        logger.debug("sm.send_command", command=lines, state=self.state.name)
-
-        for line in lines:
-            self.send(line)
-
         buffer = bytearray()
         terminated = False
         incomplete = False
@@ -433,69 +354,60 @@ class ConnectionState:
         seen_any_command_echo = False
         seen_final_command_echo = False
 
-        # Every sent line's echo is a trust boundary. Put echo patterns first so a line whose
-        # literal command text is also a prompt (eg, "Option:" or "Cheerio!") is consumed as
-        # our known echo rather than interpreted as game output. The final line still anchors
-        # the window because its batch contains the marker command.
+        # Every sent line's echo is a trust boundary. Put echo patterns first so a command such as
+        # "Option:" or "Cheerio!" is treated as our input rather than a real game prompt. The final
+        # line is the observation command, so its echo tells us the next marker is ours.
         echo_patterns = [
             re.compile(re.escape(encode_command_bytes(line)) + rb"(?:" + LINE_BREAK_RE + rb")") for line in lines
         ]
-        final_echo_pattern = echo_patterns[-1]
-        end_of_step_patterns = echo_patterns + END_OF_STEP_PATTERNS + [self.end_of_turn_marker_pattern]
+        end_of_turn_marker_pattern = marker_up_to_next_prompt(end_of_turn_marker)
+        end_of_step_patterns = echo_patterns + END_OF_STEP_PATTERNS + [end_of_turn_marker_pattern]
 
         while True:
             idx, prompt_enum = self.expect(end_of_step_patterns, raise_on_eof_timeout=False)
             matched_pattern = end_of_step_patterns[idx]
 
-            # output from between steps can arrive ahead of, or after, our echo, but either way we include
-            # anything before our matched pattern in buffer to return
+            # Output from between steps can arrive before or after our echo. Either way it happened in this read window, so keep it in the bytes returned to the environment.
             buffer += self.child.before or b""
 
-            # a prompt from outside the game (menu system, login screen) means the marker is never coming
-            # these are the only ones we don't include in the returned bytes, so we break out of the loop here
-            # and return what we have so far
+            # A menu or login prompt means we have left the game and our marker is not coming. These are the only matched prompts excluded from the returned game bytes.
             if prompt_enum in NO_LONGER_IN_GAME_PROMPTS:
                 logger.warning(
-                    "sm.send_command.left_game",
+                    "sm.read.left_game",
                     state=self.state.name,
                     matched_prompt=prompt_enum.name if prompt_enum else None,
                 )
                 incomplete = True
                 break
 
-            # otherwise we include the matched prompt in the bytes to return. TIMEOUT/EOF match the pexpect
-            # exception classes rather than bytes, so there is nothing to include for those.
+            # Everything else is part of the response. TIMEOUT and EOF are exception classes rather than bytes, so naturally add nothing here.
             if isinstance(self.child.after, bytes):
                 buffer += self.child.after
 
-            if any(matched_pattern is pattern for pattern in echo_patterns):
+            if idx < len(echo_patterns):
                 seen_any_command_echo = True
-                if matched_pattern is final_echo_pattern:
+                if idx == len(echo_patterns) - 1:
                     seen_final_command_echo = True
                 continue
 
-            # our batch's end of turn marker closes the read window. A marker seen before our echo is stale output
-            # from an earlier desynchronised window (eg, a timeout-cut step's responses arriving late): it is
-            # buffered like any other pre-echo content and the read continues until our own marker.
-            if matched_pattern is self.end_of_turn_marker_pattern and seen_final_command_echo:
+            # A marker only belongs to us after the final echo. One seen earlier is late output from an old, desynchronised window, so keep it as ordinary pre-echo content and carry on.
+            if matched_pattern is end_of_turn_marker_pattern and seen_final_command_echo:
                 marker_arrived = True
                 break
 
-            # A rejection after any command echo belongs to this batch. It closes the window only
-            # after the final line's echo because an earlier rejected line in a split batch does
-            # not prevent the already-sent final auto-command line from reaching its marker.
+            # A rejection after any echo belongs to this exchange. Rejecting the player's action does not stop the separately sent observation line, so only a rejection after that final echo closes the window.
             command_rejected = matched_pattern in INVALID_COMMAND_PROMPTS and seen_any_command_echo
             rejected = rejected or command_rejected
             rejection_closes_window = command_rejected and seen_final_command_echo
             if prompt_enum in GAME_OVER_PROMPTS or prompt_enum in TRANSPORT_BREAK_PROMPTS or rejection_closes_window:
-                # the death/rejection text is already buffered above, keep it and return what we have.
+                # The death or rejection text is already in the buffer, so keep it and return what we managed to read.
                 terminated = prompt_enum in GAME_OVER_PROMPTS
-                incomplete = prompt_enum in TRANSPORT_BREAK_PROMPTS
+                incomplete = prompt_enum in TRANSPORT_BREAK_PROMPTS or rejection_closes_window
                 if incomplete and seen_final_command_echo:
                     logger.warning(
-                        "sm.send_command.marker_missing",
+                        "sm.read.marker_missing",
                         state=self.state.name,
-                        hint="no end of turn marker before timeout - did the batch end with the marker command?",
+                        hint="no end of turn marker before the read window closed",
                     )
                 break
 
@@ -505,7 +417,7 @@ class ConnectionState:
             "marker_arrived": marker_arrived,
         }
         logger.debug(
-            "sm.send_command.complete",
+            "sm.read.complete",
             state=self.state.name,
             matched_prompt=debug_info["matched_prompt"],
             terminated=terminated,
@@ -524,6 +436,20 @@ class ConnectionState:
         - state is DEAD/OPTION and process is alive (traditional)
         - process is dead / isalive() is False (quicklogin EOF)
         """
+
+        if self.state == State.GAME_OVER:
+            # The game-over prompt has already moved the state machine on. There is nothing useful left to send, just follow the remaining menu/EOF transition if the process is alive.
+            if not self.isalive():
+                self.state = State.DEAD
+                return
+            try:
+                self.continue_until([State.DEAD, State.OPTION])
+            except RuntimeError:
+                if not self.isalive():
+                    self.state = State.DEAD
+                    return
+                raise
+            return
 
         if self.state in [State.GAME, State.TEAROOM, State.TEA_SIPPED]:
             if not self.isalive():

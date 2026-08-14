@@ -1,9 +1,9 @@
+import re
 from collections.abc import Sequence
 from typing import Any
 
 from gymnasium import spaces
 
-from mudgym.connections.prompts import FINAL_COMMAND_MARKER, INVENTORY_DIVIDER
 from mudgym.envs.specs import IDENTIFIER_SPACE
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.strings import decode_text_bytes
@@ -15,6 +15,8 @@ from .field import ObservationField
 # drop these markers from the portables.
 DARK_PORTABLES = "oo"
 BLIND_PORTABLES = "--"
+
+INVENTORY_DIVIDER = b"========"
 
 
 def parse_inventory_lines(block: bytes) -> tuple[str, ...]:
@@ -36,8 +38,8 @@ class FEInventoryField(ObservationField):
 
     command = "fei"
 
-    # the ======== divider is the stock end-of-turn marker the transport falls back to
-    end_of_turn_marker = FINAL_COMMAND_MARKER
+    # the ======== divider
+    end_of_turn_marker = re.compile(rb"(?m)(?:^|\x1b\[[0-9;]*m)========\r?\n")
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {

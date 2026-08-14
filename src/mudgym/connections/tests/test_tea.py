@@ -5,6 +5,7 @@ import pytest
 
 from mudgym.connections.prompts import State
 from mudgym.connections.registry import available_connections_dict
+from mudgym.envs.fields.feinventory import FEInventoryField
 
 
 @pytest.mark.parametrize("connection_key", available_connections_dict)
@@ -51,7 +52,10 @@ def test_tea(connection_key, subtests, tea_results, steps=5):
 
         with subtests.test(msg="Taking game steps"):
             for _ in range(steps):
-                connection.send_command("move north,fei")
+                lines = ["move north", "fei"]
+                for line in lines:
+                    connection.send_line(line)
+                connection.read_response(lines, FEInventoryField.end_of_turn_marker)
         log_time("steps")
 
         connection.reset()

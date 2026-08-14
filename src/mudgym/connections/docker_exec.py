@@ -72,7 +72,7 @@ class DockerExecConnection(MudConnection):
             return self.start_container()
         raise RuntimeError(f"No running container matches name={name}; start_if_missing={start_if_missing}")
 
-    def start_container(self, slots: int = 1) -> str:
+    def start_container(self) -> str:
         """Start a new container and return the container ID."""
         ensure_docker_image(self.container_image)
         output = subprocess.check_output(
@@ -82,13 +82,12 @@ class DockerExecConnection(MudConnection):
                 "--init",
                 "--rm",
                 "-d",
-                #'--ipc="private"',
                 "--name",
                 self.container_name,
                 self.container_image,
                 "/bin/sh",
                 "-lc",
-                f"/app/bin/boot -n {slots} -f -k",
+                "/app/bin/boot -n 1 -f -k",
             ],
             text=True,
         ).strip()
@@ -129,24 +128,24 @@ class DockerExecConnection(MudConnection):
         return cmd
 
     def close(self):
-        """Close the exec session, and remove the container if this connection started it.
+        """
+        Close the exec session, and remove the container if this connection started it.
 
         We only tear down the container we own (one we started because none was running). A
         pre-existing, shared container is left alone so other clients exec'd into it survive.
         """
-        super().close()
-
-        if not self._started_container:
-            return
-
         try:
-            subprocess.run(
-                ["docker", "rm", "-f", self.container_name],
-                capture_output=True,
-                check=False,  # Don't raise if the container is already gone
-            )
-            logger.debug("docker.container.removed", container_name=self.container_name)
-        except Exception as e:
-            logger.debug("docker.container.remove.failed", container_name=self.container_name, error=str(e))
+            super().close()
         finally:
-            self._started_container = False
+            if self._started_container:
+                try:
+                    subprocess.run(
+                        ["docker", "rm", "-f", self.container_name],
+                        capture_output=True,
+                        check=False,  # Don't raise if the container is already gone
+                    )
+                    logger.debug("docker.container.removed", container_name=self.container_name)
+                except Exception as e:
+                    logger.debug("docker.container.remove.failed", container_name=self.container_name, error=str(e))
+                finally:
+                    self._started_container = False

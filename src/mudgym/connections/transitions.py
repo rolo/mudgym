@@ -1,9 +1,9 @@
 """State transition lookup table for the connection state machine."""
 
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
 
-from mudgym.connections.persona import generate_persona_name, parse_persona_screen
+from mudgym.connections.persona import UNUSED_PERSONA, generate_persona_name, parse_persona_screen
 from mudgym.connections.prompts import Prompt, State
 from mudgym.logs import get_logger
 
@@ -22,17 +22,15 @@ class Transition(NamedTuple):
 
     next_state: State
     action: TransitionAction | None = None
-    expected_prompt: Prompt | None = None
 
 
 def T(
     next_state: State,
     action: TransitionAction | None = None,
-    expected_prompt: Prompt | None = None,
 ) -> Transition:
     """Helper to keep table entries concise."""
 
-    return Transition(next_state=next_state, action=action, expected_prompt=expected_prompt)
+    return Transition(next_state=next_state, action=action)
 
 
 def handle_supersede(sm: "ConnectionState") -> None:
@@ -81,7 +79,7 @@ def choose_or_create_persona(sm: "ConnectionState") -> None:
     # Parse available personas from buffer
     current_buffer = sm.get_buffer()
     personas = parse_persona_screen(current_buffer)
-    actual_personas = {k: v for k, v in personas.items() if v != "Unused"}
+    actual_personas = {k: v for k, v in personas.items() if v != UNUSED_PERSONA}
 
     if actual_personas:
         # Select existing persona
@@ -120,16 +118,11 @@ def sip_tea(sm: "ConnectionState") -> None:
     sm.send(b"sip t")
 
 
-GAME_OVER_TRANSITIONS: Mapping[Prompt, Transition] = {
+GAME_OVER_TRANSITIONS: dict[Prompt, Transition] = {
     Prompt.GAME_OVER_QUIT_CHEERIO: T(State.GAME_OVER),
     Prompt.GAME_OVER_EPISODE_POINTS: T(State.GAME_OVER),
     Prompt.GAME_OVER_NOT_UPDATING_PERSONA: T(State.GAME_OVER),
-}
-
-LOGIN_TRANSITIONS: dict[Prompt, Transition] = {
-    Prompt.SUPERSEDE: T(State.LOGIN, handle_supersede),
-    Prompt.SESSION_DYING: T(State.LOGIN),  # Wait for session to die, OPTION comes next
-    Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda c: c.send_cr()),
+    Prompt.GAME_OVER_KILLED_FOR_SWEARING: T(State.GAME_OVER),
 }
 
 GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
@@ -147,88 +140,50 @@ GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
     **GAME_OVER_TRANSITIONS,
 }
 
-
-TRANSITIONS: MutableMapping[State, dict[Prompt, Transition]] = {
+STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     State.INITIAL: {
         Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
-        Prompt.EOF: T(State.DEAD),
-        **LOGIN_TRANSITIONS,
+        Prompt.SUPERSEDE: T(State.LOGIN, handle_supersede),
+        Prompt.SESSION_DYING: T(State.LOGIN),
+        Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda sm: sm.send_cr()),
     },
     State.GAME: {
         Prompt.ENTERED_LAND: T(State.GAME),
-        # answer the silent Option menu on leaving the game, as the login tables do
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
-        **GAME_OVER_TRANSITIONS,
     },
     State.OPTION: {
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
-        Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
-        Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
         Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT),
-        Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
-        Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
         Prompt.BOOT_COMPLETE: T(State.OPTION),
     },
     State.PERSONA_SELECT: {
-        Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
-        Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
+        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
         Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.GAME: T(State.GAME),
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
-        Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
-        Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
     },
     State.PERSONA_NAME_INPUT: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
-        Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
+        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
         Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
-        Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
-        Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
     },
     State.PERSONA_SEX_INPUT: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda c: c.send(b"m")),
+        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
         Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.GAME: T(State.GAME, sip_tea),
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
     },
     State.CLOSING: {
         # Q backs out of persona selection to the Option menu, and Q at the
         # Option menu logs the account out of mudlogin (EOF follows).
-        Prompt.PERSONA_AVAILABLE: T(State.CLOSING, lambda c: c.send(b"Q")),
-        Prompt.OPTION: T(State.CLOSING, lambda c: c.send(b"Q")),
+        Prompt.PERSONA_AVAILABLE: T(State.CLOSING, lambda sm: sm.send(b"Q")),
+        Prompt.OPTION: T(State.CLOSING, lambda sm: sm.send(b"Q")),
     },
     State.RESETTING: {
-        Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
-        Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
-        Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda c: c.send_cr()),
-        # After reset completes, Option: may come without DATABASE_FINISHED_INITIALIZING
-        Prompt.OPTION: T(State.OPTION, send_db_slot),
-        Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
+        Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda sm: sm.send_cr()),
         Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
+    },
+    State.TEAROOM: {
+        Prompt.ENTERED_LAND: T(State.GAME),
+    },
+    State.TEA_SIPPED: {
+        Prompt.ENTERED_LAND: T(State.GAME),
     },
 }
 
-TEAROOM_TRANSITIONS: dict[Prompt, Transition] = {
-    Prompt.ENTERED_LAND: T(State.GAME),
-    # answer the silent Option menu on arrival, as State.GAME does
-    Prompt.OPTION: T(State.OPTION, send_db_slot),
-    **GAME_OVER_TRANSITIONS,
-    Prompt.TEA_SIPPED: T(State.TEA_SIPPED),
-}
-
-TEA_SIPPED_TRANSITIONS: dict[Prompt, Transition] = {
-    Prompt.ENTERED_LAND: T(State.GAME),
-    # answer the silent Option menu on arrival, as State.GAME does
-    Prompt.OPTION: T(State.OPTION, send_db_slot),
-    **GAME_OVER_TRANSITIONS,
-}
-
-TRANSITIONS[State.TEAROOM] = TEAROOM_TRANSITIONS
-TRANSITIONS[State.TEA_SIPPED] = TEA_SIPPED_TRANSITIONS
-
-
-for state in State:
-    specific = TRANSITIONS.get(state, {})
-    TRANSITIONS[state] = {**GLOBAL_TRANSITIONS, **specific}
+TRANSITIONS = {state: GLOBAL_TRANSITIONS | STATE_TRANSITIONS.get(state, {}) for state in State}

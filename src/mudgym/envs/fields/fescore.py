@@ -13,10 +13,6 @@ from mudgym.envs.specs import BIT_DTYPE, INDEX_DTYPE, INT_DTYPE, SINGLE_LINE_CHA
 
 from .field import ObservationField
 
-# Longest reset cycle the game counts down from, so the count starts here on a
-# freshly reset world. Raise this if the game's cycle ever lengthens: a value
-# above the bound puts every parsed and cheats observation outside its own
-# observation space, which Gymnasium only surfaces under gym.make().
 MAX_RESET_MINUTES = 105
 
 

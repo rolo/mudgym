@@ -7,9 +7,10 @@ def example(fragments) -> None:
         # --8<-- [start:actions-text]
         from mudgym import make_env
 
-        env = make_env(observation="parsed")
+        env = make_env(observation="parsed", render_mode="ansi")
         env.reset()
         observation, reward, terminated, truncated, info = env.step("look")
+        rendered = env.render()
         env.close()
 
         print(f"room_name  {observation['room_name']}")
@@ -18,4 +19,4 @@ def example(fragments) -> None:
         print(f"truncated  {truncated}")
         # --8<-- [end:actions-text]
     fragments.write_fenced("actions-text", stdout.getvalue())
-    fragments.write_ansi("actions-text", info["render_bytes"])
+    fragments.write_ansi("actions-text", rendered.encode("latin-1"))

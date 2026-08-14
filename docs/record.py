@@ -185,20 +185,36 @@ class FragmentWriters:
 
 
 @contextlib.contextmanager
-def swapped_default_backends(connection_factory, provider_factory) -> Iterator[None]:
+def swapped_default_backends(
+    connection_factory,
+    provider_factory,
+    parallel_provider_factory=None,
+) -> Iterator[None]:
     """Point the factory defaults at different backends while an example runs.
 
     The example code must stay a bare ``make_env()`` / ``make_parallel_env()`` call -- it is the
     code readers see -- so the swap happens at the registry defaults the factory resolves at call
     time, restored on the way out.
     """
-    previous = registry.default_connection, registry.default_provider_factory
+    if parallel_provider_factory is None:
+        parallel_provider_factory = provider_factory
+
+    previous = (
+        registry.default_connection,
+        registry.default_provider_factory,
+        registry.default_parallel_provider_factory,
+    )
     registry.default_connection = connection_factory
     registry.default_provider_factory = provider_factory
+    registry.default_parallel_provider_factory = parallel_provider_factory
     try:
         yield
     finally:
-        registry.default_connection, registry.default_provider_factory = previous
+        (
+            registry.default_connection,
+            registry.default_provider_factory,
+            registry.default_parallel_provider_factory,
+        ) = previous
 
 
 def record(name: str, version: str) -> None:
@@ -222,10 +238,13 @@ def record(name: str, version: str) -> None:
         written.append(path)
         return path
 
-    def provider_factory(**provider_kwargs):
-        return RecordingProvider(DockerExecProvider(**provider_kwargs), agent_capture_path_written, metadata)
+    def provider_factory():
+        return RecordingProvider(DockerExecProvider(), agent_capture_path_written, metadata)
 
-    with swapped_default_backends(connection_factory, provider_factory):
+    def parallel_provider_factory():
+        return RecordingProvider(DockerExecProvider(worlds=1), agent_capture_path_written, metadata)
+
+    with swapped_default_backends(connection_factory, provider_factory, parallel_provider_factory):
         EXAMPLES[name](FragmentWriters(name, RECORDINGS_DIR, RECORDINGS_DIR))
 
     # only after a successful run: captures the example no longer produces (a removed agent, fewer
@@ -255,7 +274,7 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
         replays.append(connection)
         return connection
 
-    def provider_factory(**_provider_kwargs):
+    def provider_factory():
         provider = ReplayProvider(lambda env_index: agent_capture_path(name, env_index))
         providers.append(provider)
         return provider
@@ -263,11 +282,18 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
     with swapped_default_backends(connection_factory, provider_factory):
         EXAMPLES[name](FragmentWriters(name, fragments_dir, RECORDINGS_DIR))
 
-    for connection in replays + [replay for provider in providers for replay in provider.connections]:
+    for connection in replays:
         remaining = connection.remaining_events()
         if remaining:
             raise StaleCaptureError(
                 f"Replaying {name} left {remaining} unconsumed event(s) in {connection.path.name}: "
+                f"the example no longer matches its capture; run `just docs-record {name}`."
+            )
+    for provider in providers:
+        remaining = provider.remaining_events()
+        if any(remaining):
+            raise StaleCaptureError(
+                f"Replaying {name} left unconsumed provider events {remaining}: "
                 f"the example no longer matches its capture; run `just docs-record {name}`."
             )
 

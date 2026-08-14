@@ -28,8 +28,8 @@ class ObservationField(ABC):
 
     command: str | None = None
 
-    # When this field's command ends the auto-command batch, this pattern identifies its response bytes as the step's
-    # end of turn marker.
+    # When this is the final observation field, this pattern identifies its response bytes as the step's
+    # end of step marker.
     # None (the default) means the response is not distinctive enough to trust for end of step marking duty.
     end_of_turn_marker: re.Pattern[bytes] | None = None
 
@@ -38,7 +38,7 @@ class ObservationField(ABC):
 
     # Messages the game emits in place of a command's real output when the persona cannot act
     # (unconscious, asleep, ...). A refusal claims the field's slot but carries no data.
-    # Unknown responses keep failing loudly in bytes_to_observation.
+    # Unknown responses keep failing loudly in MudEnv's observation parser.
     PLAYER_STATE_REFUSALS: tuple[bytes, ...] = (
         b"You can't wake yourself up yet!",
         b"You can't see a thing, you're blind.",

@@ -4,7 +4,7 @@ from typing import Any
 
 import pexpect
 
-from mudgym.connections.prompts import FINAL_COMMAND_MARKER, PromptSpec, State
+from mudgym.connections.prompts import PromptSpec, State
 from mudgym.connections.state_machine import ConnectionState
 from mudgym.logs import get_logger
 
@@ -13,27 +13,20 @@ logger = get_logger(__name__)
 
 class MudConnection:
     """
-    Base class for managing connections to MUD2 instances.
+    Base class for managing connections to MUD2 game instances.
 
-    The connection lifecycle is managed by the state machine, this class wraps the state machine and allows for
-    different types of transport whilst exposing a (hopefully) easier to deal with API.
+    The state machine handles the fiddly lifecycle. This class wraps it so we can swap in different
+    transports.
 
     Lifecycle:
-    - reset() -> Get us to the TEA_SIPPED state, ready for an episode to begin.
-    - send_command(command: str) -> tuple[bytes, bool, bool, dict] -> Send a command to the game, receiving the
-      raw response bytes, terminated and incomplete flags and some debug info.
-    - close() -> Close the connection, terminating the child process. Typically you would use reset() instead if you
-      are going to want to reuse the connection to start a new episode (for connections that support it).
+    - ``reset()`` gets us to ``TEA_SIPPED``, ready for an episode to begin. Note that the env's reset differs as it exits
+    the tearoom to start an episode.
+    - ``send_line()`` and ``read_response()`` split sending from receiving so several players can see each other's actions.
+    - ``close()`` terminates the child process. Use ``reset()`` instead when the connection will be reused for another episode.
     """
 
     # initial prompt we expect to see - subclasses can override
     initial_prompt: PromptSpec | None = None
-
-    # the end of turn marker closing each step's read window: the pattern identifying the response of the batch's
-    # final command. This class attribute is the protocol's one declared default (fei's ======== divider), which
-    # keeps a bare connection usable on its own; the session overrides it per instance with whatever marker the
-    # env's batch actually ends with.
-    end_of_turn_marker: re.Pattern = FINAL_COMMAND_MARKER
 
     def __init__(
         self,
@@ -54,16 +47,6 @@ class MudConnection:
         # our state machine instance, that does most of the heavy lifting
         self.sm: ConnectionState | None = None
 
-    @classmethod
-    def is_available(cls) -> bool:
-        """
-        Check if the connection is available to use in the current environment. Subclasses can override this method to
-        perform a check specific to the connection type. This is to help with experimenting with different connections
-        types.
-        """
-        logger.debug("connection.is_available.default", connection_class=cls.__name__)
-        return True
-
     def spawn(self) -> pexpect.spawn:
         """
         The method that does the actual connecting by spawning and returning our child process.
@@ -81,7 +64,7 @@ class MudConnection:
 
         This tells us the `MudConnection` is ready but the `MudEnv` has its own `reset()` steps afterwards that does
         episode related things that don't make sense here, like issuing commands to set up the initial environment state
-        (eg, score) and running start of episode autocommands and taking the northwards step outside of the tearoom.
+        (eg, score), running observation commands, and taking the northwards step outside of the tearoom.
 
         I can imagine a situation with multiple `MudConnection`s waiting on each other after `reset()` to be ready so it
         seemed negligent to leave agents hanging around outside of the sanctity of the Tearoom where they might get
@@ -115,7 +98,6 @@ class MudConnection:
                 db_slot=self.db_slot,
                 name_generator=self.name_generator,
                 initial_prompt=self.initial_prompt,
-                end_of_turn_marker=self.end_of_turn_marker,
             )
 
         # OPTION -> persona selection/creation -> TEAROOM -> sip tea -> TEA_SIPPED
@@ -127,17 +109,40 @@ class MudConnection:
             last_prompt=self.sm.last_prompt.name if self.sm.last_prompt else None,
         )
 
-    def send_command(self, command: str | Sequence[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        """
-        Send a command batch (one wire line, or several when the caller split it) and return the
-        raw response bytes, terminated/incomplete flags, and debug info.
+    def send_line(self, line: str) -> None:
+        """Send a line without waiting for its response."""
+        if self.sm is None:
+            raise RuntimeError("Connection has not been reset, call reset() first.")
+        self.sm.send(line)
+
+    def read_response(
+        self,
+        lines: Sequence[str],
+        end_of_turn_marker: re.Pattern,
+    ) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        """Read the response up to the marker for lines already sent through ``send_line``.
+
+        ``lines`` tells the state machine which echoes belong to this exchange. The marker belongs
+        to the final observation command and closes the read window. Everything else is returned as
+        raw bytes for ``MudEnv`` to interpret.
         """
         if self.sm is None:
             raise RuntimeError("Connection has not been reset, call reset() first.")
-        lines = [command] if isinstance(command, str) else list(command)
-        if not lines:
-            raise ValueError("send_command requires at least one command line; got an empty batch")
-        return self.sm.send_command(lines)
+        return self.sm.read(lines, end_of_turn_marker)
+
+    def invalidate(self) -> None:
+        """Throw away a desynchronised transport so the next reset has to spawn a fresh one."""
+        if self.sm is None:
+            return
+        state_machine = self.sm
+        try:
+            if state_machine.isalive():
+                state_machine.quit()
+        except RuntimeError as exc:
+            logger.debug("connection.invalidate.quit_failed", exc_info=exc)
+        finally:
+            state_machine.close(force=True)
+            self.sm = None
 
     def close(self):
         if self.sm is None:

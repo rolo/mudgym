@@ -30,7 +30,7 @@ class DockerRunConnection(MudConnection):
     def __init__(
         self,
         container_name: str | None = None,
-        image_name: str | None = DOCKER_IMAGE,
+        image_name: str = DOCKER_IMAGE,
         use_tty: bool = True,
         *,
         account_id: str = DEFAULT_ACCOUNT_ID,

@@ -22,7 +22,7 @@ TEXT_CHARSET = PRINTABLE_ASCII + "\n"
 # never a line break.
 SINGLE_LINE_CHARSET = PRINTABLE_ASCII
 
-# An action is one logical game input line: the env appends its own auto-command line each step,
+# An action is one logical game input line: the session sends its observation-command line separately,
 # so a line break inside an action would smuggle extra wire commands. The game also
 # transliterates input bytes above 0x7F (a typed 0xE9 'e-acute' echoes back as 'i'), so actions
 # stay printable ASCII.
