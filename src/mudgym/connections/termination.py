@@ -16,11 +16,7 @@ NO_LONGER_IN_GAME_PROMPTS = [
     Prompt.PERSONA_SEX,
 ]
 
-# everything besides the requested end-of-turn marker that can complete a read window: a game-over,
-# no longer being in the game, transport
-# EOF/TIMEOUT, or a rejected command that aborts the rest of the line. Prompt.GAME is included so
-# each in-window response resets the expect timeout rather than the whole batch having to arrive
-# inside a single expect window.
+# Patterns read() handles before the marker. Prompt.GAME restarts the timeout for each response.
 END_OF_STEP_PATTERNS = [
     *[prompt.value for prompt in GAME_OVER_PROMPTS],
     Prompt.EOF.value,

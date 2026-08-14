@@ -395,14 +395,12 @@ class ConnectionState:
                 marker_arrived = True
                 break
 
-            # A rejection after any echo belongs to this exchange. Rejecting the player's action does not stop the separately sent observation line, so only a rejection after that final echo closes the window.
+            # Echoes can run ahead of responses, so keep reading for the marker.
             command_rejected = matched_pattern in INVALID_COMMAND_PROMPTS and seen_any_command_echo
             rejected = rejected or command_rejected
-            rejection_closes_window = command_rejected and seen_final_command_echo
-            if prompt_enum in GAME_OVER_PROMPTS or prompt_enum in TRANSPORT_BREAK_PROMPTS or rejection_closes_window:
-                # The death or rejection text is already in the buffer, so keep it and return what we managed to read.
+            if prompt_enum in GAME_OVER_PROMPTS or prompt_enum in TRANSPORT_BREAK_PROMPTS:
                 terminated = prompt_enum in GAME_OVER_PROMPTS
-                incomplete = prompt_enum in TRANSPORT_BREAK_PROMPTS or rejection_closes_window
+                incomplete = prompt_enum in TRANSPORT_BREAK_PROMPTS
                 if incomplete and seen_final_command_echo:
                     logger.warning(
                         "sm.read.marker_missing",
