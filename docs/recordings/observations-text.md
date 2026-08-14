@@ -1,4 +1,4 @@
-<!-- Derived from the observations-text session capture (mudgym v0.3.0-8-gb609722-dirty) by docs/record.py. Do not edit by hand: `just docs-derive observations-text` rewrites this, `just docs-record observations-text` re-records it. -->
+<!-- Derived from the observations-text connection capture (mudgym v0.3.0-8-gb609722-dirty) by docs/record.py. Do not edit by hand: `just docs-derive observations-text` rewrites this, `just docs-record observations-text` re-records it. -->
 
 ```text
 Badly-paved road.

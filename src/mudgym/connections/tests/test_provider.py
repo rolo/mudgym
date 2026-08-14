@@ -87,11 +87,6 @@ def test_multiplayer_connections_share_configured_worlds():
 
 
 def test_multiple_containers_use_local_slots_and_preserve_shared_world_mapping(monkeypatch):
-    class StubConnection(MudConnection):
-        def __init__(self, *, container_id: str, **kwargs):
-            super().__init__(**kwargs)
-            self.container_id = container_id
-
     container_ids = iter(["container-1", "container-2"])
     monkeypatch.setattr(
         DockerExecProvider,
@@ -100,7 +95,7 @@ def test_multiple_containers_use_local_slots_and_preserve_shared_world_mapping(m
     )
     monkeypatch.setattr("mudgym.connections.provider.subprocess.run", lambda *args, **kwargs: None)
 
-    provider = DockerExecProvider(worlds=3, worlds_per_container=2, connection_class=StubConnection)
+    provider = DockerExecProvider(worlds=3, worlds_per_container=2)
     try:
         connections = provider.create_connections(6)
         assert [(connection.container_id, connection.db_slot) for connection in connections] == [

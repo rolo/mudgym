@@ -4,10 +4,10 @@ The example code shown on the docs pages lives in `docs/code/`, one file per exa
 `--8<--` snippet regions the pages include -- so the code a reader sees is exactly the code that
 runs. Each example runs in two phases:
 
-- record: the example plays the live game once (requires Docker) and the wire conversation is
+- record: the example plays the live game once (requires Docker) and each connection transcript is
   written to `docs/recordings/<name>*.session.jsonl` -- the committed source of truth.
 - derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
-  fragments (`docs/recordings/*.md`, `*.ansi`) are rewritten from the replayed session.
+  fragments (`docs/recordings/*.md`, `*.ansi`) are rewritten from the replayed transcript.
 
 Because fragments are derived from a committed capture, presentation edits re-derive the same
 world instead of rerolling a random one, and `tests/test_docs_recordings.py` can verify the
@@ -44,9 +44,9 @@ from mudgym.connections.recording import (
     RecordingConnection,
     RecordingProvider,
     ReplayConnection,
+    ReplayMismatchError,
     ReplayProvider,
-    StaleCaptureError,
-    read_capture,
+    _read_capture,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
@@ -93,7 +93,7 @@ def agent_capture_path(name: str, env_index: int) -> Path:
     return RECORDINGS_DIR / f"{name}.player_{env_index}.session.jsonl"
 
 
-def session_capture_paths(name: str) -> list[Path]:
+def capture_paths(name: str) -> list[Path]:
     patterns = (f"{name}.session.jsonl", f"{name}.env*.session.jsonl", f"{name}.player_*.session.jsonl")
     return sorted(path for pattern in patterns for path in RECORDINGS_DIR.glob(pattern))
 
@@ -123,7 +123,7 @@ def describe_path(path: Path) -> str:
 
 
 class FragmentWriters:
-    """Writes an example's displayed fragments, tying each one to its session capture."""
+    """Write an example's displayed fragments, tying each one to its connection captures."""
 
     def __init__(self, example_name: str, fragments_dir: Path, captures_dir: Path):
         self.example_name = example_name
@@ -144,10 +144,11 @@ class FragmentWriters:
         name = self.example_name
         patterns = (f"{name}.session.jsonl", f"{name}.env*.session.jsonl", f"{name}.player_*.session.jsonl")
         paths = sorted(path for pattern in patterns for path in self.captures_dir.glob(pattern))
-        header, _ = read_capture(paths[0])
+        header, _ = _read_capture(paths[0])
         return (
-            f"<!-- Derived from the {name} session capture (mudgym {header['mudgym']}) by docs/record.py. "
-            f"Do not edit by hand: `just docs-derive {name}` rewrites this, `just docs-record {name}` re-records it. -->"
+            f"<!-- Derived from the {name} connection capture (mudgym {header['mudgym']}) by docs/record.py. "
+            f"Do not edit by hand: `just docs-derive {name}` rewrites this, "
+            f"`just docs-record {name}` re-records it. -->"
         )
 
     def write_fragment(self, name: str, body: str) -> None:
@@ -249,16 +250,16 @@ def record(name: str, version: str) -> None:
 
     # only after a successful run: captures the example no longer produces (a removed agent, fewer
     # envs) must not linger, but a failed run must not have deleted the previous good captures either
-    for stale in set(session_capture_paths(name)) - set(written):
+    for stale in set(capture_paths(name)) - set(written):
         stale.unlink()
-    for path in session_capture_paths(name):
+    for path in capture_paths(name):
         print(f"wrote {describe_path(path)}")
 
 
 def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
     """Replay the example's committed captures and rewrite the fragments the docs display."""
-    if not session_capture_paths(name):
-        raise SystemExit(f"No session capture for {name!r}; run `just docs-record {name}` first.")
+    if not capture_paths(name):
+        raise SystemExit(f"No connection capture for {name!r}; run `just docs-record {name}` first.")
 
     # clear the recording's fragments first, so ones the replay no longer produces (a removed
     # agent, a renamed fragment) cannot linger and keep rendering in the docs
@@ -267,7 +268,6 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
 
     env_counter = itertools.count()
     replays: list[ReplayConnection] = []
-    providers: list[ReplayProvider] = []
 
     def connection_factory():
         connection = ReplayConnection(single_env_capture_path(name, next(env_counter)))
@@ -275,27 +275,22 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
         return connection
 
     def provider_factory():
-        provider = ReplayProvider(lambda env_index: agent_capture_path(name, env_index))
-        providers.append(provider)
-        return provider
+        class RetainedReplayProvider(ReplayProvider):
+            def create_connections(self, count: int):
+                connections = super().create_connections(count)
+                replays.extend(connections)
+                return connections
+
+        return RetainedReplayProvider(lambda env_index: agent_capture_path(name, env_index))
 
     with swapped_default_backends(connection_factory, provider_factory):
         EXAMPLES[name](FragmentWriters(name, fragments_dir, RECORDINGS_DIR))
 
-    for connection in replays:
-        remaining = connection.remaining_events()
-        if remaining:
-            raise StaleCaptureError(
-                f"Replaying {name} left {remaining} unconsumed event(s) in {connection.path.name}: "
-                f"the example no longer matches its capture; run `just docs-record {name}`."
-            )
-    for provider in providers:
-        remaining = provider.remaining_events()
-        if any(remaining):
-            raise StaleCaptureError(
-                f"Replaying {name} left unconsumed provider events {remaining}: "
-                f"the example no longer matches its capture; run `just docs-record {name}`."
-            )
+    try:
+        for connection in replays:
+            connection.assert_exhausted()
+    except ReplayMismatchError as error:
+        raise ReplayMismatchError(f"{error} Run `just docs-record {name}` to re-record it.") from error
 
 
 def refresh_example(name: str) -> None:
@@ -304,14 +299,14 @@ def refresh_example(name: str) -> None:
     Presentation edits keep the recorded world: derivation alone answers them. The live game is only
     contacted when the example has no capture yet, or replay proves its commands have changed.
     """
-    if not session_capture_paths(name):
+    if not capture_paths(name):
         print(f"{name}: no capture yet; recording against the live game")
         record(name, describe_repository())
         derive(name)
         return
     try:
         derive(name)
-    except StaleCaptureError as error:
+    except ReplayMismatchError as error:
         print(f"{name}: {error}")
         print(f"{name}: commands changed; re-recording against the live game")
         record(name, describe_repository())
@@ -362,7 +357,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "--derive-only",
         action="store_true",
-        help="Skip the live game and rewrite fragments from the committed session captures.",
+        help="Skip the live game and rewrite fragments from the committed connection captures.",
     )
     parser.add_argument(
         "--watch",

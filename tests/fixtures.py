@@ -41,11 +41,6 @@ def live_env_factory():
 
 
 @pytest.fixture
-def live_env(live_env_factory):
-    return live_env_factory()
-
-
-@pytest.fixture
 def live_vector_env_factory():
     yield from tracked_factory(make_vector_env)
 

@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import Any
 
 import pexpect
@@ -19,10 +19,12 @@ class MudConnection:
     transports.
 
     Lifecycle:
-    - ``reset()`` gets us to ``TEA_SIPPED``, ready for an episode to begin. Note that the env's reset differs as it exits
-    the tearoom to start an episode.
-    - ``send_line()`` and ``read_response()`` split sending from receiving so several players can see each other's actions.
-    - ``close()`` terminates the child process. Use ``reset()`` instead when the connection will be reused for another episode.
+    - ``reset()`` gets us to ``TEA_SIPPED``, ready for an episode to begin. The env's reset then
+      exits the tearoom to start that episode.
+    - ``send_line()`` and ``read_response()`` split sending from receiving so several players can
+      see each other's actions.
+    - ``close()`` terminates the child process. Use ``reset()`` instead when the connection will be
+      reused for another episode.
     """
 
     # initial prompt we expect to see - subclasses can override
@@ -46,6 +48,7 @@ class MudConnection:
 
         # our state machine instance, that does most of the heavy lifting
         self.sm: ConnectionState | None = None
+        self._pending_lines: list[str] = []
 
     def spawn(self) -> pexpect.spawn:
         """
@@ -70,6 +73,8 @@ class MudConnection:
         seemed negligent to leave agents hanging around outside of the sanctity of the Tearoom where they might get
         attacked by mobiles or something.
         """
+
+        self._pending_lines.clear()
 
         # do we need to respawn the process or can we reuse via some menu choices?
         needs_respawn = self.sm is None or not self.sm.isalive()
@@ -114,24 +119,32 @@ class MudConnection:
         if self.sm is None:
             raise RuntimeError("Connection has not been reset, call reset() first.")
         self.sm.send(line)
+        # only lines that made it onto the wire belong to the response we drain later
+        self._pending_lines.append(line)
 
     def read_response(
         self,
-        lines: Sequence[str],
         end_of_turn_marker: re.Pattern,
     ) -> tuple[bytes, bool, bool, dict[str, Any]]:
         """Read the response up to the marker for lines already sent through ``send_line``.
 
-        ``lines`` tells the state machine which echoes belong to this exchange. The marker belongs
-        to the final observation command and closes the read window. Everything else is returned as
-        raw bytes for ``MudEnv`` to interpret.
+        The connection remembers which lines were actually sent, which lets the state machine find
+        their echoes without asking the caller to reconstruct the wire history afterwards.
         """
         if self.sm is None:
             raise RuntimeError("Connection has not been reset, call reset() first.")
-        return self.sm.read(lines, end_of_turn_marker)
+        if not self._pending_lines:
+            raise RuntimeError("No command lines are awaiting a response.")
+
+        lines = self._pending_lines
+        self._pending_lines = []
+        raw_bytes, terminated, incomplete, debug_info = self.sm.read(lines, end_of_turn_marker)
+        debug_info["wire_lines"] = list(lines)
+        return raw_bytes, terminated, incomplete, debug_info
 
     def invalidate(self) -> None:
         """Throw away a desynchronised transport so the next reset has to spawn a fresh one."""
+        self._pending_lines.clear()
         if self.sm is None:
             return
         state_machine = self.sm
@@ -145,6 +158,7 @@ class MudConnection:
             self.sm = None
 
     def close(self):
+        self._pending_lines.clear()
         if self.sm is None:
             return
         try:

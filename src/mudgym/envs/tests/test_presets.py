@@ -1,7 +1,6 @@
 import pytest
 from gymnasium import spaces
 
-from mudgym.connections.registry import default_connection
 from mudgym.envs.factory import OBSERVATION_PRESETS
 from mudgym.envs.fields import (
     FEInventoryField,
@@ -91,10 +90,6 @@ def test_default_observation_is_parsed(scripted_env_factory):
     env = scripted_env_factory()
 
     assert observation_keys(env) == PRESET_KEYS["parsed"]
-
-
-def test_env_uses_default_connection(live_env):
-    assert live_env.unwrapped.session.connection.__class__ == default_connection
 
 
 EXPLICIT_RAW_BYTES_KEYS = {

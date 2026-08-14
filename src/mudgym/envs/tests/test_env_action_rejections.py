@@ -99,4 +99,4 @@ def test_rejected_environment_step_records_and_replays_identically(tmp_path):
     assert actual[1:4] == expected[1:4]
     assert actual[4]["action_rejected"] is True
     assert actual_render == expected_render
-    assert replay_connection.remaining_events() == 0
+    replay_connection.assert_exhausted()

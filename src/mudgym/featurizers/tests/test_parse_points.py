@@ -8,7 +8,10 @@ SWEARING_LOSS_BYTES = b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\
 
 # Captured from the live game: 'say' with raw ESC bytes in the message; the game strips the ESC
 # from the spoken output, leaving the SGR body as plain text.
-ESC_STRIPPED_SPEECH_BYTES = b'\x1b[0;33;40mRaymond the sorcerer says "\x1b[1;33;40m(x +99 = [0;32;40m99[1;37;40m)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
+ESC_STRIPPED_SPEECH_BYTES = (
+    b'\x1b[0;33;40mRaymond the sorcerer says "\x1b[1;33;40m'
+    b'(x +99 = [0;32;40m99[1;37;40m)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
+)
 
 
 def test_parse_points_gain_event():

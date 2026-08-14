@@ -4,25 +4,7 @@ import pytest
 
 from mudgym.connections.connection import MudConnection
 from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
-from tests.scripted import ScriptedConnection
-
-
-class TrackingProvider:
-    def __init__(self):
-        self.connections: list[ScriptedConnection] = []
-        self.requested_count: int | None = None
-        self.closed = False
-
-    def create_connections(self, count: int) -> list[MudConnection]:
-        self.requested_count = count
-        self.connections = [ScriptedConnection() for _ in range(count)]
-        return list(self.connections)
-
-    def reset(self, *, seed=None) -> None:
-        pass
-
-    def close(self) -> None:
-        self.closed = True
+from tests.scripted import ScriptedConnection, ScriptedProvider
 
 
 def test_make_env_invalid_actions_rejected_before_constructing_env():
@@ -39,6 +21,17 @@ def test_make_envconnection_kwargs_with_instance_rejected():
     assert conn.sm is None
 
 
+def test_make_env_resolves_the_registry_default_at_call_time(monkeypatch):
+    monkeypatch.setattr("mudgym.envs.factory.registry.default_connection", ScriptedConnection)
+
+    env = make_env(observation="parsed")
+    try:
+        observation, _ = env.reset()
+        assert observation["room_name"]
+    finally:
+        env.close()
+
+
 @pytest.mark.parametrize(
     ("factory", "factory_kwargs"),
     [
@@ -47,7 +40,7 @@ def test_make_envconnection_kwargs_with_instance_rejected():
     ],
 )
 def test_invalid_observation_is_rejected_before_adopting_provider(factory, factory_kwargs):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
 
     with pytest.raises(ValueError, match="observation must be one of"):
         factory(provider=provider, observation="nope", **factory_kwargs)
@@ -97,7 +90,7 @@ def test_make_env_constructor_failure_closes_connection():
     ],
 )
 def test_child_constructor_failure_closes_entire_batch_and_provider(factory, factory_kwargs):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
 
     with pytest.raises(ValueError, match="declare a command"):
         factory(provider=provider, field_parsers=[], **factory_kwargs)
@@ -107,7 +100,7 @@ def test_child_constructor_failure_closes_entire_batch_and_provider(factory, fac
 
 
 def test_vector_constructor_failure_closes_children_and_provider(monkeypatch):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
 
     def failing_vector_env(children, **kwargs):
         raise RuntimeError("vector constructor failed")
@@ -122,7 +115,7 @@ def test_vector_constructor_failure_closes_children_and_provider(monkeypatch):
 
 
 def test_wrapper_constructor_failure_closes_children_and_provider(monkeypatch):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
 
     def failing_wrapper(env):
         raise RuntimeError("wrapper constructor failed")
@@ -137,23 +130,13 @@ def test_wrapper_constructor_failure_closes_children_and_provider(monkeypatch):
 
 
 def test_provider_returning_wrong_batch_size_is_closed_with_its_connections():
-    provider = TrackingProvider()
+    provider = ScriptedProvider(returned_count=2)
 
     with pytest.raises(RuntimeError, match="returned 2 connections, expected 3"):
-        make_vector_env(3, provider=provider_with_fixed_count(provider, count=2))
+        make_vector_env(3, provider=provider)
 
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True
-
-
-def provider_with_fixed_count(provider: TrackingProvider, *, count: int) -> TrackingProvider:
-    def create_connections(requested_count: int) -> list[MudConnection]:
-        provider.requested_count = requested_count
-        provider.connections = [ScriptedConnection() for _ in range(count)]
-        return list(provider.connections)
-
-    provider.create_connections = create_connections
-    return provider
 
 
 @pytest.mark.parametrize(
@@ -164,7 +147,7 @@ def provider_with_fixed_count(provider: TrackingProvider, *, count: int) -> Trac
     ],
 )
 def test_factory_requests_one_connection_batch(factory, factory_kwargs, expected_count):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
 
     env = factory(provider=provider, **factory_kwargs)
     try:
@@ -181,7 +164,7 @@ def test_factory_requests_one_connection_batch(factory, factory_kwargs, expected
     ],
 )
 def test_default_provider_configuration_policy(monkeypatch, factory, factory_kwargs, registry_factory_name):
-    provider = TrackingProvider()
+    provider = ScriptedProvider()
     calls = []
 
     def provider_factory():

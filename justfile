@@ -23,7 +23,8 @@ format:
     uv run ruff format .
 
 test:
-    uv run pytest --tb=short --durations=20 --cov=src --cov-branch --cov-report=xml --cov-report=html --cov-report=term-missing
+    uv run pytest --tb=short --durations=20 --cov=src --cov-branch \
+        --cov-report=xml --cov-report=html --cov-report=term-missing
 
 # Build the sdist and wheel from scratch. Deliberately no `just publish`:
 # production publishing is CI and OIDC only, so a local mistake cannot reach PyPI.
@@ -39,11 +40,11 @@ check-dist: build
 release version:
     uv run python scripts/release.py {{version}}
 
-# play the docs examples against the live game to record sessions in docs/recordings/
+# play the docs examples against the live game to record connection calls in docs/recordings/
 docs-record *names:
     uv run python docs/record.py {{names}}
 
-# replay committed session captures through the env stack to rewrite the docs displayed fragments
+# replay committed connection captures through the env stack to rewrite the docs displayed fragments
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
 

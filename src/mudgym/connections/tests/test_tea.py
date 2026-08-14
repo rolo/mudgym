@@ -55,7 +55,7 @@ def test_tea(connection_key, subtests, tea_results, steps=5):
                 lines = ["move north", "fei"]
                 for line in lines:
                     connection.send_line(line)
-                connection.read_response(lines, FEInventoryField.end_of_turn_marker)
+                connection.read_response(FEInventoryField.end_of_turn_marker)
         log_time("steps")
 
         connection.reset()

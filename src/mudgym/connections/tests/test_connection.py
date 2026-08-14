@@ -8,7 +8,7 @@ from mudgym.envs.fields.feinventory import FEInventoryField
 def send_and_read(connection, lines):
     for line in lines:
         connection.send_line(line)
-    return connection.read_response(lines, FEInventoryField.end_of_turn_marker)
+    return connection.read_response(FEInventoryField.end_of_turn_marker)
 
 
 @pytest.mark.parametrize("connection_key", available_connections_dict)

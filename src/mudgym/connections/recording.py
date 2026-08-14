@@ -1,91 +1,60 @@
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
 from mudgym.connections.connection import MudConnection
+from mudgym.connections.errors import ConnectionClosedError
 from mudgym.connections.provider import ConnectionProvider
 from mudgym.logs import get_logger
 
 logger = get_logger(__name__)
 
-CAPTURE_FORMAT = "mudgym-session-capture"
-CAPTURE_VERSION = 2
+CAPTURE_FORMAT = "mudgym-connection-capture"
+CAPTURE_VERSION = 3
 
 
-class StaleCaptureError(RuntimeError):
-    """The caller's conversation no longer matches the capture; re-recording is the only fix."""
+class ReplayMismatchError(RuntimeError):
+    """Calls made during replay do not match the recorded connection transcript."""
 
 
-def bytes_to_capture_text(raw_bytes: bytes) -> str:
-    return bytes(raw_bytes).decode("latin-1")
-
-
-def capture_text_to_bytes(text: str) -> bytes:
-    return text.encode("latin-1")
-
-
-def read_capture(path: str | Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Load a capture file, returning its header and its events with ``raw_bytes`` restored."""
+def _read_capture(path: str | Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Load one JSONL connection transcript."""
     path = Path(path)
-    # split strictly on "\n": JSON strings never contain a raw newline, while str.splitlines()
-    # would also split on characters like U+0085 that ensure_ascii=False writes unescaped
-    lines = [line for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
-    if not lines:
+    with path.open(encoding="utf-8") as handle:
+        records = [json.loads(line) for line in handle if line.strip()]
+    if not records:
         raise ValueError(f"Capture {path} is empty.")
 
-    header = json.loads(lines[0])
+    header, *calls = records
     if header.get("format") != CAPTURE_FORMAT:
         raise ValueError(f"Capture {path} has format {header.get('format')!r}, expected {CAPTURE_FORMAT!r}.")
     if header.get("version") != CAPTURE_VERSION:
         raise ValueError(f"Capture {path} has version {header.get('version')!r}, expected {CAPTURE_VERSION}.")
 
-    events = []
-    for line in lines[1:]:
-        event = json.loads(line)
-        if event["event"] == "step":
-            event["raw_bytes"] = capture_text_to_bytes(event.pop("raw_text"))
-        events.append(event)
-    return header, events
+    for call in calls:
+        if call["call"] == "read_response":
+            call["raw_bytes"] = call.pop("raw_text").encode("latin-1")
+    return header, calls
 
 
-class CaptureWriter:
-    """Streams one session's events to a capture file, header first, flushing per line."""
+class _CaptureWriter:
+    """Stream one connection transcript to disk, flushing after every call."""
 
-    def __init__(self, path: str | Path, metadata: dict[str, Any] | None = None):
+    def __init__(self, path: str | Path, metadata: dict[str, Any] | None = None) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("w", encoding="utf-8")
-        self._write_line({"format": CAPTURE_FORMAT, "version": CAPTURE_VERSION, **(metadata or {})})
+        self._write({"format": CAPTURE_FORMAT, "version": CAPTURE_VERSION, **(metadata or {})})
 
-    def _write_line(self, payload: dict[str, Any]) -> None:
-        self.handle.write(json.dumps(payload, ensure_ascii=False))
+    def _write(self, payload: dict[str, Any]) -> None:
+        self.handle.write(json.dumps(payload))
         self.handle.write("\n")
         self.handle.flush()
 
-    def record_reset(self) -> None:
-        self._write_line({"event": "reset"})
-
-    def record_step(
-        self,
-        lines: list[str],
-        raw_bytes: bytes,
-        terminated: bool,
-        incomplete: bool,
-        rejected: bool = False,
-        marker_arrived: bool = False,
-    ) -> None:
-        event = {
-            "event": "step",
-            "lines": lines,
-            "raw_text": bytes_to_capture_text(raw_bytes),
-            "terminated": bool(terminated),
-            "incomplete": bool(incomplete),
-            "rejected": bool(rejected),
-            "marker_arrived": bool(marker_arrived),
-        }
-        self._write_line(event)
+    def write_call(self, call: str, **payload: Any) -> None:
+        self._write({"call": call, **payload})
 
     def close(self) -> None:
         if not self.handle.closed:
@@ -93,28 +62,38 @@ class CaptureWriter:
 
 
 class RecordingConnection(MudConnection):
-    """Wraps a live connection and records every reset and step to a capture file."""
+    """Record calls made at one live ``MudConnection`` boundary."""
 
-    def __init__(self, connection: MudConnection, path: str | Path, metadata: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        connection: MudConnection,
+        path: str | Path,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         metadata = {"connection": type(connection).__name__, **(metadata or {})}
         self.connection = connection
-        self.writer = CaptureWriter(path, metadata)
+        self.capture = _CaptureWriter(path, metadata)
         logger.debug("recording.start", path=str(path), connection=type(connection).__name__)
 
     def reset(self) -> None:
         self.connection.reset()
-        self.writer.record_reset()
+        self.capture.write_call("reset")
 
     def send_line(self, line: str) -> None:
-        self.connection.send_line(line)
+        try:
+            self.connection.send_line(line)
+        except ConnectionClosedError:
+            self.capture.write_call("send_line", line=line, error="connection_closed")
+            raise
+        self.capture.write_call("send_line", line=line)
 
-    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(lines, end_of_turn_marker)
-        self.writer.record_step(
-            list(lines),
-            raw_bytes,
-            terminated,
-            incomplete,
+    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(end_of_turn_marker)
+        self.capture.write_call(
+            "read_response",
+            raw_text=raw_bytes.decode("latin-1"),
+            terminated=bool(terminated),
+            incomplete=bool(incomplete),
             rejected=bool(debug_info.get("rejected", False)),
             marker_arrived=bool(debug_info.get("marker_arrived", False)),
         )
@@ -122,74 +101,85 @@ class RecordingConnection(MudConnection):
 
     def invalidate(self) -> None:
         self.connection.invalidate()
+        self.capture.write_call("invalidate")
 
     def close(self) -> None:
         try:
             self.connection.close()
         finally:
-            self.writer.close()
+            self.capture.close()
 
 
 class ReplayConnection(MudConnection):
-    """Plays a capture file back through the `MudConnection` interface, verifying every step.
-    The caller must issue exactly the recorded conversation. Any divergence raises right away."""
+    """Replay and verify calls at one recorded ``MudConnection`` boundary."""
 
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
-        self.header, self.events = read_capture(self.path)
+        self.header, self.calls = _read_capture(self.path)
         self.cursor = 0
+        self._pending_lines: list[str] = []
 
-    def _next_event(self, expected: str) -> dict[str, Any]:
-        if self.cursor >= len(self.events):
-            raise StaleCaptureError(f"Replay of {self.path} exhausted: no event left to answer a {expected!r}.")
-        event = self.events[self.cursor]
-        if event["event"] != expected:
-            raise StaleCaptureError(
-                f"Replay of {self.path} out of order at event {self.cursor}: "
-                f"expected a {expected!r}, capture has a {event['event']!r}."
+    def _take(self, expected: str) -> dict[str, Any]:
+        if self.cursor >= len(self.calls):
+            raise ReplayMismatchError(f"Replay of {self.path} is exhausted; expected {expected!r}.")
+        call = self.calls[self.cursor]
+        if call["call"] != expected:
+            raise ReplayMismatchError(
+                f"Replay of {self.path} diverged at call {self.cursor}: "
+                f"expected {expected!r}, capture has {call['call']!r}."
             )
         self.cursor += 1
-        return event
-
-    def remaining_events(self) -> int:
-        return len(self.events) - self.cursor
+        return call
 
     def reset(self) -> None:
-        self._next_event("reset")
+        self._pending_lines.clear()
+        self._take("reset")
 
-    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        lines = list(lines)
-        event = self._next_event("step")
-        if lines != event["lines"]:
-            raise StaleCaptureError(
-                f"Replay of {self.path} diverged at event {self.cursor - 1}: "
-                f"sent {lines!r} but the capture recorded {event['lines']!r}. "
-                f"The capture is stale for this code; re-record it."
+    def send_line(self, line: str) -> None:
+        call = self._take("send_line")
+        if line != call["line"]:
+            raise ReplayMismatchError(
+                f"Replay of {self.path} diverged at call {self.cursor - 1}: "
+                f"sent {line!r}, capture recorded {call['line']!r}."
             )
+        if call.get("error") == "connection_closed":
+            raise ConnectionClosedError(f"Recorded connection closed while sending {line!r}.")
+        self._pending_lines.append(line)
+
+    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        call = self._take("read_response")
+        wire_lines = list(self._pending_lines)
+        self._pending_lines.clear()
         return (
-            event["raw_bytes"],
-            event["terminated"],
-            event["incomplete"],
+            call["raw_bytes"],
+            call["terminated"],
+            call["incomplete"],
             {
-                "rejected": event["rejected"],
-                "marker_arrived": event["marker_arrived"],
+                "rejected": call["rejected"],
+                "marker_arrived": call["marker_arrived"],
                 "replayed": True,
                 "capture": str(self.path),
+                "wire_lines": wire_lines,
             },
         )
 
-    def send_line(self, line: str) -> None:
-        pass
-
     def invalidate(self) -> None:
-        pass
+        self._take("invalidate")
+        self._pending_lines.clear()
+
+    def remaining_calls(self) -> int:
+        return len(self.calls) - self.cursor
+
+    def assert_exhausted(self) -> None:
+        if remaining := self.remaining_calls():
+            raise ReplayMismatchError(f"Replay of {self.path} finished with {remaining} unconsumed calls.")
 
     def close(self) -> None:
         pass
 
 
 class RecordingProvider(ConnectionProvider):
-    """Wraps each connection from another provider with its own session recording."""
+    """Wrap each connection from another provider with its own connection capture."""
 
     def __init__(
         self,
@@ -218,8 +208,7 @@ class RecordingProvider(ConnectionProvider):
                 )
             return recorded_connections
         except BaseException:
-            # Wrappers already built own their raw connection. The unwrapped suffix does not. Close
-            # each connection exactly once, then let the underlying provider release shared state.
+            # wrappers already built own their raw connection; the unwrapped suffix does not
             for connection in [*recorded_connections, *connections[len(recorded_connections) :]]:
                 with suppress(Exception):
                     connection.close()
@@ -235,35 +224,13 @@ class RecordingProvider(ConnectionProvider):
 
 
 class ReplayProvider(ConnectionProvider):
-    """Provides one fixed batch of replay connections without needing a game behind them."""
+    """Create replay connections without needing a game behind them."""
 
     def __init__(self, capture_path_for_index: Callable[[int], Path]):
         self.capture_path_for_index = capture_path_for_index
-        self._connections: list[ReplayConnection] = []
-        self._batch_created = False
 
     def create_connections(self, count: int) -> list[MudConnection]:
-        if count < 1:
-            raise ValueError("count must be at least 1.")
-        if self._batch_created:
-            raise RuntimeError("Provider has already created its connection batch.")
-        self._batch_created = True
-
-        try:
-            for index in range(count):
-                self._connections.append(ReplayConnection(self.capture_path_for_index(index)))
-            return list(self._connections)
-        except BaseException:
-            # A missing or stale capture can fail halfway through the batch. Nothing was returned,
-            # so the provider still owns all replay connections created up to that point.
-            for connection in self._connections:
-                with suppress(Exception):
-                    connection.close()
-            self._connections.clear()
-            raise
-
-    def remaining_events(self) -> list[int]:
-        return [connection.remaining_events() for connection in self._connections]
+        return [ReplayConnection(self.capture_path_for_index(index)) for index in range(count)]
 
     def reset(self, *, seed: int | list[int | None] | None = None) -> None:
         pass

@@ -27,7 +27,7 @@ class MudSession:
 
         self.persona: str | None = None
         # A pending command has been sent to the game but its response hasn't been read yet.
-        # This is for the two step act/observe pattern to ensure we have the latest game text to act on. 
+        # This is for the two step act/observe pattern to ensure we have the latest game text to act on.
         self.pending_command: str | None = None
 
     def reset(self) -> None:
@@ -61,7 +61,6 @@ class MudSession:
         after every player has entered the world.
         """
         command = self.pending_command
-        wire_lines = [] if command is None else [command]
         try:
             self.connection.send_line(self.observation_line)
         except ConnectionClosedError:
@@ -69,18 +68,11 @@ class MudSession:
             # reading. With no pending action there is nothing to recover, so surface the failure.
             if command is None:
                 raise
-        else:
-            wire_lines.append(self.observation_line)
-
         try:
-            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(
-                wire_lines,
-                self.end_of_turn_marker,
-            )
+            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(self.end_of_turn_marker)
         finally:
             self.pending_command = None
 
-        debug_info["wire_lines"] = wire_lines
         if terminated or incomplete:
             self.connection.invalidate()
         return raw_bytes, terminated, incomplete, debug_info

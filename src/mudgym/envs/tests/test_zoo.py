@@ -6,7 +6,7 @@ from pettingzoo.test import parallel_api_test
 
 from mudgym import make_parallel_env
 from mudgym.envs.zoo import MudParallelEnv
-from tests.scripted import NoOpProvider, ScriptedConnection, scripted_response
+from tests.scripted import NoOpProvider, ScriptedProvider, scripted_response
 
 
 def make_test_parallel_env(envs, *, provider=None, render_mode=None):
@@ -25,16 +25,6 @@ def test_parallel_env_requires_a_provider():
     [(None, None), ("ansi", "ansi"), ("human", "ansi")],
 )
 def test_parallel_factory_derives_child_render_mode(render_mode, expected_child_render_mode):
-    class ScriptedProvider:
-        def create_connections(self, count: int):
-            return [ScriptedConnection() for _ in range(count)]
-
-        def reset(self, *, seed=None):
-            pass
-
-        def close(self):
-            pass
-
     env = make_parallel_env(agents=1, provider=ScriptedProvider(), render_mode=render_mode)
     try:
         assert env.render_mode == render_mode

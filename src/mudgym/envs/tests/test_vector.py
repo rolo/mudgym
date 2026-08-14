@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -23,21 +22,17 @@ class TrackingConnection(ScriptedConnection):
         self.events.append(("send", self.index, line))
         super().send_line(line)
 
-    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        self.events.append(("receive", self.index, list(lines)))
-        return super().read_response(lines, end_of_turn_marker)
+    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        self.events.append(("receive", self.index, list(self.pending_lines)))
+        return super().read_response(end_of_turn_marker)
 
 
 class TrackingProvider:
-    instances: list["TrackingProvider"] = []
-
-    def __init__(self, *, worlds: int | None = None):
-        self.worlds = worlds
+    def __init__(self):
         self.requested_count: int | None = None
         self.events: list[tuple] = []
         self.connections: list[TrackingConnection] = []
         self.closed = False
-        self.instances.append(self)
 
     def create_connections(self, count: int) -> list[MudConnection]:
         self.requested_count = count
@@ -53,9 +48,9 @@ class TrackingProvider:
 
 
 def make_tracking_vector(**kwargs):
-    TrackingProvider.instances.clear()
-    vector_env = make_vector_env(2, provider=TrackingProvider(worlds=1), **kwargs)
-    return vector_env, TrackingProvider.instances[0]
+    provider = TrackingProvider()
+    vector_env = make_vector_env(2, provider=provider, **kwargs)
+    return vector_env, provider
 
 
 def test_vector_reset_resets_provider_before_children():

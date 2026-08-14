@@ -115,29 +115,40 @@ class ScriptedConnection(MudConnection):
     flags or debug info. Unscripted commands get a generated response.
     """
 
-    def __init__(self, responses: Mapping[str, ScriptedResponse] | None = None):
+    def __init__(
+        self,
+        responses: Mapping[str, ScriptedResponse] | None = None,
+        *,
+        send_errors: Mapping[str, Exception] | None = None,
+    ):
         super().__init__()
         self.responses = dict(responses or {})
+        self.send_errors = dict(send_errors or {})
         self.sent_lines: list[list[str]] = []
         self.pending_lines: list[str] = []
         self.read_markers = []
         self.entered_land = False
+        self.invalidated = False
         self.closed = False
 
     def reset(self) -> None:
+        self.pending_lines.clear()
         self.entered_land = False
+        self.invalidated = False
         self.closed = False
 
     def send_line(self, line: str) -> None:
+        if error := self.send_errors.get(line):
+            raise error
         self.pending_lines.append(line)
 
-    def read_response(self, lines: Sequence[str], end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
         self.read_markers.append(end_of_turn_marker)
-        lines = list(lines)
-        if lines != self.pending_lines:
-            raise RuntimeError(f"Read lines {lines!r} do not match sent lines {self.pending_lines!r}.")
+        lines = list(self.pending_lines)
         self.pending_lines.clear()
-        return self.complete_command(lines)
+        raw_bytes, terminated, incomplete, debug_info = self.complete_command(lines)
+        debug_info["wire_lines"] = lines
+        return raw_bytes, terminated, incomplete, debug_info
 
     def complete_command(self, lines: list[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
         self.sent_lines.append(lines)
@@ -160,6 +171,10 @@ class ScriptedConnection(MudConnection):
         raw_bytes, terminated, incomplete, debug_info = response
         return raw_bytes, terminated, incomplete, dict(debug_info)
 
+    def invalidate(self) -> None:
+        self.pending_lines.clear()
+        self.invalidated = True
+
     def close(self) -> None:
         self.closed = True
 
@@ -172,6 +187,29 @@ class NoOpProvider:
 
     def close(self) -> None:
         pass
+
+
+class ScriptedProvider:
+    """Supply scripted connections while exposing provider lifecycle calls to tests."""
+
+    def __init__(self, *, returned_count: int | None = None):
+        self.returned_count = returned_count
+        self.connections: list[ScriptedConnection] = []
+        self.requested_count: int | None = None
+        self.reset_seeds: list[int | list[int | None] | None] = []
+        self.closed = False
+
+    def create_connections(self, count: int) -> list[MudConnection]:
+        self.requested_count = count
+        returned_count = count if self.returned_count is None else self.returned_count
+        self.connections = [ScriptedConnection() for _ in range(returned_count)]
+        return list(self.connections)
+
+    def reset(self, *, seed: int | list[int | None] | None = None) -> None:
+        self.reset_seeds.append(seed)
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def make_scripted_env(

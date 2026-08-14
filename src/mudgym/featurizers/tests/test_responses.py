@@ -7,20 +7,56 @@ from mudgym.featurizers.responses import contains_echo, split_on_echo, split_on_
 
 @pytest.fixture
 def raw_bytes():
-    return b"dance,fes,fex,fei\r\n\x1b[0;33;40mOK, Janet the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\x1b[1;32;40m60\x1b[0;37;40m \x1b[1;32;40m60\x1b[0;37;40m 53 61 56 59 0 60 0377 N N N N 46 F\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40mup down out swampward south southeast east north\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40mcoracle\r\nvial1\r\nring0\r\nbrand39\r\ncoronet\r\n========\r\nkey50\r\ncloth-of-gold\r\nbroadsword\r\n\x1b[1;37;40m\r\n\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    return (
+        b"dance,fes,fex,fei\r\n"
+        b"\x1b[0;33;40mOK, Janet the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n"
+        b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+        b"\x1b[0;37;40m\x1b[1;32;40m60\x1b[0;37;40m \x1b[1;32;40m60\x1b[0;37;40m "
+        b"53 61 56 59 0 60 0377 N N N N 46 F\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b"up down out swampward south southeast east north\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b"coracle\r\nvial1\r\nring0\r\nbrand39\r\ncoronet\r\n========\r\n"
+        b"key50\r\ncloth-of-gold\r\nbroadsword\r\n\x1b[1;37;40m\r\n"
+        b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    )
 
 
 @pytest.fixture
 def raw_bytes_berk():
-    return b'\x1b[1;37;40mmove south,sql,fes,fex,fei\r\n\x1b[32mDally Lane\x1b[37m.\r\n\x1b[0;32;40mIt is raining. \x1b[1;37;40m\x1b[36mA splendid necklace lies on the ground. \x1b[37m\r\n\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40mThe place known as "\x1b[1;32;40mDally Lane\x1b[0;37;40m" contains \x1b[1;36;40mthe necklace\x1b[0;37;40m, \x1b[32mrain\x1b[37m, \x1b[31mAlexander the protector\x1b[37m and \x1b[32mthe road\x1b[37m.\r\nYou are carrying the following:\r\n        nothing.\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\x1b[1;32;40m75\x1b[0;37;40m \x1b[1;32;40m75\x1b[0;37;40m 52 52 53 53 0 75 0200 N N N N 53 R\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40mup out swampward southwest south west east north\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40mnecklace0\r\n========\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m'
+    return (
+        b"\x1b[1;37;40mmove south,sql,fes,fex,fei\r\n"
+        b"\x1b[32mDally Lane\x1b[37m.\r\n"
+        b"\x1b[0;32;40mIt is raining. \x1b[1;37;40m"
+        b"\x1b[36mA splendid necklace lies on the ground. \x1b[37m\r\n"
+        b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b'The place known as "\x1b[1;32;40mDally Lane\x1b[0;37;40m" contains '
+        b"\x1b[1;36;40mthe necklace\x1b[0;37;40m, \x1b[32mrain\x1b[37m, "
+        b"\x1b[31mAlexander the protector\x1b[37m and \x1b[32mthe road\x1b[37m.\r\n"
+        b"You are carrying the following:\r\n        nothing.\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b"\x1b[1;32;40m75\x1b[0;37;40m \x1b[1;32;40m75\x1b[0;37;40m "
+        b"52 52 53 53 0 75 0200 N N N N 53 R\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b"up out swampward southwest south west east north\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+        b"necklace0\r\n========\r\n"
+        b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
+    )
 
 
 def test_split_response_chunks(raw_bytes):
     expected = [
-        b"dance,fes,fex,fei\r\n\x1b[0;33;40mOK, Janet the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n",
+        (
+            b"dance,fes,fex,fei\r\n\x1b[0;33;40mOK, Janet the protector "
+            b"\x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n"
+        ),
         b"60\x1b[0;37;40m \x1b[1;32;40m60\x1b[0;37;40m 53 61 56 59 0 60 0377 N N N N 46 F\r\n",
         b"up down out swampward south southeast east north\r\n",
-        b"coracle\r\nvial1\r\nring0\r\nbrand39\r\ncoronet\r\n========\r\nkey50\r\ncloth-of-gold\r\nbroadsword\r\n\x1b[1;37;40m\r\n",
+        (
+            b"coracle\r\nvial1\r\nring0\r\nbrand39\r\ncoronet\r\n========\r\n"
+            b"key50\r\ncloth-of-gold\r\nbroadsword\r\n\x1b[1;37;40m\r\n"
+        ),
     ]
     assert [chunk for chunk in split_on_prompt(raw_bytes) if chunk] == expected
 
@@ -59,8 +95,17 @@ def test_contains_echo_stays_linear_on_many_inline_prompt_markers():
 
 def test_split_response_chunks_berk(raw_bytes_berk):
     expected = [
-        b"\x1b[1;37;40mmove south,sql,fes,fex,fei\r\n\x1b[32mDally Lane\x1b[37m.\r\n\x1b[0;32;40mIt is raining. \x1b[1;37;40m\x1b[36mA splendid necklace lies on the ground. \x1b[37m\r\n",
-        b'The place known as "\x1b[1;32;40mDally Lane\x1b[0;37;40m" contains \x1b[1;36;40mthe necklace\x1b[0;37;40m, \x1b[32mrain\x1b[37m, \x1b[31mAlexander the protector\x1b[37m and \x1b[32mthe road\x1b[37m.\r\nYou are carrying the following:\r\n        nothing.\r\n',
+        (
+            b"\x1b[1;37;40mmove south,sql,fes,fex,fei\r\n\x1b[32mDally Lane\x1b[37m.\r\n"
+            b"\x1b[0;32;40mIt is raining. \x1b[1;37;40m"
+            b"\x1b[36mA splendid necklace lies on the ground. \x1b[37m\r\n"
+        ),
+        (
+            b'The place known as "\x1b[1;32;40mDally Lane\x1b[0;37;40m" contains '
+            b"\x1b[1;36;40mthe necklace\x1b[0;37;40m, \x1b[32mrain\x1b[37m, "
+            b"\x1b[31mAlexander the protector\x1b[37m and \x1b[32mthe road\x1b[37m.\r\n"
+            b"You are carrying the following:\r\n        nothing.\r\n"
+        ),
         b"75\x1b[0;37;40m \x1b[1;32;40m75\x1b[0;37;40m 52 52 53 53 0 75 0200 N N N N 53 R\r\n",
         b"up out swampward southwest south west east north\r\n",
         b"necklace0\r\n========\r\n",

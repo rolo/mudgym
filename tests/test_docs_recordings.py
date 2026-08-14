@@ -19,8 +19,8 @@ spec.loader.exec_module(record_docs)
 
 @pytest.mark.parametrize("name", list(record_docs.EXAMPLES))
 def test_committed_fragments_match_their_captures(name, tmp_path):
-    assert record_docs.session_capture_paths(name), (
-        f"No committed session capture for {name!r}. Captures are the source of truth for the docs "
+    assert record_docs.capture_paths(name), (
+        f"No committed connection capture for {name!r}. Captures are the source of truth for the docs "
         f"fragments; restore the deleted file or run `just docs-record {name}` and commit it."
     )
 

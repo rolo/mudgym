@@ -1,4 +1,4 @@
-<!-- Derived from the observations-cheats session capture (mudgym v0.3.0-8-gb609722-dirty) by docs/record.py. Do not edit by hand: `just docs-derive observations-cheats` rewrites this, `just docs-record observations-cheats` re-records it. -->
+<!-- Derived from the observations-cheats connection capture (mudgym v0.3.0-8-gb609722-dirty) by docs/record.py. Do not edit by hand: `just docs-derive observations-cheats` rewrites this, `just docs-record observations-cheats` re-records it. -->
 
 | Key | Value |
 |---|---|

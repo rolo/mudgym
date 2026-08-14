@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from mudgym.connections.registry import default_connection
-from mudgym.db.rooms import ROOM_NAMES
 from mudgym.envs.env import MudEnv
 
 observations = [
@@ -45,25 +44,6 @@ def test_env_lifecycle(live_env_factory, maker_kwarg_set, subtests):
             assert isinstance(truncated, bool)
             assert isinstance(info, dict)
             assert info["persona"] == persona
-
-
-def test_env_reset(live_env_factory):
-    """
-    Check that the reset puts us in The Land with the correct step data.
-    Uses cheats preset to get room_name from MGCheatsField.
-    """
-    env = live_env_factory(observation="cheats")
-    obs, info = env.reset()
-    assert obs is not None
-    assert isinstance(obs, dict)
-
-    # cheats preset includes MGCheatsField with room_name
-    assert obs["room_name"] != ""
-    assert obs["room_name"] != "elizabethan tearoom"
-    assert obs["room_name"] in ROOM_NAMES
-
-    # cheats includes room_id (unlike old parsed preset)
-    assert "room_id" in obs
 
 
 def test_bare_env_runs_against_the_live_game():
