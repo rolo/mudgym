@@ -30,13 +30,13 @@ Games of MUD2 begin in The Elizabethan Tearoom. MudGym spins up a Docker contain
 
 Player-visible output is ASCII plus ANSI escape sequences.
 
-Every reset and step puts all three forms below in `info`, regardless of observation mode.
+Every reset and step exposes all three forms below, regardless of observation mode.
 
 | Key | What it is |
 |---|---|
-| `info["raw_bytes"]` | The unmodified bytestring, including prompts and command echo. |
-| `env.render()` with `render_mode="ansi"` | Player visible output, with ANSI kept. |
-| `observation["text"]` | Player visible plain text, with ANSI stripped. |
+| `info["raw_bytes"]` | The unmodified bytestring, including command echoes and observation-command output. |
+| `info["render_bytes"]` | Player-visible output, with ANSI retained. |
+| `observation["text"]` | Player-visible plain text, with ANSI stripped. |
 
 ## Rendering
 

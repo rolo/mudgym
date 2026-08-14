@@ -186,8 +186,8 @@ def test_recorded_connection_closed_send_replays_before_action_response_is_drain
 
     assert live_result[:3] == (b"buffered death output", True, False)
     assert replay_result[:3] == live_result[:3]
-    assert live_result[3]["wire_lines"] == ["quit"]
-    assert replay_result[3]["wire_lines"] == ["quit"]
+    assert live_result[3]["sent_lines"] == ["quit"]
+    assert replay_result[3]["sent_lines"] == ["quit"]
     assert live_connection.invalidated is True
 
 

@@ -33,6 +33,17 @@ def test_parallel_factory_derives_child_render_mode(render_mode, expected_child_
         env.close()
 
 
+def test_parallel_infos_carry_render_bytes_for_each_agent():
+    env = make_parallel_env(agents=2, provider=ScriptedProvider())
+    try:
+        _, infos = env.reset()
+
+        assert set(infos) == {"player_0", "player_1"}
+        assert all(isinstance(info["render_bytes"], bytes) for info in infos.values())
+    finally:
+        env.close()
+
+
 class TrackingEnv:
     observation_space = gym.spaces.Dict({"value": gym.spaces.Discrete(10)})
     action_space = gym.spaces.Discrete(3)

@@ -87,7 +87,7 @@ def test_step_matches_act_followed_by_observe(scripted_env_factory):
     assert split_rest[:3] == stepped_rest[:3]
     stepped_info = stepped_rest[3]
     split_info = split_rest[3]
-    for key in ("raw_bytes", "step", "persona", "action_rejected"):
+    for key in ("raw_bytes", "render_bytes", "step", "persona", "action_rejected"):
         assert split_info[key] == stepped_info[key], key
 
 
@@ -107,6 +107,7 @@ def test_only_player_actions_advance_the_env_step_count(scripted_env_factory):
     assert step_info["step"] == 1
     assert set(step_info) == {
         "raw_bytes",
+        "render_bytes",
         "step",
         "persona",
         "action_rejected",

@@ -22,12 +22,13 @@ from mudgym.session import MudSession
 
 logger = get_logger(__name__)
 
-# A bare MudEnv still needs something reliable to close each read window. This marker-only score field gives it the fes marker without quietly adding score keys to the observation.
 DEFAULT_FIELDS: tuple[FieldSpec, ...] = (FEScoreField(include_keys=()),)
 
 
 class MudEnv(gym.Env[dict[str, Any], str]):
-    """Gymnasium environment for MUD2."""
+    """
+    A Gymnasium environment for MUD2.
+    """
 
     metadata = {
         "render_modes": ["human", "ansi"],
@@ -43,31 +44,32 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     ):
         super().__init__()
 
-        # An action is one logical game input line, so unlike observation text it cannot contain a line break and smuggle another command onto the wire.
         self.action_space = gym.spaces.Text(
             max_length=ACTION_MAX_LENGTH,
             min_length=1,
             charset=ACTION_CHARSET,
         )
 
-        # None means the default. An explicit empty sequence really is empty and fails the command check below rather than being silently replaced.
+        # None means use default. An explicit empty sequence means empty but it will fail the command check below as we
+        # need an end of step marker
         if field_parsers is None:
             field_parsers = DEFAULT_FIELDS
         self.fields = [instantiate_field(field) for field in field_parsers]
 
-        observation_spaces: dict[str, gym.spaces.Space] = {
+        observation_space: dict[str, gym.spaces.Space] = {
             "text": gym.spaces.Text(max_length=TEXT_MAX_LENGTH, min_length=0, charset=TEXT_CHARSET),
         }
-        self.empty_observation: dict[str, Any] = {"text": ""}
+        empty_observation: dict[str, Any] = {"text": ""}
         for field in self.fields:
             field_space = field.space()
-            duplicates = observation_spaces.keys() & field_space.keys()
+            duplicates = observation_space.keys() & field_space.keys()
             if duplicates:
                 raise ValueError(f"Duplicate observation keys: {sorted(duplicates)}")
-            observation_spaces.update(field_space)
-            self.empty_observation.update(field.empty())
+            observation_space.update(field_space)
+            empty_observation.update(field.empty())
 
-        self.observation_space = gym.spaces.Dict(observation_spaces)
+        self.observation_space = gym.spaces.Dict(observation_space)
+        self.empty_observation = empty_observation
 
         command_fields = tuple(field for field in self.fields if field.command is not None)
         commands = tuple(field.command for field in command_fields)
@@ -103,31 +105,32 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self,
         raw_bytes: bytes,
         *,
-        wire_lines: Sequence[str],
+        sent_lines: Sequence[str],
         response_complete: bool,
     ) -> tuple[dict[str, Any], bytes, dict[str, bytes]]:
-        """Turn one framed game response into an observation and its renderable bytes."""
-        # Field defaults can contain arrays and other mutable values, so each observation needs its own copy rather than slowly mutating the template shared by later steps.
+        """Turn a step's response payload into an observation and its renderable bytes."""
+
+        # deepcopy so we don't accidentally mutate
         obs = deepcopy(self.empty_observation)
 
-        # The game echoes every wire line. Splitting around those echoes removes our own input from the text observation and separates anything that happened before the observation-command echo from the command responses that follow it.
-        segments = split_on_echo_lines(raw_bytes, wire_lines)
+        # split the response into pre and post echo
+        segments = split_on_echo_lines(raw_bytes, sent_lines)
         if segments is not None:
-            # Other players and asynchronous game events can land before the final echo. They are still part of what this player saw, just not responses a field parser should claim.
+            # anything that came from the game before our echo we don't try and parse into observation fields
             pre_echo_chunks = [chunk for segment in segments[:-1] for chunk in split_on_prompt(segment)]
             chunks = split_on_prompt(segments[-1])
         else:
             pre_echo_chunks = []
             chunks = split_on_prompt(raw_bytes)
 
-        # Commandless fields inspect the whole window. It includes player-authored text, so their patterns need to anchor on something players cannot forge rather than the words alone.
+        # fields with no command set use the whole step's bytes.
         for field in (field for field in self.fields if field.command is None):
             obs.update(field.extract([raw_bytes], persona=self.persona))
 
         payload_text_chunks: list[bytes] = []
         field_refusals: dict[str, bytes] = {}
         if response_complete:
-            # Commanded fields claim chunks in the same order their commands were sent. A refusal still consumes that field's place: being asleep is an answer, albeit not a useful one.
+            # claim in the same order commands were sent. A refusal still consumes, eg, asleep
             pending_fields = list(self.observation_command_fields)
             for position, chunk in enumerate(chunks):
                 field = pending_fields[0] if pending_fields else None
@@ -141,13 +144,13 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                         payload_text_chunks.append(chunk)
                     pending_fields.pop(0)
                 elif position == len(chunks) - 1:
-                    # The final chunk owns the marker. If no field claims it then it was useful for framing rather than observation, so leave it out of the text.
+                    # final chunk can be used just as a marker rather than a field
                     pass
                 else:
                     payload_text_chunks.append(chunk)
             if pending_fields:
                 raise RuntimeError(
-                    f"end-of-turn marker arrived but fields {[f.__class__.__name__ for f in pending_fields]} "
+                    f"end of step marker arrived but fields {[f.__class__.__name__ for f in pending_fields]} "
                     f"found no matching response among {len(chunks)} window chunks"
                 )
 
@@ -168,12 +171,15 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
     def make_info(
         self,
+        *,
         raw_bytes: bytes,
+        render_bytes: bytes,
         rejected: bool,
         field_refusals: dict[str, bytes],
     ) -> dict[str, Any]:
         info: dict[str, Any] = {
             "raw_bytes": raw_bytes,
+            "render_bytes": render_bytes,
             "step": self.step_count,
             "persona": self.persona,
             "action_rejected": rejected,
@@ -239,12 +245,18 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             raise ValueError(f"tearoom exit marker {trim_re.pattern!r} not found in: {raw_bytes!r}")
         raw_bytes = raw_bytes[: echo_end + 1] + raw_bytes[match.end() :]
 
-        obs, self.last_render_bytes, field_refusals = self.bytes_to_observation(
+        obs, render_bytes, field_refusals = self.bytes_to_observation(
             raw_bytes,
-            wire_lines=debug_info["wire_lines"],
+            sent_lines=debug_info["sent_lines"],
             response_complete=bool(debug_info.get("marker_arrived", False)),
         )
-        info = self.make_info(raw_bytes, bool(debug_info.get("rejected", False)), field_refusals)
+        self.last_render_bytes = render_bytes
+        info = self.make_info(
+            raw_bytes=raw_bytes,
+            render_bytes=render_bytes,
+            rejected=bool(debug_info.get("rejected", False)),
+            field_refusals=field_refusals,
+        )
 
         if self.render_mode == "human":
             self.render()
@@ -278,12 +290,18 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         raw_bytes, terminated, truncated, debug_info = self.session.receive()
 
         # A truncated result means the read window ended without its marker: we left the game, the transport died, timed out, or otherwise stopped for a reason outside the MDP.
-        obs, self.last_render_bytes, field_refusals = self.bytes_to_observation(
+        obs, render_bytes, field_refusals = self.bytes_to_observation(
             raw_bytes,
-            wire_lines=debug_info["wire_lines"],
+            sent_lines=debug_info["sent_lines"],
             response_complete=bool(debug_info.get("marker_arrived", False)) and not truncated,
         )
-        info = self.make_info(raw_bytes, bool(debug_info.get("rejected", False)), field_refusals)
+        self.last_render_bytes = render_bytes
+        info = self.make_info(
+            raw_bytes=raw_bytes,
+            render_bytes=render_bytes,
+            rejected=bool(debug_info.get("rejected", False)),
+            field_refusals=field_refusals,
+        )
 
         # calculate the reward from any points change events. The scan runs over the raw bytes, echo included: forgery resistance lives in the pattern itself, which requires the ANSI colour a player cannot type (see featurizers.points).
         reward_events = parse_points_changes(raw_bytes)

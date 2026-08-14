@@ -35,7 +35,7 @@ def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_en
     env = scripted_env_factory(observation="parsed")
     obs, _, field_refusals = env.bytes_to_observation(
         FORD_COLLAPSE_BYTES,
-        wire_lines=["move swampward", "sql,fes,fex,fei"],
+        sent_lines=["move swampward", "sql,fes,fex,fei"],
         response_complete=True,
     )
 
@@ -88,7 +88,7 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     env = scripted_env_factory(observation="parsed")
     obs, _, field_refusals = env.bytes_to_observation(
         VAMPIRE_BLIND_BYTES,
-        wire_lines=["west", "sql,fes,fex,fei"],
+        sent_lines=["west", "sql,fes,fex,fei"],
         response_complete=True,
     )
 
@@ -134,6 +134,6 @@ def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_facto
     with pytest.raises(RuntimeError, match="SuperQuickLookField.*found no matching response"):
         env.bytes_to_observation(
             raw_bytes,
-            wire_lines=["look", "sql,fes,fex,fei"],
+            sent_lines=["look", "sql,fes,fex,fei"],
             response_complete=True,
         )

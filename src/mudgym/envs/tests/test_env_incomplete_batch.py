@@ -18,7 +18,7 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
 
     obs, _, _ = env.bytes_to_observation(
         raw_bytes,
-        wire_lines=["jump"],
+        sent_lines=["jump"],
         response_complete=False,
     )
 

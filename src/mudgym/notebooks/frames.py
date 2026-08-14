@@ -206,19 +206,20 @@ def observation_text(value: Any) -> str:
 def show_game_tabs(
     info: Mapping[str, Any],
     *,
-    render_bytes: bytes,
+    render_bytes: bytes | None = None,
     observation: Mapping[str, Any] | None = None,
     scroll: bool = True,
 ) -> HTML:
     """Render one game response as tabs for its display and raw protocol output.
 
-    ``display`` shows the explicitly supplied rendered game display, while ``raw`` shows
-    ``info["raw_bytes"]`` (the protocol output the action produced).
-    Passing ``observation`` adds a third tab listing the fields the environment
-    produced for the same step.
+    ``display`` shows ``info["render_bytes"]``, unless an explicit override is supplied,
+    while ``raw`` shows ``info["raw_bytes"]`` (the protocol output the action produced).
+    Passing ``observation`` adds a third tab listing the fields the environment produced
+    for the same step.
     """
     group = f"game-tabs-{next(TAB_GROUP_IDS)}"
-    display = show_ansi(render_bytes, scroll=scroll).data
+    display_bytes = info["render_bytes"] if render_bytes is None else render_bytes
+    display = show_ansi(display_bytes, scroll=scroll).data
     raw = show_ansi(info["raw_bytes"], scroll=scroll).data
 
     inputs = [

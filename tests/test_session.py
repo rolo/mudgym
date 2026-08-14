@@ -48,7 +48,7 @@ def test_command_is_send_followed_by_receive():
 
     result = session.command("look")
 
-    assert result[3]["wire_lines"] == ["look", "sql,fes,fex,fei"]
+    assert result[3]["sent_lines"] == ["look", "sql,fes,fex,fei"]
 
 
 def test_receive_without_a_pending_command_refreshes_observation_only(tmp_path):

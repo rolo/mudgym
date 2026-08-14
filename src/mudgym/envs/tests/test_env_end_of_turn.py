@@ -36,7 +36,7 @@ DRAGONFLY_INTERLEAVED_BYTES = DRAGONFLY_WINDOW_BYTES + FEI_MARKER_CHUNK
 
 def framing(command: str, *, marker_arrived: bool) -> dict:
     return {
-        "wire_lines": [command, "sql,fes,fex,fei"],
+        "sent_lines": [command, "sql,fes,fex,fei"],
         "marker_arrived": marker_arrived,
     }
 
@@ -44,7 +44,7 @@ def framing(command: str, *, marker_arrived: bool) -> dict:
 def parse(env, raw_bytes: bytes, info: dict):
     observation, _, _ = env.bytes_to_observation(
         raw_bytes,
-        wire_lines=info["wire_lines"],
+        sent_lines=info["sent_lines"],
         response_complete=info["marker_arrived"] and not info.get("incomplete", False),
     )
     return observation

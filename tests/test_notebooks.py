@@ -9,6 +9,7 @@ from mudgym.notebooks import (
     game_accordion,
     notebook_palette,
     show_ansi,
+    show_episode,
     show_game_tabs,
     show_room_map,
     show_table,
@@ -91,7 +92,7 @@ def test_show_text_renders_plain_text_without_ansi_spans():
 
 
 def test_show_game_tabs_renders_both_streams_with_display_selected():
-    html = show_game_tabs({"raw_bytes": b"step response"}, render_bytes=b"redrawn screen")
+    html = show_game_tabs({"raw_bytes": b"step response", "render_bytes": b"redrawn screen"})
 
     assert "redrawn screen" in html.data
     assert "step response" in html.data
@@ -102,10 +103,20 @@ def test_show_game_tabs_renders_both_streams_with_display_selected():
     assert "checked" not in raw_input
 
 
+def test_show_game_tabs_can_override_the_infos_render_bytes():
+    html = show_game_tabs(
+        {"raw_bytes": b"step response", "render_bytes": b"stored screen"},
+        render_bytes=b"replacement screen",
+    )
+
+    assert "replacement screen" in html.data
+    assert "stored screen" not in html.data
+
+
 def test_show_game_tabs_uses_a_fresh_radio_group_per_widget():
-    info = {"raw_bytes": b"response"}
-    first = show_game_tabs(info, render_bytes=b"screen")
-    second = show_game_tabs(info, render_bytes=b"screen")
+    info = {"raw_bytes": b"response", "render_bytes": b"screen"}
+    first = show_game_tabs(info)
+    second = show_game_tabs(info)
 
     first_group = first.data.split('name="')[1].split('"')[0]
     second_group = second.data.split('name="')[1].split('"')[0]
@@ -114,14 +125,29 @@ def test_show_game_tabs_uses_a_fresh_radio_group_per_widget():
 
 def test_show_game_tabs_adds_an_observation_tab_when_given_one():
     html = show_game_tabs(
-        {"raw_bytes": b"response"},
-        render_bytes=b"screen",
+        {"raw_bytes": b"response", "render_bytes": b"screen"},
         observation={"room_name": b"Tearoom", "available_exits": (1, 0, 1)},
     )
 
     assert ">observation</label>" in html.data
     assert "Tearoom" in html.data
     assert "1, 0, 1" in html.data
+
+
+def test_show_episode_reads_each_frames_render_bytes_from_info():
+    html = show_episode(
+        [
+            {
+                "info": {"raw_bytes": b"first raw", "render_bytes": b"first screen"},
+                "next_observation": {"room_name": "Tearoom"},
+            },
+            {"info": {"raw_bytes": b"second raw", "render_bytes": b"second screen"}},
+        ]
+    )
+
+    assert "first screen" in html.data
+    assert "second screen" in html.data
+    assert "Tearoom" in html.data
 
 
 def test_show_table_right_aligns_numbers_and_reads_booleans_as_words():

@@ -139,7 +139,7 @@ class MudConnection:
         lines = self._pending_lines
         self._pending_lines = []
         raw_bytes, terminated, incomplete, debug_info = self.sm.read(lines, end_of_turn_marker)
-        debug_info["wire_lines"] = list(lines)
+        debug_info["sent_lines"] = list(lines)
         return raw_bytes, terminated, incomplete, debug_info
 
     def invalidate(self) -> None:

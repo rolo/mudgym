@@ -147,7 +147,7 @@ class ScriptedConnection(MudConnection):
         lines = list(self.pending_lines)
         self.pending_lines.clear()
         raw_bytes, terminated, incomplete, debug_info = self.complete_command(lines)
-        debug_info["wire_lines"] = lines
+        debug_info["sent_lines"] = lines
         return raw_bytes, terminated, incomplete, debug_info
 
     def complete_command(self, lines: list[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:

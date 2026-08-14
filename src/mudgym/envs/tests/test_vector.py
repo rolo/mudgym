@@ -83,6 +83,8 @@ def test_vector_batches_child_info_with_gymnasium_masks():
 
         assert infos["step"].tolist() == [0, 0]
         assert infos["_step"].tolist() == [True, True]
+        assert all(isinstance(render_bytes, bytes) for render_bytes in infos["render_bytes"])
+        assert infos["_render_bytes"].tolist() == [True, True]
     finally:
         vector_env.close()
 

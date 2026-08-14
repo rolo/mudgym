@@ -148,7 +148,7 @@ class ReplayConnection(MudConnection):
 
     def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
         call = self._take("read_response")
-        wire_lines = list(self._pending_lines)
+        sent_lines = list(self._pending_lines)
         self._pending_lines.clear()
         return (
             call["raw_bytes"],
@@ -159,7 +159,7 @@ class ReplayConnection(MudConnection):
                 "marker_arrived": call["marker_arrived"],
                 "replayed": True,
                 "capture": str(self.path),
-                "wire_lines": wire_lines,
+                "sent_lines": sent_lines,
             },
         )
 
