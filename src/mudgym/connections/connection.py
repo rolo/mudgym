@@ -54,12 +54,15 @@ class MudConnection:
         """
         The method that does the actual connecting by spawning and returning our child process.
         """
-        return pexpect.spawn(
+        child = pexpect.spawn(
             self.command[0],
             self.command[1:] if len(self.command) > 1 else [],
             encoding=None,
             use_poll=True,  # poll() instead of select() to avoid FD_SETSIZE limit
         )
+        # reduce pexpect's pause before each send - defaults to 0.05 (in seconds)
+        child.delaybeforesend = 0.005
+        return child
 
     def reset(self) -> None:
         """
