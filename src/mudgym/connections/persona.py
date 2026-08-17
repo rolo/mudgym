@@ -19,6 +19,9 @@ PERSONA_NAME_BLACKLIST = [
 ]
 UNUSED_PERSONA = "**Unused**"
 
+# what the game takes at "What sex do you wish to be?"
+PERSONA_SEXES = (b"m", b"f")
+
 
 def parse_persona_screen(text: bytes) -> dict[int, str]:
     """Extract persona names from persona selection text."""
@@ -43,3 +46,7 @@ def generate_persona_name() -> str:
     ):
         name = faker.first_name()
     return name
+
+
+def generate_persona_sex() -> bytes:
+    return faker.random_element(PERSONA_SEXES)

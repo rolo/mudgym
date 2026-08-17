@@ -3,7 +3,12 @@
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
 
-from mudgym.connections.persona import UNUSED_PERSONA, generate_persona_name, parse_persona_screen
+from mudgym.connections.persona import (
+    UNUSED_PERSONA,
+    generate_persona_name,
+    generate_persona_sex,
+    parse_persona_screen,
+)
 from mudgym.connections.prompts import Prompt, State
 from mudgym.logs import get_logger
 
@@ -112,6 +117,13 @@ def send_persona_name(sm: "ConnectionState") -> None:
     sm.send(name)
 
 
+def send_persona_sex(sm: "ConnectionState") -> None:
+    """Transition action: answer the persona sex question."""
+    sex = generate_persona_sex()
+    logger.info("transition.persona.send_sex", sex=sex)
+    sm.send(sex)
+
+
 def sip_tea(sm: "ConnectionState") -> None:
     """Transition action: automatically sip tea in the tearoom."""
     logger.debug("transition.sip_tea")
@@ -130,7 +142,6 @@ GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
     Prompt.EOF: T(State.DEAD),
     Prompt.RESET_IN_PROGRESS: T(State.RESETTING),
     Prompt.DATABASE_NOT_INITIALIZED: T(State.RESETTING),
-    Prompt.DATABASE_FINISHED_INITIALIZING: T(State.OPTION, send_db_slot_if_ours),
     Prompt.PERSONA_AVAILABLE: T(State.PERSONA_SELECT, choose_or_create_persona),
     Prompt.PERSONA_NAME: T(State.PERSONA_NAME_INPUT, send_persona_name),
     Prompt.TEA_SIPPED: T(State.TEA_SIPPED),
@@ -140,9 +151,33 @@ GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
     **GAME_OVER_TRANSITIONS,
 }
 
+# the dialogue's questions mean the same thing wherever we are, so answer them from every state
+# still working through it - answering from one state but not another leaves the game waiting on us
+DIALOGUE_TRANSITIONS: dict[Prompt, Transition] = {
+    Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, send_persona_sex),
+    Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
+}
+
+DIALOGUE_STATES = (
+    State.INITIAL,
+    State.LOGIN,
+    State.OPTION,
+    State.PERSONA_SELECT,
+    State.PERSONA_NAME_INPUT,
+    State.PERSONA_SEX_INPUT,
+    State.RESETTING,
+)
+
+# every session gets this broadcast, so it lands wherever our dialogue has got to - it only tells
+# us anything while we're still in the menus
+DATABASE_BROADCAST_TRANSITIONS: dict[Prompt, Transition] = {
+    Prompt.DATABASE_FINISHED_INITIALIZING: T(State.OPTION, send_db_slot_if_ours),
+}
+
+MENU_STATES = (State.INITIAL, State.LOGIN, State.OPTION, State.RESETTING)
+
 STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     State.INITIAL: {
-        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.SUPERSEDE: T(State.LOGIN, handle_supersede),
         Prompt.SESSION_DYING: T(State.LOGIN),
         Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda sm: sm.send_cr()),
@@ -151,21 +186,12 @@ STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
         Prompt.ENTERED_LAND: T(State.GAME),
     },
     State.OPTION: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT),
         Prompt.BOOT_COMPLETE: T(State.OPTION),
     },
     State.PERSONA_SELECT: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
-        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.GAME: T(State.GAME),
     },
-    State.PERSONA_NAME_INPUT: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
-        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
-    },
     State.PERSONA_SEX_INPUT: {
-        Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, lambda sm: sm.send(b"m")),
-        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
         Prompt.GAME: T(State.GAME, sip_tea),
     },
     State.CLOSING: {
@@ -176,7 +202,6 @@ STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     },
     State.RESETTING: {
         Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda sm: sm.send_cr()),
-        Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
     },
     State.TEAROOM: {
         Prompt.ENTERED_LAND: T(State.GAME),
@@ -186,4 +211,10 @@ STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     },
 }
 
-TRANSITIONS = {state: GLOBAL_TRANSITIONS | STATE_TRANSITIONS.get(state, {}) for state in State}
+TRANSITIONS = {
+    state: GLOBAL_TRANSITIONS
+    | (DIALOGUE_TRANSITIONS if state in DIALOGUE_STATES else {})
+    | (DATABASE_BROADCAST_TRANSITIONS if state in MENU_STATES else {})
+    | STATE_TRANSITIONS.get(state, {})
+    for state in State
+}
