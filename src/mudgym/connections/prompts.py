@@ -60,11 +60,17 @@ PROMPT_CORE = rb"(?:" + STARLINE + rb"|" + DASHES + rb")"
 # not-a-complete-line lookahead past a \r\n
 SGR_POSSESSIVE = rb"(?:\x1b\[[0-9;]*m)*+"
 
+# the game can drop one of these in at any moment, including right behind a prompt, where its
+# leading break would otherwise make the prompt look like a complete line
+DATABASE_BROADCAST_LINE = rb"(?:\r?\n)+\+- (?:Database \d+|The database) has finished initialising"
+
 # A genuine input prompt on the wire starts a physical line and is never a complete line: it
 # dangles awaiting input, or continues with the echo of whatever the player types next. Spoken
 # copies sit mid-line behind the speech quoting and narrative copies end in \r\n, so the two
-# anchors together reject both.
-NEXT_PROMPT_BOUNDARY = rb"(?m:^)" + SGR + PROMPT_CORE + SGR_POSSESSIVE + rb"(?![\r\n])"
+# anchors together reject both. A broadcast behind a prompt does not make it a complete line.
+DANGLES = rb"(?:(?![\r\n])|(?=" + DATABASE_BROADCAST_LINE + rb"))"
+
+NEXT_PROMPT_BOUNDARY = rb"(?m:^)" + SGR + PROMPT_CORE + SGR_POSSESSIVE + DANGLES
 
 TEAROOM_PROMPT_PATTERN = (
     rb"^"
@@ -143,7 +149,7 @@ class Prompt(enum.Enum):
         + rb"|\x1b\[1;[0-9;]*m\*\x1b\[[0-9;]*m"  # bold coloured mortal star
         + rb")"
         + SGR_POSSESSIVE
-        + rb"(?![\r\n])"
+        + DANGLES
     )
 
     TEA_SIPPED = regex_up_to_next_prompt(rb"You watch the world go by\.")

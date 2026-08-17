@@ -5,8 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from mudgym.connections.prompts import Prompt, State
+from mudgym.connections.prompts import Prompt, State, marker_up_to_next_prompt
 from mudgym.connections.state_machine import ConnectionState
+from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.featurizers.strings import encode_command_bytes
 
 DIALOGUE_STATES = (
@@ -274,3 +275,31 @@ def test_an_echo_swallowed_by_an_intervening_match_is_accumulated():
     state_machine.expect()
 
     assert [b"p0", b"p0"] == state_machine.sent
+
+
+# as captured at 64 slots, where a broadcast landed behind the prompt that closes the response
+BROADCAST_BEHIND_PROMPT = (
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m========\r\n"
+    b"tea\r\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"\r\n+- Database 63 has finished initialising -+\r\n"
+)
+
+
+def test_a_broadcast_behind_a_prompt_still_closes_the_response():
+    """Its leading break would otherwise make the prompt look like a complete line."""
+    marker = marker_up_to_next_prompt(FEInventoryField.end_of_turn_marker)
+
+    assert marker.search(BROADCAST_BEHIND_PROMPT)
+
+
+def test_a_broadcast_behind_a_prompt_leaves_it_a_game_prompt():
+    assert Prompt.GAME.value.search(BROADCAST_BEHIND_PROMPT)
+
+
+@pytest.mark.parametrize(
+    "forgery",
+    [b'\x1b[0;37;40mBob says "*"\r\n', b"\x1b[0;37;40m*\r\n"],
+)
+def test_the_prompt_anchors_still_reject_forgeries(forgery):
+    assert not Prompt.GAME.value.search(forgery)
