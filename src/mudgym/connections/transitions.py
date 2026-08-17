@@ -53,7 +53,8 @@ def send_db_slot(sm: "ConnectionState") -> None:
     # redraw too would leave a stray line that the persona dialogue later swallows as a name,
     # desynchronising every answer after it. The echo is the consumption signal: only answer
     # again once the previous answer has been echoed back.
-    if sm.pending_menu_answer is not None and sm.pending_menu_answer.encode("ascii") not in sm.get_buffer():
+    seen = sm.output_since_menu_answer + sm.get_buffer()
+    if sm.pending_menu_answer is not None and sm.pending_menu_answer.encode("ascii") not in seen:
         logger.debug(
             "transition.skip_db_slot",
             reason="previous answer not consumed",
@@ -65,6 +66,7 @@ def send_db_slot(sm: "ConnectionState") -> None:
     logger.debug("transition.send_db_slot", slot=slot, state=sm.state.name)
     sm.send(answer)
     sm.pending_menu_answer = answer
+    sm.output_since_menu_answer = b""
 
 
 def send_db_slot_if_ours(sm: "ConnectionState") -> None:
@@ -151,8 +153,7 @@ GLOBAL_TRANSITIONS: dict[Prompt, Transition] = {
     **GAME_OVER_TRANSITIONS,
 }
 
-# the dialogue's questions mean the same thing wherever we are, so answer them from every state
-# still working through it - answering from one state but not another leaves the game waiting on us
+# these mean the same thing wherever we are, so answer them from every state still in the dialogue
 DIALOGUE_TRANSITIONS: dict[Prompt, Transition] = {
     Prompt.PERSONA_SEX: T(State.PERSONA_SEX_INPUT, send_persona_sex),
     Prompt.TEAROOM: T(State.TEAROOM, sip_tea),
@@ -167,14 +168,6 @@ DIALOGUE_STATES = (
     State.PERSONA_SEX_INPUT,
     State.RESETTING,
 )
-
-# every session gets this broadcast, so it lands wherever our dialogue has got to - it only tells
-# us anything while we're still in the menus
-DATABASE_BROADCAST_TRANSITIONS: dict[Prompt, Transition] = {
-    Prompt.DATABASE_FINISHED_INITIALIZING: T(State.OPTION, send_db_slot_if_ours),
-}
-
-MENU_STATES = (State.INITIAL, State.LOGIN, State.OPTION, State.RESETTING)
 
 STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     State.INITIAL: {
@@ -202,6 +195,8 @@ STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
     },
     State.RESETTING: {
         Prompt.BOOT_COMPLETE: T(State.LOGIN, lambda sm: sm.send_cr()),
+        # the only state waiting on a database - stay put and let the next real prompt place us
+        Prompt.DATABASE_FINISHED_INITIALIZING: T(State.RESETTING, send_db_slot_if_ours),
     },
     State.TEAROOM: {
         Prompt.ENTERED_LAND: T(State.GAME),
@@ -214,7 +209,6 @@ STATE_TRANSITIONS: dict[State, dict[Prompt, Transition]] = {
 TRANSITIONS = {
     state: GLOBAL_TRANSITIONS
     | (DIALOGUE_TRANSITIONS if state in DIALOGUE_STATES else {})
-    | (DATABASE_BROADCAST_TRANSITIONS if state in MENU_STATES else {})
     | STATE_TRANSITIONS.get(state, {})
     for state in State
 }

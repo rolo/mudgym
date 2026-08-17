@@ -24,8 +24,7 @@ UNUSED_PERSONA = "**Unused**"
 # what the game takes at "What sex do you wish to be?"
 PERSONA_SEXES = (b"m", b"f")
 
-# set MUDGYM_PERSONA_SEX to any of these to create every persona that sex, otherwise each one is
-# drawn at random
+# set MUDGYM_PERSONA_SEX to any of these to pin it, otherwise each persona is drawn at random
 PERSONA_SEX_BY_NAME = {"m": b"m", "male": b"m", "f": b"f", "female": b"f"}
 
 

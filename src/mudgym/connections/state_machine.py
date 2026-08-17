@@ -1,12 +1,14 @@
 import re
 from collections import deque
 from collections.abc import Callable, Collection, Sequence
+from time import monotonic
 from typing import Any
 
 import pexpect
 
 from mudgym.connections.errors import ConnectionClosedError
 from mudgym.connections.prompts import (
+    BROADCAST_PROMPTS,
     EXPECT_LIST,
     GAME_OVER_PROMPTS,
     INVALID_COMMAND_PROMPTS,
@@ -63,6 +65,11 @@ class ConnectionState:
         self.password = password or ""
         self.max_transition_steps = 15
 
+        # a backstop, not flow control. broadcasts and the init retry loop are both free of the
+        # step budget, and a slow database can spend thousands of matches legitimately, so only
+        # elapsed time separates that from a session that will never move
+        self.max_continue_seconds = 300.0
+
         self.default_persona_slot = persona_slot
         self.default_db_slot = db_slot
         self.default_name_generator = name_generator
@@ -74,6 +81,9 @@ class ConnectionState:
         # the menu answer we have sent but not yet seen echoed back; guards against answering an
         # Option prompt redraw a second time (see transitions.send_db_slot)
         self.pending_menu_answer: str | None = None
+
+        # what the game has sent since that answer - the echo can land in any match's chunk
+        self.output_since_menu_answer = b""
 
         # we begin in the initial state and await the initial prompt
         self.state = State.INITIAL
@@ -190,6 +200,8 @@ class ConnectionState:
             consumed = (self.child.before or b"") + (self.child.after if isinstance(self.child.after, bytes) else b"")
             if consumed:
                 self.chunk_history.append(consumed)
+                if self.pending_menu_answer is not None:
+                    self.output_since_menu_answer += consumed
 
         matched_prompt = PROMPTS_BY_VALUE.get(matched_pattern)
 
@@ -238,18 +250,19 @@ class ConnectionState:
         Args:
             prompt: The prompt that was matched.
         """
-        # any prompt other than the Option menu means the menu moved on, so a pending menu answer
-        # is no longer outstanding
-        if prompt is not Prompt.OPTION:
-            self.pending_menu_answer = None
-
         # see if we have a transition for this Prompt in this State
         transition = TRANSITIONS[self.state].get(prompt)
 
-        # no transition, nothing to see here
+        # no transition, nothing to see here - an unhandled match must not mutate anything
         if not transition:
             logger.debug("sm.transition.missing", state=self.state.name, prompt=prompt.name)
             return
+
+        # a prompt we handle means the menu moved on, so the pending answer is done with.
+        # broadcasts are the exception - RESETTING acts on them but they say nothing about our answer
+        if prompt is not Prompt.OPTION and prompt not in BROADCAST_PROMPTS:
+            self.pending_menu_answer = None
+            self.output_since_menu_answer = b""
 
         # we have a transition to apply.
 
@@ -296,17 +309,22 @@ class ConnectionState:
         steps = 0
         last_prompt = None
         prev_state = None
-        while self.state not in until and steps < self.max_transition_steps:
-            # Don't count steps during initialization retry loops (RESETTING <-> OPTION)
-            # This prevents tight retry loops from burning through the step limit
-            in_init_retry = self.state == State.RESETTING or prev_state == State.RESETTING
-            if not in_init_retry:
-                steps += 1
+        started = monotonic()
+        while (
+            self.state not in until
+            and steps < self.max_transition_steps
+            and monotonic() - started < self.max_continue_seconds
+        ):
             prev_state = self.state
 
             # Use longer timeout after SESSION_DYING since the session takes time to die
             expect_timeout = 5.0 if last_prompt == Prompt.SESSION_DYING else timeout
             _, last_prompt = self.expect(timeout=expect_timeout)
+
+            # only charge for what could be progress - init retries and broadcasts would each eat it
+            in_init_retry = State.RESETTING in (self.state, prev_state)
+            if not in_init_retry and last_prompt not in BROADCAST_PROMPTS:
+                steps += 1
 
         if self.state not in until:
             # Decode and show debug information and recent state history for troubleshooting
@@ -318,6 +336,8 @@ class ConnectionState:
                 until=until,
                 steps=steps,
                 max_transition_steps=self.max_transition_steps,
+                elapsed=monotonic() - started,
+                max_continue_seconds=self.max_continue_seconds,
                 before=self.child.before or b"",
                 after=self.child.after,
             )
@@ -328,6 +348,7 @@ class ConnectionState:
             debug_parts.append(f"Last prompt: {last_prompt.name if last_prompt else 'None'}")
             debug_parts.append(f"Recent state history: {history}")
             debug_parts.append(f"steps_taken: {steps}/{self.max_transition_steps}")
+            debug_parts.append(f"elapsed: {monotonic() - started:.1f}s/{self.max_continue_seconds}s")
             debug_parts.append("Recent buffer output:")
             debug_parts.append(f"  {last_buffer!r}")
             error_msg = "\n".join(debug_parts)

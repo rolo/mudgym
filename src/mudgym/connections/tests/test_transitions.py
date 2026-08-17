@@ -21,6 +21,7 @@ class FakeStateMachine:
     def __init__(self, buffer: bytes = b"", db_slot: int = 0):
         self.default_db_slot = db_slot
         self.pending_menu_answer: str | None = None
+        self.output_since_menu_answer = b""
         self.state = State.OPTION
         self.sent: list[str] = []
         self._buffer = buffer

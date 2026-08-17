@@ -43,7 +43,7 @@ def trusted_input_prompt(pattern: bytes, flags: int = 0) -> re.Pattern:
     Compile an input prompt against its trusted raw-wire prefix.
 
     MUD2 emits menu, login, and pager input points at the start of a physical line, sometimes
-    after terminal controls. Spoken or ambient copies have narrative text before the
+    after terminal controls. Spoken or incidental copies have narrative text before the
     player-controlled words. Command echoes need an additional dynamic trust boundary: the
     command loop consumes every known echo before it considers these prompt patterns.
     """
@@ -103,7 +103,7 @@ def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
 def system_line_up_to_next_prompt(needle: bytes) -> re.Pattern:
     """Match a game-generated response line through its following input prompt.
 
-    The line anchor and optional colour prefix keep player speech and ambient copies of the
+    The line anchor and optional colour prefix keep player speech and incidental copies of the
     response text from being mistaken for front-end protocol output.
     """
     return regex_up_to_next_prompt(rb"^" + SGR + needle)
@@ -197,6 +197,9 @@ GAME_OVER_PROMPTS = [
     Prompt.GAME_OVER_NOT_UPDATING_PERSONA,
     Prompt.GAME_OVER_KILLED_FOR_SWEARING,
 ]
+
+# the game sends these to every session, one per database slot, so they say nothing about us
+BROADCAST_PROMPTS = frozenset({Prompt.DATABASE_FINISHED_INITIALIZING})
 
 # Use an explicit order for mapping idx -> Prompt
 PROMPTS: tuple[Prompt, ...] = (
