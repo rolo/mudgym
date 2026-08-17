@@ -1,5 +1,7 @@
 """Generated persona names must satisfy the game's rules."""
 
+import pytest
+
 from mudgym.connections import persona
 from mudgym.connections.prompts import State
 from mudgym.connections.transitions import choose_or_create_persona
@@ -10,6 +12,23 @@ def test_generated_names_retry_until_faker_returns_an_acceptable_name(monkeypatc
     monkeypatch.setattr(persona.faker, "first_name", lambda: next(candidates))
 
     assert persona.generate_persona_name() == "Alice"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("m", b"m"), ("male", b"m"), ("M", b"m"), ("f", b"f"), ("female", b"f"), (" Female ", b"f")],
+)
+def test_the_persona_sex_env_var_pins_the_sex(monkeypatch, value, expected):
+    monkeypatch.setenv("MUDGYM_PERSONA_SEX", value)
+
+    assert expected == persona.generate_persona_sex()
+
+
+def test_an_unusable_persona_sex_env_var_is_rejected(monkeypatch):
+    monkeypatch.setenv("MUDGYM_PERSONA_SEX", "man")
+
+    with pytest.raises(ValueError, match="MUDGYM_PERSONA_SEX"):
+        persona.generate_persona_sex()
 
 
 def test_unused_persona_slots_are_not_treated_as_existing_personas():

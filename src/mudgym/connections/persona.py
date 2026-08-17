@@ -2,6 +2,8 @@
 Handles persona selection and creation logic.
 """
 
+import os
+import random
 import re
 
 from faker import Faker
@@ -21,6 +23,10 @@ UNUSED_PERSONA = "**Unused**"
 
 # what the game takes at "What sex do you wish to be?"
 PERSONA_SEXES = (b"m", b"f")
+
+# set MUDGYM_PERSONA_SEX to any of these to create every persona that sex, otherwise each one is
+# drawn at random
+PERSONA_SEX_BY_NAME = {"m": b"m", "male": b"m", "f": b"f", "female": b"f"}
 
 
 def parse_persona_screen(text: bytes) -> dict[int, str]:
@@ -49,4 +55,12 @@ def generate_persona_name() -> str:
 
 
 def generate_persona_sex() -> bytes:
-    return faker.random_element(PERSONA_SEXES)
+    override = os.getenv("MUDGYM_PERSONA_SEX")
+    if not override:
+        return random.choice(PERSONA_SEXES)
+
+    wanted = override.strip().lower()
+    if wanted not in PERSONA_SEX_BY_NAME:
+        raise ValueError(f"MUDGYM_PERSONA_SEX must be one of {', '.join(PERSONA_SEX_BY_NAME)}, got {override!r}")
+
+    return PERSONA_SEX_BY_NAME[wanted]
