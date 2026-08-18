@@ -35,7 +35,7 @@ class DialogueStateMachine(ConnectionState):
         self.state = state
         self.sent: list[bytes] = []
         self.history: list[State] = []
-        self.pending_menu_answer: str | None = None
+        self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.default_db_slot = db_slot
         self.child = SimpleNamespace(after=matched)
@@ -85,13 +85,13 @@ def test_a_broadcast_does_not_clear_an_outstanding_resetting_menu_answer():
 
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
     assert [b"p0"] == state_machine.sent
-    assert "p0" == state_machine.pending_menu_answer
+    assert b"p0" == state_machine.pending_menu_answer
 
     # another slot finishes before our answer is echoed
     state_machine.child.after = OTHER_SLOTS_BROADCAST
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
 
-    assert "p0" == state_machine.pending_menu_answer
+    assert b"p0" == state_machine.pending_menu_answer
 
     state_machine.maybe_apply_transition(Prompt.OPTION)
 
@@ -123,12 +123,12 @@ def test_resetting_keeps_waiting_when_another_slot_finishes():
 def test_a_broadcast_does_not_reopen_the_option_answer_gate():
     """A broadcast between an Option prompt and its redraw must not let it be answered twice."""
     state_machine = DialogueStateMachine(State.OPTION, matched=OTHER_SLOTS_BROADCAST)
-    state_machine.pending_menu_answer = "p0"
+    state_machine.pending_menu_answer = b"p0"
 
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
 
     assert State.OPTION == state_machine.state
-    assert "p0" == state_machine.pending_menu_answer
+    assert b"p0" == state_machine.pending_menu_answer
     assert [] == state_machine.sent
 
     state_machine.maybe_apply_transition(Prompt.OPTION)
@@ -216,7 +216,7 @@ class ScriptedStateMachine(ConnectionState):
         self.history = deque(maxlen=10)
         self.chunk_history = deque(maxlen=10)
         self.last_prompt = None
-        self.pending_menu_answer: str | None = None
+        self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.default_db_slot = db_slot
         self.max_transition_steps = 15

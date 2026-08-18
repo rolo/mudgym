@@ -80,7 +80,7 @@ class ConnectionState:
 
         # the menu answer we have sent but not yet seen echoed back; guards against answering an
         # Option prompt redraw a second time (see transitions.send_db_slot)
-        self.pending_menu_answer: str | None = None
+        self.pending_menu_answer: bytes | None = None
 
         # what the game has sent since that answer - the echo can land in any match's chunk
         self.output_since_menu_answer = b""

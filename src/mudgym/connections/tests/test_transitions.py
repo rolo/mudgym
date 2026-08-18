@@ -20,7 +20,7 @@ class FakeStateMachine:
 
     def __init__(self, buffer: bytes = b"", db_slot: int = 0):
         self.default_db_slot = db_slot
-        self.pending_menu_answer: str | None = None
+        self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.state = State.OPTION
         self.sent: list[str] = []
@@ -38,8 +38,8 @@ def test_a_fresh_option_prompt_is_answered():
 
     send_db_slot(state_machine)
 
-    assert state_machine.sent == ["p0"]
-    assert state_machine.pending_menu_answer == "p0"
+    assert state_machine.sent == [b"p0"]
+    assert state_machine.pending_menu_answer == b"p0"
 
 
 def test_the_mail_interstitial_matches_no_recognised_prompt():
@@ -70,7 +70,7 @@ def test_a_redrawn_option_prompt_is_not_answered_again():
     send_db_slot(state_machine)
 
     assert state_machine.sent == []
-    assert state_machine.pending_menu_answer == "p0"
+    assert state_machine.pending_menu_answer == b"p0"
 
 
 def test_a_reask_after_the_echo_is_answered_again():
@@ -82,7 +82,7 @@ def test_a_reask_after_the_echo_is_answered_again():
 
     send_db_slot(state_machine)
 
-    assert state_machine.sent == ["p0"]
+    assert state_machine.sent == [b"p0"]
 
 
 def test_the_configured_slot_is_used():
@@ -90,5 +90,5 @@ def test_the_configured_slot_is_used():
 
     send_db_slot(state_machine)
 
-    assert state_machine.sent == ["p3"]
-    assert state_machine.pending_menu_answer == "p3"
+    assert state_machine.sent == [b"p3"]
+    assert state_machine.pending_menu_answer == b"p3"

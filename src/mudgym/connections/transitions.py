@@ -46,7 +46,7 @@ def handle_supersede(sm: "ConnectionState") -> None:
 
 def send_db_slot(sm: "ConnectionState") -> None:
     slot = sm.default_db_slot if sm.default_db_slot is not None else 0
-    answer = f"p{slot}"
+    answer = b"p%d" % slot
 
     # The menu redraws its Option prompt around interstitials (eg the MAIL screens after mgquit)
     # before consuming an answer we already sent. The game queues typed input, so answering the
@@ -54,7 +54,7 @@ def send_db_slot(sm: "ConnectionState") -> None:
     # desynchronising every answer after it. The echo is the consumption signal: only answer
     # again once the previous answer has been echoed back.
     seen = sm.output_since_menu_answer + sm.get_buffer()
-    if sm.pending_menu_answer is not None and sm.pending_menu_answer.encode("ascii") not in seen:
+    if sm.pending_menu_answer is not None and sm.pending_menu_answer not in seen:
         logger.debug(
             "transition.skip_db_slot",
             reason="previous answer not consumed",
