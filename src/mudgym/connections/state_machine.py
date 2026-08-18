@@ -23,7 +23,7 @@ from mudgym.connections.termination import (
     NO_LONGER_IN_GAME_PROMPTS,
     TRANSPORT_BREAK_PROMPTS,
 )
-from mudgym.connections.transitions import TRANSITIONS
+from mudgym.connections.transitions import MENU_ECHO_WINDOW_BYTES, TRANSITIONS, menu_answer_was_echoed
 from mudgym.featurizers.strings import LINE_BREAK_RE, decode_wire_bytes, encode_command_bytes
 from mudgym.logs import get_logger
 
@@ -84,6 +84,8 @@ class ConnectionState:
 
         # what the game has sent since that answer - the echo can land in any match's chunk
         self.output_since_menu_answer = b""
+        # latched, so bounding the window above cannot lose an echo we already saw
+        self.menu_answer_echoed = False
 
         # we begin in the initial state and await the initial prompt
         self.state = State.INITIAL
@@ -200,8 +202,10 @@ class ConnectionState:
             consumed = (self.child.before or b"") + (self.child.after if isinstance(self.child.after, bytes) else b"")
             if consumed:
                 self.chunk_history.append(consumed)
-                if self.pending_menu_answer is not None:
-                    self.output_since_menu_answer += consumed
+                if self.pending_menu_answer is not None and not self.menu_answer_echoed:
+                    recent = self.output_since_menu_answer + consumed
+                    self.menu_answer_echoed = menu_answer_was_echoed(recent, self.pending_menu_answer)
+                    self.output_since_menu_answer = recent[-MENU_ECHO_WINDOW_BYTES:]
 
         matched_prompt = PROMPTS_BY_VALUE.get(matched_pattern)
 
@@ -263,6 +267,7 @@ class ConnectionState:
         if prompt is not Prompt.OPTION and prompt not in BROADCAST_PROMPTS:
             self.pending_menu_answer = None
             self.output_since_menu_answer = b""
+            self.menu_answer_echoed = False
 
         # we have a transition to apply.
 

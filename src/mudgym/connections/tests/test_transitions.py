@@ -6,9 +6,10 @@ line that the persona dialogue swallows later, desynchronising the relogin.
 """
 
 import pexpect
+import pytest
 
 from mudgym.connections.prompts import EXPECT_LIST, State
-from mudgym.connections.transitions import send_db_slot
+from mudgym.connections.transitions import menu_answer_was_echoed, send_db_slot
 
 # the wire bytes the menu emits between answering an Option prompt and its redraw, as captured
 # after mgquit
@@ -22,6 +23,7 @@ class FakeStateMachine:
         self.default_db_slot = db_slot
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
+        self.menu_answer_echoed = False
         self.state = State.OPTION
         self.sent: list[str] = []
         self._buffer = buffer
@@ -92,3 +94,39 @@ def test_the_configured_slot_is_used():
 
     assert state_machine.sent == [b"p3"]
     assert state_machine.pending_menu_answer == b"p3"
+
+
+# the two shapes the menu echoes an answer back in, both as captured
+ECHO_FORMS = [b"\r\np0\r\n", b" p0\r\nDatabase 0 is not initialised.\r\n"]
+
+# text carrying the answer's bytes without being an echo of it
+NON_ECHO_FORMS = [
+    b"An incidental status string containing p0 but not an echo.\r\n",
+    MAIL_INTERSTITIAL,
+    b"p0no\r\n",
+]
+
+
+@pytest.mark.parametrize("output", ECHO_FORMS)
+def test_an_echoed_answer_is_recognised(output):
+    assert menu_answer_was_echoed(output, b"p0")
+
+
+@pytest.mark.parametrize("output", NON_ECHO_FORMS)
+def test_the_answers_bytes_in_passing_are_not_an_echo(output):
+    assert not menu_answer_was_echoed(output, b"p0")
+
+
+def test_a_colour_wrapped_echo_is_recognised():
+    assert menu_answer_was_echoed(b"\x1b[0;37;40mp0\x1b[1;37;40m\r\n", b"p0")
+
+
+def test_incidental_output_does_not_reopen_the_gate():
+    state_machine = FakeStateMachine()
+    send_db_slot(state_machine)
+    state_machine.sent.clear()
+    state_machine._buffer = b"An incidental status string containing p0 but not an echo.\r\n"
+
+    send_db_slot(state_machine)
+
+    assert state_machine.sent == []

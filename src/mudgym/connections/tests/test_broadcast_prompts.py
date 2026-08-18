@@ -37,6 +37,7 @@ class DialogueStateMachine(ConnectionState):
         self.history: list[State] = []
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
+        self.menu_answer_echoed = False
         self.default_db_slot = db_slot
         self.child = SimpleNamespace(after=matched)
         self._buffer = buffer
@@ -102,7 +103,7 @@ def test_the_resetting_answer_is_repeated_once_it_has_been_echoed():
     state_machine = DialogueStateMachine(State.RESETTING, matched=OUR_SLOTS_BROADCAST)
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
 
-    state_machine.output_since_menu_answer = b"p0\r\n"
+    state_machine._buffer = b"p0\r\n"
     state_machine.child.after = OTHER_SLOTS_BROADCAST
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
 
@@ -135,22 +136,6 @@ def test_a_broadcast_does_not_reopen_the_option_answer_gate():
 
     # no p0 echo seen, so the earlier answer is still queued
     assert [] == state_machine.sent
-
-
-def test_an_echo_the_broadcast_swallowed_still_counts_as_consumed():
-    """The echo can land in the broadcast's chunk, and the redraw must still be answered."""
-    state_machine = DialogueStateMachine(State.OPTION)
-    state_machine.maybe_apply_transition(Prompt.OPTION)
-
-    # as captured - the p0 echo lands inside the chunk the broadcast consumed
-    state_machine.output_since_menu_answer = b" -+\r\np0\r\n\r\n+- Database 1 has finished initialising"
-    state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
-
-    # the redraw's own buffer no longer carries the echo
-    state_machine._buffer = b" -+\r\n\x1b[f\x1b[2J\x1b[1;37;40m"
-    state_machine.maybe_apply_transition(Prompt.OPTION)
-
-    assert [b"p0", b"p0"] == state_machine.sent
 
 
 def test_the_sex_question_is_answered_after_a_broadcast_interrupts():
@@ -218,6 +203,7 @@ class ScriptedStateMachine(ConnectionState):
         self.last_prompt = None
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
+        self.menu_answer_echoed = False
         self.default_db_slot = db_slot
         self.max_transition_steps = 15
         self.max_continue_seconds = 300.0

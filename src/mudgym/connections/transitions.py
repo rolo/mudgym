@@ -10,6 +10,7 @@ from mudgym.connections.persona import (
     parse_persona_screen,
 )
 from mudgym.connections.prompts import Prompt, State
+from mudgym.featurizers.ansi import strip_ansi
 from mudgym.logs import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - only needed for static analysis
@@ -17,6 +18,16 @@ if TYPE_CHECKING:  # pragma: no cover - only needed for static analysis
 
 
 logger = get_logger(__name__)
+
+
+# enough to recognise a short echo line that straddles two matches, and no more
+MENU_ECHO_WINDOW_BYTES = 512
+
+
+def menu_answer_was_echoed(output: bytes, answer: bytes) -> bool:
+    """The answer came back on a line of its own, rather than its bytes turning up in passing."""
+    lines = output.replace(b"\r\n", b"\n").split(b"\n")
+    return any(strip_ansi(line).strip() == answer for line in lines)
 
 
 TransitionAction = Callable[["ConnectionState"], None]
@@ -53,8 +64,8 @@ def send_db_slot(sm: "ConnectionState") -> None:
     # redraw too would leave a stray line that the persona dialogue later swallows as a name,
     # desynchronising every answer after it. The echo is the consumption signal: only answer
     # again once the previous answer has been echoed back.
-    seen = sm.output_since_menu_answer + sm.get_buffer()
-    if sm.pending_menu_answer is not None and sm.pending_menu_answer not in seen:
+    pending = sm.pending_menu_answer
+    if pending is not None and not (sm.menu_answer_echoed or menu_answer_was_echoed(sm.get_buffer(), pending)):
         logger.debug(
             "transition.skip_db_slot",
             reason="previous answer not consumed",
@@ -67,6 +78,7 @@ def send_db_slot(sm: "ConnectionState") -> None:
     sm.send(answer)
     sm.pending_menu_answer = answer
     sm.output_since_menu_answer = b""
+    sm.menu_answer_echoed = False
 
 
 def send_db_slot_if_ours(sm: "ConnectionState") -> None:
