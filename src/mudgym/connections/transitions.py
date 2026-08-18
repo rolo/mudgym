@@ -1,6 +1,7 @@
 """State transition lookup table for the connection state machine."""
 
 from collections.abc import Callable
+from time import monotonic, sleep
 from typing import TYPE_CHECKING, NamedTuple
 
 from mudgym.connections.persona import (
@@ -22,6 +23,9 @@ logger = get_logger(__name__)
 
 # enough to recognise a short echo line that straddles two matches, and no more
 MENU_ECHO_WINDOW_BYTES = 512
+
+# the least time we leave between two answers to the Option menu
+MENU_ANSWER_MIN_INTERVAL_SECONDS = 0.02
 
 
 def menu_answer_was_echoed(output: bytes, answer: bytes) -> bool:
@@ -74,8 +78,17 @@ def send_db_slot(sm: "ConnectionState") -> None:
         )
         return
 
+    # The menu redraws the moment the game rejects an answer for a database that is still
+    # initialising, so answering every redraw floods it with thousands of answers a second at 16
+    # worlds, and the session eventually dies. Space the retries out. The database takes the same
+    # time to arrive either way.
+    waited = monotonic() - sm.last_menu_answer_at
+    if waited < MENU_ANSWER_MIN_INTERVAL_SECONDS:
+        sleep(MENU_ANSWER_MIN_INTERVAL_SECONDS - waited)
+
     logger.debug("transition.send_db_slot", slot=slot, state=sm.state.name)
     sm.send(answer)
+    sm.last_menu_answer_at = monotonic()
     sm.pending_menu_answer = answer
     sm.output_since_menu_answer = b""
     sm.menu_answer_echoed = False

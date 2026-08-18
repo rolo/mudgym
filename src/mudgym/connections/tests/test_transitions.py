@@ -8,6 +8,7 @@ line that the persona dialogue swallows later, desynchronising the relogin.
 import pexpect
 import pytest
 
+from mudgym.connections import transitions
 from mudgym.connections.prompts import EXPECT_LIST, State
 from mudgym.connections.transitions import menu_answer_was_echoed, send_db_slot
 
@@ -24,15 +25,31 @@ class FakeStateMachine:
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.menu_answer_echoed = False
+        self.last_menu_answer_at = 0.0
         self.state = State.OPTION
-        self.sent: list[str] = []
+        self.sent: list[bytes] = []
         self._buffer = buffer
 
     def get_buffer(self) -> bytes:
         return self._buffer
 
-    def send(self, data: str) -> None:
+    def send(self, data: bytes) -> None:
         self.sent.append(data)
+
+
+class FakeClock:
+    """Deterministic stand-in for the transition module's monotonic and sleep."""
+
+    def __init__(self, now: float):
+        self.now = now
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
 
 
 def test_a_fresh_option_prompt_is_answered():
@@ -75,15 +92,47 @@ def test_a_redrawn_option_prompt_is_not_answered_again():
     assert state_machine.pending_menu_answer == b"p0"
 
 
-def test_a_reask_after_the_echo_is_answered_again():
+def test_a_reask_after_the_echo_is_answered_again(monkeypatch):
     # captured shape: during boot the menu re-asks after rejecting the answer, and the echo shows
     # the earlier answer was consumed
+    monkeypatch.setattr(transitions, "MENU_ANSWER_MIN_INTERVAL_SECONDS", 0.0)
     state_machine = FakeStateMachine(buffer=b" p0\r\nDatabase 0 is not initialised.\r\n")
     send_db_slot(state_machine)
     state_machine.sent.clear()
 
     send_db_slot(state_machine)
 
+    assert state_machine.sent == [b"p0"]
+
+
+def test_retries_are_spaced_out(monkeypatch):
+    # the menu redraws the instant the game rejects an answer for a database still initialising,
+    # and answering every redraw floods the game until the session dies (mudgym-dw0)
+    clock = FakeClock(now=100.0)
+    monkeypatch.setattr(transitions, "monotonic", clock.monotonic)
+    monkeypatch.setattr(transitions, "sleep", clock.sleep)
+    monkeypatch.setattr(transitions, "MENU_ANSWER_MIN_INTERVAL_SECONDS", 0.05)
+    state_machine = FakeStateMachine()
+    state_machine.last_menu_answer_at = 99.99
+
+    send_db_slot(state_machine)
+
+    assert clock.sleeps == [pytest.approx(0.04)]
+    assert state_machine.sent == [b"p0"]
+    assert state_machine.last_menu_answer_at == pytest.approx(100.04)
+
+
+def test_an_answer_beyond_the_interval_is_not_delayed(monkeypatch):
+    clock = FakeClock(now=100.0)
+    monkeypatch.setattr(transitions, "monotonic", clock.monotonic)
+    monkeypatch.setattr(transitions, "sleep", clock.sleep)
+    monkeypatch.setattr(transitions, "MENU_ANSWER_MIN_INTERVAL_SECONDS", 0.05)
+    state_machine = FakeStateMachine()
+    state_machine.last_menu_answer_at = 99.0
+
+    send_db_slot(state_machine)
+
+    assert clock.sleeps == []
     assert state_machine.sent == [b"p0"]
 
 

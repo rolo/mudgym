@@ -87,6 +87,9 @@ class ConnectionState:
         # latched, so bounding the window above cannot lose an echo we already saw
         self.menu_answer_echoed = False
 
+        # when we last answered the Option menu, so a rejected answer cannot become a send flood
+        self.last_menu_answer_at = 0.0
+
         # we begin in the initial state and await the initial prompt
         self.state = State.INITIAL
         self.expect(initial_prompt or EXPECT_LIST, timeout=5.0)

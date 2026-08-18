@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from mudgym.connections import transitions
 from mudgym.connections.prompts import Prompt, State, marker_up_to_next_prompt
 from mudgym.connections.state_machine import ConnectionState
 from mudgym.envs.fields.feinventory import FEInventoryField
@@ -38,6 +39,7 @@ class DialogueStateMachine(ConnectionState):
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.menu_answer_echoed = False
+        self.last_menu_answer_at = 0.0
         self.default_db_slot = db_slot
         self.child = SimpleNamespace(after=matched)
         self._buffer = buffer
@@ -99,7 +101,8 @@ def test_a_broadcast_does_not_clear_an_outstanding_resetting_menu_answer():
     assert [b"p0"] == state_machine.sent
 
 
-def test_the_resetting_answer_is_repeated_once_it_has_been_echoed():
+def test_the_resetting_answer_is_repeated_once_it_has_been_echoed(monkeypatch):
+    monkeypatch.setattr(transitions, "MENU_ANSWER_MIN_INTERVAL_SECONDS", 0.0)
     state_machine = DialogueStateMachine(State.RESETTING, matched=OUR_SLOTS_BROADCAST)
     state_machine.maybe_apply_transition(Prompt.DATABASE_FINISHED_INITIALIZING)
 
@@ -204,6 +207,7 @@ class ScriptedStateMachine(ConnectionState):
         self.pending_menu_answer: bytes | None = None
         self.output_since_menu_answer = b""
         self.menu_answer_echoed = False
+        self.last_menu_answer_at = 0.0
         self.default_db_slot = db_slot
         self.max_transition_steps = 15
         self.max_continue_seconds = 300.0
