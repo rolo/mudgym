@@ -1,6 +1,6 @@
 [project]
 name = "mudgym"
-version = "0.4.1"
+version = "0.4.2"
 description = "Reinforcement learning environment for MUD2."
 readme = "README.md"
 license = "MIT"
