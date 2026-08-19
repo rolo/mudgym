@@ -63,11 +63,7 @@ def send_db_slot(sm: "ConnectionState") -> None:
     slot = sm.default_db_slot if sm.default_db_slot is not None else 0
     answer = b"p%d" % slot
 
-    # The menu redraws its Option prompt around interstitials (eg the MAIL screens after mgquit)
-    # before consuming an answer we already sent. The game queues typed input, so answering the
-    # redraw too would leave a stray line that the persona dialogue later swallows as a name,
-    # desynchronising every answer after it. The echo is the consumption signal: only answer
-    # again once the previous answer has been echoed back.
+    # only answer again once the previous answer has been echoed back.
     pending = sm.pending_menu_answer
     if pending is not None and not (sm.menu_answer_echoed or menu_answer_was_echoed(sm.get_buffer(), pending)):
         logger.debug(
@@ -78,10 +74,7 @@ def send_db_slot(sm: "ConnectionState") -> None:
         )
         return
 
-    # The menu redraws the moment the game rejects an answer for a database that is still
-    # initialising, so answering every redraw floods it with thousands of answers a second at 16
-    # worlds, and the session eventually dies. Space the retries out. The database takes the same
-    # time to arrive either way.
+    # stop flooding spam retries
     waited = monotonic() - sm.last_menu_answer_at
     if waited < MENU_ANSWER_MIN_INTERVAL_SECONDS:
         sleep(MENU_ANSWER_MIN_INTERVAL_SECONDS - waited)

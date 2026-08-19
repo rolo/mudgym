@@ -1,10 +1,3 @@
-"""The Option-menu answer gate: redrawn prompts must not be answered twice.
-
-The menu redraws its Option prompt around interstitials (the MAIL screens after mgquit) before
-consuming an answer already sent. The game queues typed input, so a second answer becomes a stray
-line that the persona dialogue swallows later, desynchronising the relogin.
-"""
-
 import pexpect
 import pytest
 
@@ -107,7 +100,7 @@ def test_a_reask_after_the_echo_is_answered_again(monkeypatch):
 
 def test_retries_are_spaced_out(monkeypatch):
     # the menu redraws the instant the game rejects an answer for a database still initialising,
-    # and answering every redraw floods the game until the session dies (mudgym-dw0)
+    # and answering every redraw floods the game until the session dies
     clock = FakeClock(now=100.0)
     monkeypatch.setattr(transitions, "monotonic", clock.monotonic)
     monkeypatch.setattr(transitions, "sleep", clock.sleep)
@@ -117,7 +110,7 @@ def test_retries_are_spaced_out(monkeypatch):
 
     send_db_slot(state_machine)
 
-    assert clock.sleeps == [pytest.approx(0.04)]
+    assert clock.sleeps == pytest.approx([0.04])
     assert state_machine.sent == [b"p0"]
     assert state_machine.last_menu_answer_at == pytest.approx(100.04)
 
@@ -134,6 +127,7 @@ def test_an_answer_beyond_the_interval_is_not_delayed(monkeypatch):
 
     assert clock.sleeps == []
     assert state_machine.sent == [b"p0"]
+    assert state_machine.last_menu_answer_at == pytest.approx(100.0)
 
 
 def test_the_configured_slot_is_used():
