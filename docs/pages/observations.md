@@ -10,9 +10,11 @@ observation, info = env.reset()
 env.close()
 ```
 
+Every built-in observation mode includes `text` and `points`, the persona's current score.
+
 ## `text`
 
-Just `{"text": str}`.
+Contains the common `text` and `points` observations only.
 
 ```python
 --8<-- "docs/code/observations_text.py:observations-text"
@@ -55,7 +57,7 @@ print(show_ansi(Path("docs/recordings/observations-cheats.ansi").read_bytes()).d
 
 ## `bytes`
 
-Adds `raw_bytes`, a fixed-size `uint8` NumPy array, zero-padded to 16,384 bytes by default. The unpadded bytes value is available as `info["raw_bytes"]`.
+Adds `raw_bytes`, a fixed-size `uint8` NumPy array zero-padded to 16,384 bytes by default. The unpadded bytes value is available as `info["raw_bytes"]`.
 
 ```python
 raw = observation["raw_bytes"][: len(info["raw_bytes"])].tobytes()

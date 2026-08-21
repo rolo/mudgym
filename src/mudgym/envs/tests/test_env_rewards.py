@@ -16,16 +16,40 @@ SORCERISE_BODY = (
 )
 
 
-def scripted_step_bytes(action: str, body: bytes) -> bytes:
+def scripted_step_bytes(action: str, body: bytes, *, status_points: int = 200) -> bytes:
     """Echo line, response body, then the observation-command responses, prompt-delimited."""
     observation_line = "sql,fes,fex,fei"
     parts = [action.encode("ascii"), b"\r\n", body, PROMPT, observation_line.encode("ascii"), b"\r\n"]
     for position, observation_command in enumerate(observation_line.split(",")):
         if position:
             parts.append(PROMPT)
-        parts.append(OBSERVATION_COMMAND_RESPONSES[observation_command])
+        response = OBSERVATION_COMMAND_RESPONSES[observation_command]
+        if observation_command == "fes":
+            response = response.replace(b"0200", f"{status_points:04d}".encode("ascii"))
+        parts.append(response)
     parts.append(PROMPT)
     return b"".join(parts)
+
+
+def scripted_step_with_event_after_fes(action: str, body: bytes) -> bytes:
+    """Build a complete response with a points event after fes."""
+    responses = OBSERVATION_COMMAND_RESPONSES
+    return (
+        action.encode("ascii")
+        + b"\r\n"
+        + PROMPT
+        + b"sql,fes,fex,fei\r\n"
+        + responses["sql"]
+        + PROMPT
+        + responses["fes"]
+        + PROMPT
+        + body
+        + PROMPT
+        + responses["fex"]
+        + PROMPT
+        + responses["fei"]
+        + PROMPT
+    )
 
 
 def test_points_pattern_in_command_echo_forges_no_reward(scripted_env_factory):
@@ -39,13 +63,26 @@ def test_points_pattern_in_command_echo_forges_no_reward(scripted_env_factory):
 
 
 def test_genuine_points_event_rewards(scripted_env_factory):
-    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY)}
+    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY, status_points=13_000)}
     env = scripted_env_factory(responses=responses)
-    env.reset()
+    initial_observation, _ = env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("mgsorcerise")
+    observation, reward, _, _, info = env.step("mgsorcerise")
 
-    assert reward == 12_800.0
+    assert observation["points"] == 13_000
+    assert reward == observation["points"] - initial_observation["points"]
+    assert info["points"] == 13_000
+
+
+def test_points_event_wins_over_an_earlier_stale_status_line(scripted_env_factory):
+    responses = {"mgsorcerise": scripted_step_with_event_after_fes("mgsorcerise", SORCERISE_BODY)}
+    env = scripted_env_factory(responses=responses)
+    initial_observation, _ = env.reset()
+
+    observation, reward, _, _, info = env.step("mgsorcerise")
+
+    assert observation["points"] == 13_000
+    assert reward == observation["points"] - initial_observation["points"]
     assert info["points"] == 13_000
 
 

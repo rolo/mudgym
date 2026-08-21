@@ -308,11 +308,14 @@ def test_parallel_reset_refreshes_early_observations_after_every_player_enters()
 
 def test_terminated_player_does_not_desynchronise_survivor(scripted_env_factory):
     response = scripted_response(["quit", "sql,fes,fex,fei"]), True, False, {}
+    children = {
+        "player_0": scripted_env_factory(responses={"quit": response}),
+        "player_1": scripted_env_factory(),
+    }
+    for child in children.values():
+        child.reset()
     env = make_test_parallel_env(
-        {
-            "player_0": scripted_env_factory(responses={"quit": response}),
-            "player_1": scripted_env_factory(),
-        }
+        children,
     )
 
     _, _, terminations, truncations, infos = env.step({"player_0": "quit", "player_1": "look"})

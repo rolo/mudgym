@@ -28,3 +28,11 @@ END_OF_STEP_PATTERNS = [
 
 # transport-level conditions that leave a step's read window incomplete: no end-of-turn marker arrived
 TRANSPORT_BREAK_PROMPTS = (Prompt.EOF, Prompt.TIMEOUT)
+
+
+def is_permadeath(raw_bytes: bytes) -> bool:
+    """
+    Permadeath (eg, combat, touchstone, dragon flee) prints no points change events so we trap it
+    specifically.
+    """
+    return Prompt.GAME_OVER_NOT_UPDATING_PERSONA.value.search(raw_bytes) is not None

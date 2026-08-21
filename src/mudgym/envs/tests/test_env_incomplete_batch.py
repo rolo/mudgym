@@ -22,9 +22,7 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
         response_complete=False,
     )
 
-    # no observation responses arrived, so the structured fields stay at their empty defaults.
-    # obs["points"] is sourced from the `fes` response, which never came, so it stays 0 here --
-    # the death score is recovered separately, below.
+    # without observation responses the fields stay at their empty defaults
     assert obs["room_name"] == ""
     assert obs["here"] == ()
     assert obs["points"] == 0
@@ -35,3 +33,17 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
     assert "(Persona saved on -11 = 189)." in obs["text"]
     assert "Overall, you scored 189 points this game" in obs["text"]
     assert "\x1b" not in obs["text"]
+
+
+def test_incomplete_window_carries_the_current_score(scripted_env_factory):
+    rejected = b'xyzzy\r\nI don\'t know the word "xyzzy".\r\n', False, True, {"rejected": True, "marker_arrived": False}
+    env = scripted_env_factory(observation="parsed", responses={"xyzzy": rejected})
+    env.reset()
+
+    observation, _, _, truncated, info = env.step("xyzzy")
+
+    assert truncated is True
+    assert info["action_rejected"] is True
+    # the other fields have nothing to report, but the score is still known
+    assert observation["room_name"] == ""
+    assert observation["points"] == 200

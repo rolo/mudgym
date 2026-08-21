@@ -5,7 +5,8 @@ def test_env_bytes_reset_returns_raw_bytes(scripted_env_factory):
     env = scripted_env_factory(observation="bytes")
     obs, info = env.reset()
     assert isinstance(info, dict)
-    assert set(obs) == {"text", "raw_bytes"}
+    assert set(obs) == {"text", "raw_bytes", "points"}
+    assert obs["points"] == 200
     assert isinstance(obs["raw_bytes"], np.ndarray)
 
     bytes_length = len(info["raw_bytes"])

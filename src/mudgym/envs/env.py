@@ -6,12 +6,15 @@ from typing import Any
 import gymnasium as gym
 
 from mudgym.connections.connection import MudConnection
+from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.envs.fields import FEScoreField, FieldSpec, ObservationField, instantiate_field
-from mudgym.envs.specs import ACTION_CHARSET, ACTION_MAX_LENGTH, TEXT_CHARSET, TEXT_MAX_LENGTH
+from mudgym.envs.specs import ACTION_CHARSET, ACTION_MAX_LENGTH, INT_DTYPE, TEXT_CHARSET, TEXT_MAX_LENGTH
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.points import parse_points_changes
 from mudgym.featurizers.responses import (
+    RESPONSE_PROMPT_RE,
+    echo_pattern,
     normalise_lines,
     split_on_echo_lines,
     split_on_prompt,
@@ -89,6 +92,9 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.render_mode = render_mode
         self.last_render_bytes: bytes = b""
         self.step_count = 0
+
+        # keep score independently of any one observation response
+        self.points: int | None = None
 
         self.session = MudSession(
             connection=connection,
@@ -169,6 +175,42 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         obs["text"] = text[:TEXT_MAX_LENGTH]
         return obs, render_bytes, field_refusals
 
+    def clean_tearoom_exit(self, raw_bytes: bytes, sent_lines: Sequence[str]) -> tuple[bytes, int]:
+        """Remove the tearoom setup and return the exit fes score."""
+        if len(sent_lines) != 2:
+            raise RuntimeError(f"tearoom exit sent {len(sent_lines)} wire lines, expected 2")
+
+        action_echo = echo_pattern(sent_lines[0]).search(raw_bytes)
+        observation_echo = echo_pattern(sent_lines[1]).search(
+            raw_bytes,
+            action_echo.end() if action_echo is not None else 0,
+        )
+        if action_echo is None or observation_echo is None:
+            raise RuntimeError(f"tearoom exit echoes not found in: {raw_bytes!r}")
+
+        action_response = raw_bytes[action_echo.end() : observation_echo.start()]
+        prompts = tuple(RESPONSE_PROMPT_RE.finditer(action_response))
+        if not prompts:
+            raise RuntimeError(f"tearoom exit fes prompt not found in: {action_response!r}")
+
+        fes_prompt = prompts[0]
+        fes_response = action_response[: fes_prompt.start()]
+        move_response = action_response[fes_prompt.end() :]
+        field = FEScoreField(include_keys=())
+        if not field.matches(fes_response):
+            raise RuntimeError("reset completed without establishing the persona score")
+
+        trim_re = re.compile(rb"\.\.\.\r?\n")
+        trim_match = trim_re.search(move_response)
+        if trim_match is None:
+            raise ValueError(f"tearoom exit marker {trim_re.pattern!r} not found in: {move_response!r}")
+
+        cleaned_bytes = (
+            raw_bytes[: action_echo.end()] + move_response[trim_match.end() :] + raw_bytes[observation_echo.start() :]
+        )
+        values = field.full_extract([fes_response], persona=self.persona)
+        return cleaned_bytes, int(values["points"])
+
     def make_info(
         self,
         *,
@@ -223,7 +265,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                 )
 
         # step out of the tearoom and into The Land
-        command = "move north"
+        command = "fes,move north"
         raw_bytes, terminated, truncated, debug_info = self.session.command(command)
 
         if terminated or truncated:
@@ -235,15 +277,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                 f"debug_info={debug_info!r}"
             )
 
-        # we consider the episode started after exiting the tearoom, so we drop the tearoom-exit narration
-        # ("shape..." / "nothingness...") that sits between the echoed command and the room text, ending at
-        # the "...\n" marker, leaving the echo line intact so the observation split still anchors on it.
-        trim_re = re.compile(rb"\.\.\.\r?\n")
-        echo_end = raw_bytes.find(b"\n")
-        match = trim_re.search(raw_bytes, echo_end + 1)
-        if match is None:
-            raise ValueError(f"tearoom exit marker {trim_re.pattern!r} not found in: {raw_bytes!r}")
-        raw_bytes = raw_bytes[: echo_end + 1] + raw_bytes[match.end() :]
+        raw_bytes, self.points = self.clean_tearoom_exit(raw_bytes, debug_info["sent_lines"])
 
         obs, render_bytes, field_refusals = self.bytes_to_observation(
             raw_bytes,
@@ -279,6 +313,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         """Send an action now, leaving its observation for a later ``observe`` call."""
         if not self.action_space.contains(action):
             raise ValueError(f"Invalid action {action!r}; expected {self.action_space}.")
+        if self.points is None:
+            raise RuntimeError("step called before reset established the persona score")
         self.session.send(action)
         self.step_count += 1
 
@@ -303,18 +339,29 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             field_refusals=field_refusals,
         )
 
-        # calculate the reward from any points change events. The scan runs over the raw bytes, echo included: forgery resistance lives in the pattern itself, which requires the ANSI colour a player cannot type (see featurizers.points).
-        reward_events = parse_points_changes(raw_bytes)
-        points = reward_events["points"]
-        if points is not None:
-            info["points"] = points
-            # if we end up with points > WIZARD_POINTS, we terminate the episode.
-            if reward_events["delta"] and points >= WIZARD_POINTS:
-                terminated = True
+        # points events require colours a player cannot forge through the command echo
+        points_before_step = self.points
+        if points_before_step is None:
+            raise RuntimeError("step called before reset established the persona score")
 
-        # in the, albeit very unusual, case where the player achieves wizard, it may be correct to cap the reward at the
-        # delta up to WIZARD_POINTS, but I'm not sure and I think the current behaviour is more predictable at least.
-        reward = float(reward_events["delta"] or 0)
+        points_changes = parse_points_changes(raw_bytes)
+        event_points = points_changes["points"]
+        # if we end up with points > WIZARD_POINTS, we terminate the episode.
+        if event_points is not None and points_changes["delta"] and event_points >= WIZARD_POINTS:
+            terminated = True
+
+        # permadeath is a final points event at zero, after any numeric event
+        if terminated and is_permadeath(raw_bytes):
+            event_points = 0
+        if event_points is not None:
+            info["points"] = event_points
+            self.points = event_points
+
+        reward = float(self.points - points_before_step)
+
+        # report tracked points even when the FES response is stale or missing
+        if "points" in obs:
+            obs["points"] = INT_DTYPE(self.points)
 
         if self.render_mode == "human":
             self.render()

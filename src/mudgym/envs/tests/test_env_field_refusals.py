@@ -1,5 +1,7 @@
 import pytest
 
+from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
+
 FORD_COLLAPSE_BYTES = (
     b"\x1b[1;37;40mmove swampward\r\n"
     b"\x1b[32mFord across river\x1b[37m.\r\n"
@@ -137,3 +139,25 @@ def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_facto
             sent_lines=["look", "sql,fes,fex,fei"],
             response_complete=True,
         )
+
+
+def test_completed_window_with_refused_fes_retains_the_tracked_score(scripted_env_factory):
+    refusal = b"You can't wake yourself up yet!"
+    raw_bytes = (
+        b"wait\r\nThe world waits.\r\n"
+        + PROMPT
+        + b"sql,fes,fex,fei\r\n"
+        + PROMPT.join((SQL_RESPONSE, refusal, FEX_RESPONSE, FEI_RESPONSE))
+        + PROMPT
+    )
+    env = scripted_env_factory(observation="parsed", responses={"wait": raw_bytes})
+    initial_observation, _ = env.reset()
+
+    observation, reward, terminated, truncated, info = env.step("wait")
+
+    assert initial_observation["points"] == 200
+    assert observation["points"] == initial_observation["points"]
+    assert reward == 0.0
+    assert terminated is False
+    assert truncated is False
+    assert info["field_refusals"] == {"FEScoreField": refusal + b"\r\n"}

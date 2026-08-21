@@ -85,6 +85,8 @@ def scripted_response(lines: Sequence[str], *, reset_step: bool = False) -> byte
 
     parts = [lines[0].encode("latin-1"), b"\r\n"]
     if reset_step:
+        parts.append(FES_RESPONSE)
+        parts.append(PROMPT)
         parts.append(TEAROOM_EXIT_TEXT)
 
     if user_command in OBSERVATION_COMMAND_RESPONSES:
@@ -153,7 +155,7 @@ class ScriptedConnection(MudConnection):
     def complete_command(self, lines: list[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
         self.sent_lines.append(lines)
         user_command = lines[0]
-        reset_step = user_command == "move north" and not self.entered_land
+        reset_step = user_command == "fes,move north" and not self.entered_land
         if reset_step:
             self.entered_land = True
 

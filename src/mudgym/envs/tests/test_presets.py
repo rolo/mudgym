@@ -21,7 +21,7 @@ PRESET_FIELD_TYPES = {
 }
 
 PRESET_KEYS = {
-    "bytes": {"text", "raw_bytes"},
+    "bytes": {"text", "raw_bytes", "points"},
     "text": {"text", "points"},
     "parsed": {
         "text",

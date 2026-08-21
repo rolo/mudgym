@@ -29,7 +29,7 @@ from mudgym.envs.zoo import MudParallelEnv
 
 OBSERVATION_PRESETS: dict[str, tuple[FieldSpec, ...]] = {
     # Every preset must end with a field that can tell the transport its read window is complete.
-    "bytes": (RawBytesField, FEScoreField(include_keys=())),
+    "bytes": (RawBytesField, FEScoreField(include_keys=("points",))),
     "text": (FEScoreField(include_keys=("points",)),),
     "parsed": (
         SuperQuickLookField(include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")),

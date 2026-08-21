@@ -164,6 +164,37 @@ def test_bare_env_defaults_to_a_marker_only_text_field():
         env.close()
 
 
+@pytest.mark.parametrize(
+    "field_parsers",
+    [
+        [MGCheatsField],
+        [FEScoreField],
+        [
+            SuperQuickLookField(
+                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
+            ),
+            FEScoreField,
+            FEXitsField,
+            FEInventoryField,
+        ],
+    ],
+)
+def test_tearoom_exit_parses_its_own_fes(field_parsers):
+    env = make_scripted_env(field_parsers=field_parsers)
+    try:
+        observation, _ = env.reset()
+        connection = env.unwrapped.session.connection
+
+        assert env.unwrapped.points == 200
+        assert "75 75 52 52" not in observation["text"]
+        assert connection.sent_lines[-1] == ["fes,move north", env.unwrapped.session.observation_line]
+
+        env.step("look")
+        assert connection.sent_lines[-1] == ["look", env.unwrapped.session.observation_line]
+    finally:
+        env.close()
+
+
 def test_final_observation_field_without_a_marker_raises():
     with pytest.raises(ValueError, match="end_of_turn_marker"):
         make_scripted_env(field_parsers=[FEScoreField, FEXitsField])
