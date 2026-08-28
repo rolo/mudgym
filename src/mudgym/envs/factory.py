@@ -74,8 +74,12 @@ def make_env(
     connection: str | type[MudConnection] | Callable[..., MudConnection] | MudConnection | None = None,
     connection_kwargs: Mapping[str, Any] | None = None,
     tearoom_commands: str | None = None,
+    world_ticker: Callable[[], None] | None = None,
 ) -> gym.Env:
-    """Build one Gymnasium environment."""
+    """Build one Gymnasium environment.
+
+    ``world_ticker`` runs once after the action for a step and before its observation. Leave it None for transports whose worlds pace themselves.
+    """
     if actions not in {"text", "directions"}:
         raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
     if isinstance(connection, MudConnection) and connection_kwargs:
@@ -98,6 +102,7 @@ def make_env(
             field_parsers=fields,
             render_mode=render_mode,
             tearoom_commands=tearoom_commands,
+            world_ticker=world_ticker,
         )
     except BaseException:
         close_quietly(resolved_connection)
@@ -121,10 +126,13 @@ def make_vector_env(
     render_mode: str | None = None,
     tearoom_commands: str | None = None,
     provider: ConnectionProvider | None = None,
+    world_ticker: Callable[[], None] | None = None,
 ) -> VectorEnv:
     """Create a Gymnasium vector env. It need not know how worlds are arranged.
 
     The provider decides where the connections lead. Reset is deliberately all-or-nothing for now, and both reset and step finish the shared action/setup work before collecting observations. A supplied provider becomes the resulting environment's responsibility and is closed with it.
+
+    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator alone: the children are built without one.
     """
     if envs < 1:
         raise ValueError("envs must be at least 1.")
@@ -153,7 +161,7 @@ def make_vector_env(
                 )
             )
 
-        base_env = MudVectorEnv(children, provider=provider)
+        base_env = MudVectorEnv(children, provider=provider, world_ticker=world_ticker)
         if actions == "directions":
             return VectorDiscreteDirectionsWrapper(base_env)
         return base_env
@@ -172,11 +180,14 @@ def make_parallel_env(
     render_mode: str | None = None,
     tearoom_commands: str | None = None,
     provider: ConnectionProvider | None = None,
+    world_ticker: Callable[[], None] | None = None,
 ) -> ParallelEnv:
     """Create a PettingZoo environment whose players share one MUD world.
 
     The registry supplies a one-world default. If a caller passes a provider we trust that it honours the same promise.
     The resulting environment owns that provider, and action wrappers sit around the joint environment rather than around each player.
+
+    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator alone: the children are built without one.
     """
     if agents < 1:
         raise ValueError("agents must be at least 1.")
@@ -204,7 +215,12 @@ def make_parallel_env(
                 tearoom_commands=tearoom_commands,
             )
 
-        base_env = MudParallelEnv(children, provider=provider, render_mode=render_mode)
+        base_env = MudParallelEnv(
+            children,
+            provider=provider,
+            render_mode=render_mode,
+            world_ticker=world_ticker,
+        )
         if actions == "directions":
             return ParallelDiscreteDirectionsWrapper(base_env)
         return base_env

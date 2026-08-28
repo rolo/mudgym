@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
@@ -14,11 +14,13 @@ class MudVectorEnv(VectorEnv):
         self,
         envs: Sequence[MudEnv],
         provider: ConnectionProvider,
+        world_ticker: Callable[[], None] | None = None,
     ):
         if not envs:
             raise ValueError("MudVectorEnv requires at least one child MudEnv.")
         self.envs = list(envs)
         self._provider = provider
+        self.world_ticker = world_ticker
         self.metadata = dict(self.envs[0].metadata)
         self.metadata["autoreset_mode"] = AutoresetMode.DISABLED
         self.render_mode = self.envs[0].render_mode
@@ -89,6 +91,9 @@ class MudVectorEnv(VectorEnv):
         # Don't fold these loops together. A player can affect another player's observation, so every action must reach the game before any observation commands are sent.
         for child, action in zip(self.envs, child_actions, strict=True):
             child.act(action)
+
+        if self.world_ticker is not None:
+            self.world_ticker()
 
         results = [child.observe() for child in self.envs]
         observations, rewards, terminations, truncations, infos = zip(*results, strict=True)

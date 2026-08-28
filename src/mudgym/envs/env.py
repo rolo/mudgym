@@ -1,5 +1,5 @@
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import deepcopy
 from typing import Any
 
@@ -44,8 +44,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         tearoom_commands: str | None = None,
         connection: MudConnection,
         render_mode: str | None = None,
+        world_ticker: Callable[[], None] | None = None,
     ):
         super().__init__()
+
+        self.world_ticker = world_ticker
 
         self.action_space = gym.spaces.Text(
             max_length=ACTION_MAX_LENGTH,
@@ -303,10 +306,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         """Send one action, then receive its marker-framed observation.
 
-        Vector and parallel coordinators call ``act()`` on every child before calling ``observe()``
-        on any child, so each returned observation follows the complete joint action batch.
+        ``world_ticker`` runs once after the action and before its observation, so a standalone env advances its own world here. Vector and parallel coordinators drive ``act()`` and ``observe()`` themselves and own the joint advancement, so their children are built without one.
         """
         self.act(action)
+        if self.world_ticker is not None:
+            self.world_ticker()
         return self.observe()
 
     def act(self, action: str) -> None:

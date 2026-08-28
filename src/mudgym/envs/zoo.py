@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from pettingzoo import ParallelEnv
@@ -19,12 +20,14 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         envs: dict[str, MudEnv],
         provider: ConnectionProvider,
         render_mode: str | None = None,
+        world_ticker: Callable[[], None] | None = None,
     ):
         if not envs:
             raise ValueError("MudParallelEnv requires at least one child MudEnv.")
         self.envs = dict(envs)
         self._provider = provider
         self.render_mode = render_mode
+        self.world_ticker = world_ticker
 
         self.possible_agents = list(self.envs)
         self.agents = list(self.possible_agents)
@@ -82,6 +85,9 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         # earlier observations from the same PettingZoo step.
         for agent in agents:
             self.envs[agent].act(actions[agent])
+
+        if self.world_ticker is not None:
+            self.world_ticker()
 
         for agent in agents:
             (
