@@ -9,6 +9,7 @@ from mudgym.connections.config import (
 )
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_image import ensure_docker_image
+from mudgym.connections.docker_readiness import wait_for_docker_worlds_ready
 from mudgym.connections.prompts import Prompt, PromptSpec
 from mudgym.logs import get_logger
 
@@ -100,7 +101,27 @@ class DockerExecConnection(MudConnection):
         logger.debug("docker.container.started", container_id=container_id)
         self.container_id = container_id
         self._started_container = True
+        try:
+            wait_for_docker_worlds_ready(container_id, 1)
+        except BaseException:
+            self._remove_started_container()
+            raise
         return self.container_id
+
+    def _remove_started_container(self) -> None:
+        if not self._started_container:
+            return
+        try:
+            subprocess.run(
+                ["docker", "rm", "-f", self.container_name],
+                capture_output=True,
+                check=False,
+            )
+            logger.debug("docker.container.removed", container_name=self.container_name)
+        except Exception as e:
+            logger.debug("docker.container.remove.failed", container_name=self.container_name, error=str(e))
+        finally:
+            self._started_container = False
 
     def build_command(self) -> list[str]:
         cmd = [
@@ -137,15 +158,4 @@ class DockerExecConnection(MudConnection):
         try:
             super().close()
         finally:
-            if self._started_container:
-                try:
-                    subprocess.run(
-                        ["docker", "rm", "-f", self.container_name],
-                        capture_output=True,
-                        check=False,  # Don't raise if the container is already gone
-                    )
-                    logger.debug("docker.container.removed", container_name=self.container_name)
-                except Exception as e:
-                    logger.debug("docker.container.remove.failed", container_name=self.container_name, error=str(e))
-                finally:
-                    self._started_container = False
+            self._remove_started_container()

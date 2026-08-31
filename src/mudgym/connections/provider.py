@@ -9,6 +9,7 @@ from uuid import uuid4
 from mudgym.connections.config import DOCKER_IMAGE
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
+from mudgym.connections.docker_readiness import wait_for_docker_worlds_ready
 from mudgym.logs import get_logger
 
 logger = get_logger(__name__)
@@ -104,7 +105,7 @@ class DockerExecProvider(ConnectionProvider):
 
         logger.info("provider.container.starting", container_name=container_name, slots=slots)
 
-        # boot prepares the worlds and exits, so sleep keeps the container around for docker exec.
+        # Keep boot supervising the waiters so the container remains available for docker exec.
         result = subprocess.run(
             [
                 "docker",
@@ -123,7 +124,7 @@ class DockerExecProvider(ConnectionProvider):
                 self.image,
                 "/bin/sh",
                 "-c",
-                f"/app/bin/boot -n {slots} -f -k && sleep infinity",
+                f"/app/bin/boot -n {slots} -f -k",
             ],
             capture_output=True,
             text=True,
@@ -133,6 +134,21 @@ class DockerExecProvider(ConnectionProvider):
             raise RuntimeError(f"Failed to start container: {result.stderr}")
 
         container_id = result.stdout.strip()
+        try:
+            wait_for_docker_worlds_ready(container_id, slots)
+        except BaseException:
+            cleanup = subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                capture_output=True,
+                text=True,
+            )
+            if cleanup.returncode != 0:
+                logger.error(
+                    "provider.container.failed_start_cleanup_failed",
+                    container_id=container_id,
+                    error=cleanup.stderr.strip(),
+                )
+            raise
         logger.info("provider.container.started", container_id=container_id)
         return container_id
 
