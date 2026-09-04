@@ -7,10 +7,10 @@ This payload will include any game events which have occurred since the last ste
 auto commands) echoed back, then any game events in response to our command. Each game event is delimited by a prompt
 marker (*) to tell the user the game is ready for the next command.
 
-The bytes map to text as Latin-1 (never UTF-8), but the game's text output is 7-bit: printable ASCII plus
-ANSI escape sequences, sent over telnet. Bytes above 0x7F are protocol codes (fecodes, the unsupported
-"client mode"), never text, and text paths reject them loudly as leaks. Diagnostics can still render
-arbitrary wire bytes without masking the original error.
+The game's text output is 7-bit: printable ASCII plus ANSI escape sequences, sent over telnet. Bytes
+above 0x7F are protocol codes (fecodes and the unsupported client mode), never text, and text paths
+reject them loudly as leaks. Raw diagnostics use Latin-1 so they can render arbitrary wire bytes
+without masking the original error.
 
 The functions in this module are for splitting these bytes in some different variations:
 
@@ -109,6 +109,6 @@ def split_on_prompt(raw_bytes: bytes) -> list[bytes]:
 
 def normalise_lines(raw_bytes: bytes) -> bytes:
     """
-    Normalise line breaks from \r\n to \n.
+    Normalise CRLF and drop a final CR when a terminal marker ends before its LF.
     """
-    return raw_bytes.replace(b"\r\n", b"\n")
+    return raw_bytes.replace(b"\r\n", b"\n").removesuffix(b"\r")

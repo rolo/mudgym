@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 from mudgym.envs.specs import IDENTIFIER_SPACE
 from mudgym.featurizers.ansi import strip_ansi
-from mudgym.featurizers.strings import decode_text_bytes
+from mudgym.featurizers.strings import decode_text_lines
 
 from .field import ObservationField
 
@@ -21,13 +21,7 @@ INVENTORY_DIVIDER = b"========"
 
 def parse_inventory_lines(block: bytes) -> tuple[str, ...]:
     """Decode a divider-delimited inventory block into a tuple of cleaned item names."""
-    cleaned = strip_ansi(block)
-    lines: list[str] = []
-    for raw in cleaned.splitlines():
-        raw = raw.strip()
-        if raw:
-            lines.append(decode_text_bytes(raw))
-    return tuple(lines)
+    return tuple(line for line in decode_text_lines(strip_ansi(block)) if line)
 
 
 class FEInventoryField(ObservationField):

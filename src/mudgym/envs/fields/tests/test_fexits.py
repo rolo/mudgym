@@ -154,3 +154,7 @@ def test_extracts_fex_from_real_captures(bytes_case):
     expected_names = tuple(direction for direction in DIRECTIONS if direction in bytes_case["fex"]["names"])
     assert obs["available_exit_names"] == expected_names
     assert np.array_equal(obs["available_exits"], expected_vector(bytes_case["fex"]["names"]))
+
+
+def test_separator_controls_are_not_whitespace_around_an_exits_line():
+    assert not FEXitsField().matches(b"\x1fnorth south\x1f\r\n")

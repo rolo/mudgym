@@ -122,3 +122,8 @@ def test_end_of_turn_marker_matches_the_status_line_on_the_wire_and_stripped():
 def test_include_keys_must_be_space_keys():
     with pytest.raises(ValueError, match="not in full_space"):
         FEScoreField(include_keys=("points", "bogus"))
+
+
+def test_separator_controls_are_not_whitespace_around_a_status_line():
+    # \x1f is not ASCII whitespace, so it remains part of the line and prevents a match
+    assert not FEScoreField().matches(b"\x1f58 58 61 61 61 61 0 58 0200 N N N N 53 F\x1f\r\n")

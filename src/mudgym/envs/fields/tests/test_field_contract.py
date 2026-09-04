@@ -82,6 +82,16 @@ def test_empty_include_keys_contributes_nothing():
     assert field.extract([FES_RESPONSE]) == {}
 
 
+def test_marker_only_field_does_not_parse_unused_values():
+    response = FES_RESPONSE.replace(b"0200", b"3000000000")
+    field = FEScoreField(include_keys=())
+
+    assert field.matches(response)
+    assert field.extract([response]) == {}
+    with pytest.raises(OverflowError):
+        field.full_extract([response])
+
+
 # Index keys are 1-based with 0 reserved for unknown, so the last member of each collection lands
 # on index len(collection) and needs a Discrete space of len + 1 slots (see db.index).
 BLIZZARD_FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 B"
@@ -106,7 +116,7 @@ def test_mgcheats_last_room_is_inside_its_space():
     field = MGCheatsField()
     payload = (
         f"[mgcheats]room_id={ROOM_IDS[-1]}; room_name={ROOM_NAMES[-1]}; fighting=0; dark=0; "
-        f"glowing=0; here=[]; ticks=125; inventory=[][/mgcheats]"
+        f"glowing=0; asleep=0; gifted=0; here=[]; ticks=125; inventory=[][/mgcheats]"
     ).encode("latin-1")
     obs = field.full_extract([payload])
     assert obs["room_id"] == ROOM_IDS[-1]

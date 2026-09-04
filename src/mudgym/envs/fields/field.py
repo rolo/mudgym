@@ -6,7 +6,7 @@ from typing import Any
 from gymnasium import spaces
 
 from mudgym.featurizers.ansi import strip_ansi
-from mudgym.featurizers.strings import decode_text_bytes
+from mudgym.featurizers.strings import decode_text_lines
 
 
 class ObservationField(ABC):
@@ -77,6 +77,8 @@ class ObservationField(ABC):
 
     def extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """This field's observation contribution for a turn: ``full_extract()`` restricted to include_keys."""
+        if self.include_keys == ():
+            return {}
         return self.filter_keys(self.full_extract(chunks, **context))
 
     @abstractmethod
@@ -109,18 +111,18 @@ class ObservationField(ABC):
 
     def is_refusal(self, chunk: bytes) -> bool:
         """Whether ``chunk`` is a player-state refusal instead of this command's real output."""
-        return strip_ansi(bytes(chunk)).strip() in self.PLAYER_STATE_REFUSALS
+        return strip_ansi(chunk).strip() in self.PLAYER_STATE_REFUSALS
 
-    def decode(self, raw_bytes: bytes) -> str:
-        """Strip ANSI escape codes from the bytes and decode to text."""
-        return decode_text_bytes(strip_ansi(bytes(raw_bytes)))
+    def lines(self, raw_bytes: bytes) -> list[str]:
+        """The chunk's text lines: ANSI stripped, decoded, split on line breaks and stripped of whitespace."""
+        return decode_text_lines(strip_ansi(bytes(raw_bytes)))
 
     def find_last_line(self, regex: re.Pattern[str], chunks: Sequence[bytes]) -> re.Match[str] | None:
         """Return the last line matching ``regex`` across the response chunks (or ``None``)."""
         match: re.Match[str] | None = None
         for chunk in chunks:
-            for line in self.decode(chunk).splitlines():
-                candidate = regex.match(line.strip())
+            for line in self.lines(chunk):
+                candidate = regex.match(line)
                 if candidate is not None:
                     match = candidate
         return match

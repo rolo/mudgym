@@ -92,7 +92,7 @@ class FEScoreField(ObservationField):
         }
 
     def matches(self, chunk: bytes) -> bool:
-        return any(self.REGEX.match(line.strip()) for line in self.decode(chunk).splitlines())
+        return any(self.REGEX.match(line) for line in self.lines(chunk))
 
     def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Parse the latest FES status line from the turn chunks, or the empty default if none is present."""

@@ -1,10 +1,13 @@
-"""Text policy: Latin-1 is the byte-to-text mapping (never UTF-8), game text is 7-bit, and wire
-bytes above 0x7F are protocol codes that must fail loudly in text paths while still rendering in
-diagnostics."""
+"""Game text is strict ASCII while raw diagnostics retain a total byte-to-text mapping."""
 
 import pytest
 
-from mudgym.featurizers.strings import decode_text_bytes, decode_wire_bytes, encode_command_bytes
+from mudgym.featurizers.strings import (
+    decode_text_bytes,
+    decode_text_lines,
+    decode_wire_bytes,
+    encode_command_bytes,
+)
 
 
 def test_ascii_text_round_trips():
@@ -47,3 +50,8 @@ def test_non_ascii_commands_fail_before_the_wire():
         encode_command_bytes("say caf\xe9")
     with pytest.raises(ValueError, match="outside ASCII"):
         encode_command_bytes("say €100")
+
+
+def test_text_lines_split_on_newlines_and_strip_ascii_whitespace_only():
+    # bytes.split cannot invent line breaks at separator controls, and bytes.strip leaves them intact
+    assert decode_text_lines(b"a \r\n\tb\n\x0cc\x1cd\x1f\r\n") == ["a", "b", "c\x1cd\x1f", ""]

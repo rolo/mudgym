@@ -1,36 +1,30 @@
-import re
-
 # line break
 LINE_BREAK_RE = rb"\r\n"
-
-# Wire bytes above 0x7F are protocol, never text: the game uses them for fecodes (eg \x9b\xff)
-# and the unsupported client mode, and its entire text database is 7-bit. Finding one in a text
-# path means wire bytes leaked.
-NON_TEXT_BYTE_RE = re.compile(rb"[\x80-\xff]")
 
 
 def decode_text_bytes(data: bytes) -> str:
     """
     Decode game text bytes, raising on bytes above 0x7F.
 
-    Latin-1 is the byte-to-text mapping throughout mudgym (the game predates UTF-8), but the
-    game's text output is 7-bit: any high byte in a text path is a leaked protocol byte, so it
-    fails loudly with nearby byte context instead of being silently decoded. Diagnostics that
-    must render arbitrary wire bytes use decode_wire_bytes instead.
+    The game's text output is 7-bit. A high byte in a text path is a leaked protocol byte, so it
+    fails loudly with nearby byte context. Diagnostics that must render arbitrary wire bytes use
+    ``decode_wire_bytes`` instead.
 
     ANSI escape sequences are valid and are not removed here, callers can strip them separately when plain text
     is wanted.
     """
     raw = bytes(data)
+    try:
+        return raw.decode("ascii")
+    except UnicodeDecodeError as exc:
+        start = max(0, exc.start - 80)
+        end = min(len(raw), exc.end + 80)
+        raise ValueError(f"Invalid text byte at byte {exc.start}: {raw[start:end]!r}") from exc
 
-    match = NON_TEXT_BYTE_RE.search(raw)
-    if match is not None:
-        start = max(0, match.start() - 80)
-        end = min(len(raw), match.end() + 80)
-        context = raw[start:end]
-        raise ValueError(f"Invalid bytes in text bytes at byte {match.start()}: {context!r}")
 
-    return raw.decode("latin-1")
+def decode_text_lines(data: bytes) -> list[str]:
+    """Decode newline-delimited game text, stripping ASCII whitespace around each line."""
+    return [decode_text_bytes(line.strip()) for line in bytes(data).split(b"\n")]
 
 
 def decode_wire_bytes(data: bytes) -> str:
@@ -48,7 +42,7 @@ def encode_command_bytes(text: str) -> bytes:
     Encode a player command line as ASCII, failing clearly before any bytes reach the wire
     when the text contains characters the game cannot receive.
 
-    The game's text channel is 7-bit (see NON_TEXT_BYTE_RE): a high byte sent as a command is
+    The game's text channel is 7-bit: a high byte sent as a command is
     transliterated rather than echoed back, so the read window's exact-echo anchoring would
     wait out its timeout instead of matching.
     """

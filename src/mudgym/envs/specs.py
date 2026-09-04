@@ -12,9 +12,9 @@ BIT_DTYPE = np.int8  # Gymnasium's MultiBinary space and discrete action masks u
 
 # game specific
 # The game's text is 7-bit: printable ASCII plus ANSI escapes and line breaks (the entire muddle
-# text database contains no byte above 0x7F). Wire bytes above 0x7F are protocol codes (fecodes,
-# the unsupported client mode), never text, and the decode path rejects them loudly (see
-# featurizers.strings.decode_text_bytes). Latin-1 remains the byte-to-text mapping throughout.
+# text database contains no byte above 0x7F). Wire bytes above 0x7F are protocol codes (fecodes and
+# the unsupported client mode), never text, and text paths decode as strict ASCII. Raw diagnostics
+# retain the Latin-1 byte-to-text mapping.
 PRINTABLE_ASCII = string.ascii_letters + string.digits + string.punctuation + " "
 TEXT_CHARSET = PRINTABLE_ASCII + "\n"
 
@@ -36,7 +36,7 @@ ACTION_CHARSET = PRINTABLE_ASCII
 IDENTIFIER_CHARSET = string.ascii_letters + string.digits + "()-"
 IDENTIFIER_MAX_LENGTH = 17
 
-# a sequence of game entities, eg in an inventory or room contents
+# a sequence of printable game entities, eg in an inventory or room contents
 ITEM_MAX_LENGTH = 96
 ITEM_SPACE = spaces.Sequence(
     spaces.Text(max_length=ITEM_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
@@ -44,7 +44,7 @@ ITEM_SPACE = spaces.Sequence(
 )
 
 # a sequence of machine-readable game identifiers, eg the fei inventory ids ("brand39",
-# "cloth-of-gold") and mgcheats' ``here`` values
+# "cloth-of-gold")
 IDENTIFIER_SPACE = spaces.Sequence(
     spaces.Text(max_length=IDENTIFIER_MAX_LENGTH, min_length=0, charset=IDENTIFIER_CHARSET),
     stack=False,

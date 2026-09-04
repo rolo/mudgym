@@ -58,7 +58,7 @@ class FEXitsField(ObservationField):
         return all_exits()
 
     def matches(self, chunk: bytes) -> bool:
-        lines = [line.strip() for line in self.decode(chunk).splitlines()]
+        lines = self.lines(chunk)
         # a dark room returns a blank exits response, which is a valid, if uninformative
         if not any(lines):
             return True
