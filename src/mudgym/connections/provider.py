@@ -9,6 +9,7 @@ from uuid import uuid4
 from mudgym.connections.config import DOCKER_IMAGE
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
+from mudgym.connections.docker_lease import ContainerLease
 from mudgym.connections.docker_readiness import wait_for_docker_worlds_ready
 from mudgym.logs import get_logger
 
@@ -44,6 +45,9 @@ class DockerExecProvider(ConnectionProvider):
     """Provides one fixed batch of connections backed by Docker worlds.
 
     ``worlds`` describes the topology, while the count passed to ``create_connections`` is simply how many connections the caller needs. If ``worlds`` is omitted we use one world per connection. Docker needs the whole count up front to size its containers, so this particular provider only supplies one batch.
+
+    Small child processes renew the owned containers' leases while their owner lives. Each
+    container stops itself if its lease expires.
     """
 
     def __init__(
@@ -55,6 +59,7 @@ class DockerExecProvider(ConnectionProvider):
         *,
         connection_class: type[MudConnection] = DockerExecConnection,
         connection_kwargs: dict | None = None,
+        lease_timeout_seconds: int = 600,
     ):
         if worlds is not None and worlds < 1:
             raise ValueError("worlds must be at least 1.")
@@ -66,6 +71,7 @@ class DockerExecProvider(ConnectionProvider):
         self.worlds_per_container = worlds_per_container
         self.connection_class = connection_class
         self.connection_kwargs = dict(connection_kwargs or {})
+        self.lease_timeout_seconds = lease_timeout_seconds
 
         reserved = {"account_id", "db_slot", "container_id"}
         bad = reserved & set(self.connection_kwargs)
@@ -76,6 +82,7 @@ class DockerExecProvider(ConnectionProvider):
         self._closed = False
         self._batch_created = False
         self._owner_pid = os.getpid()
+        self._lease: ContainerLease | None = None
 
         self.containers: list[str] = []
         # A supplied container belongs to its caller. Containers we start ourselves belong to us.
@@ -85,6 +92,7 @@ class DockerExecProvider(ConnectionProvider):
         state = self.__dict__.copy()
         # Locks cannot be pickled, so an unpickled provider gets a fresh one below.
         state.pop("_lock", None)
+        state["_lease"] = None
         # Once a batch exists, a pickled copy only refers to the allocating process's containers.
         # It must not decide they are now its containers and stop them on close.
         if self._batch_created:
@@ -100,32 +108,40 @@ class DockerExecProvider(ConnectionProvider):
 
     def prepare_shared_container(self, slots: int) -> str:
         """Start a new container with multiple game slots."""
+        if self._lease is None:
+            raise RuntimeError("Container lease must be running before starting a shared container.")
         unique = uuid4().hex[:6]
         container_name = f"mud_shared_{int(time.time())}_{slots}_{unique}"
 
         logger.info("provider.container.starting", container_name=container_name, slots=slots)
 
-        # Keep boot supervising the waiters so the container remains available for docker exec.
-        result = subprocess.run(
+        # Boot keeps supervising its waiters while the outer shell watches the owner's lease.
+        command = [
+            "docker",
+            "run",
+            "-d",
+            "--init",
+            "--rm",
+            "--ipc",
+            "private",
+            "--pids-limit",
+            "4096",
+            "--log-driver",
+            "none",
+            "--name",
+            container_name,
+        ]
+        command.extend(self._lease.docker_run_arguments())
+        command.extend(
             [
-                "docker",
-                "run",
-                "-d",
-                "--init",
-                "--rm",
-                "--ipc",
-                "private",
-                "--pids-limit",
-                "4096",
-                "--log-driver",
-                "none",
-                "--name",
-                container_name,
                 self.image,
                 "/bin/sh",
                 "-c",
-                f"/app/bin/boot -n {slots} -f -k",
-            ],
+                self._lease.boot_command(slots),
+            ]
+        )
+        result = subprocess.run(
+            command,
             capture_output=True,
             text=True,
         )
@@ -135,6 +151,7 @@ class DockerExecProvider(ConnectionProvider):
 
         container_id = result.stdout.strip()
         try:
+            self._lease.add_container(container_id)
             wait_for_docker_worlds_ready(container_id, slots)
         except BaseException:
             cleanup = subprocess.run(
@@ -171,6 +188,7 @@ class DockerExecProvider(ConnectionProvider):
                     # Allocation is lazy, so the process doing this work owns the containers. It
                     # may not be the process that originally constructed or pickled the provider.
                     self._owner_pid = os.getpid()
+                    self._lease = ContainerLease(self.lease_timeout_seconds)
 
                 world_count = self.worlds if self.worlds is not None else count
                 if self.container_id:
@@ -236,6 +254,8 @@ class DockerExecProvider(ConnectionProvider):
                 return
             self._closed = True
             to_stop = list(self.containers) if self.owns_containers else []
+            lease = self._lease
+            self._lease = None
             self.containers.clear()
 
         # Forked and spawned copies can close their references, but only the allocating process
@@ -245,6 +265,12 @@ class DockerExecProvider(ConnectionProvider):
             return
 
         first_exc = None
+        if lease is not None:
+            try:
+                lease.close()
+            except Exception as exc:
+                first_exc = exc
+
         for container_id in to_stop:
             try:
                 subprocess.run(["docker", "stop", container_id], check=True, capture_output=True)
