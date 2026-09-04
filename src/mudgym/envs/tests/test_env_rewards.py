@@ -86,6 +86,18 @@ def test_points_event_wins_over_an_earlier_stale_status_line(scripted_env_factor
     assert info["points"] == 13_000
 
 
+def test_tearoom_points_event_updates_the_episode_start_without_reward(scripted_env_factory):
+    responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY, status_points=13_000)}
+    env = scripted_env_factory(responses=responses, tearoom_commands="mgsorcerise")
+
+    initial_observation, _ = env.reset()
+    observation, reward, _, _, _ = env.step("look")
+
+    assert initial_observation["points"] == 13_000
+    assert observation["points"] == 13_000
+    assert reward == 0.0
+
+
 def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory):
     # A plain parenthesised number carries no raw-wire signal distinguishing it from player text,
     # so it must not become reward, termination, or score metadata.

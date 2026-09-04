@@ -40,6 +40,7 @@ def test_tea(connection_key, subtests, tea_results, steps=5):
             assert connection.sm.state == State.TEA_SIPPED, (
                 f"Expected TEA_SIPPED state after connect, got {connection.sm.state}"
             )
+            assert connection.sm.child.delaybeforesend == 0
 
         log_time("tea")
 
@@ -49,6 +50,7 @@ def test_tea(connection_key, subtests, tea_results, steps=5):
             assert connection.sm.state == State.TEA_SIPPED, (
                 f"Expected TEA_SIPPED state after second reset, got {connection.sm.state}"
             )
+            assert connection.sm.child.delaybeforesend == 0
 
         with subtests.test(msg="Taking game steps"):
             for _ in range(steps):
@@ -65,6 +67,7 @@ def test_tea(connection_key, subtests, tea_results, steps=5):
             assert connection.sm.state == State.TEA_SIPPED, (
                 f"Expected TEA_SIPPED state after third reset, got {connection.sm.state}"
             )
+            assert connection.sm.child.delaybeforesend == 0
     finally:
         connection.close()
 

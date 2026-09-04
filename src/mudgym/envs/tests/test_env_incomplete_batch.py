@@ -33,6 +33,7 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
     assert "(Persona saved on -11 = 189)." in obs["text"]
     assert "Overall, you scored 189 points this game" in obs["text"]
     assert "\x1b" not in obs["text"]
+    assert env.observation_space.contains(obs)
 
 
 def test_incomplete_window_carries_the_current_score(scripted_env_factory):

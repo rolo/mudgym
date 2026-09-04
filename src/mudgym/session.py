@@ -2,7 +2,7 @@ import re
 
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.errors import ConnectionClosedError
-from mudgym.featurizers.quickscore import parse_quickscore_name
+from mudgym.featurizers.quickscore import QUICKSCORE_COMMAND, QUICKSCORE_PATTERN, parse_quickscore
 
 
 class MudSession:
@@ -25,25 +25,22 @@ class MudSession:
         self.observation_line = observation_line
         self.end_of_turn_marker = end_of_turn_marker
 
-        self.persona: str | None = None
         # A pending command has been sent to the game but its response hasn't been read yet.
         # This is for the two step act/observe pattern to ensure we have the latest game text to act on.
         self.pending_command: str | None = None
 
-    def reset(self) -> None:
-        """
-        Reset the session: connect, enter the tearoom, and learn which persona we are playing.
-        """
+    def reset(self) -> tuple[str, int]:
+        """Enter the tearoom and return the persona name and points from quickscore."""
         self.pending_command = None
         self.connection.reset()
 
-        # use quickscore to find out the current persona name, regardless of connection type or how we got here
-        raw_bytes, terminated, incomplete, _ = self.command("qs")
+        self.send(QUICKSCORE_COMMAND)
+        raw_bytes, terminated, incomplete, _ = self.read_pending_response(QUICKSCORE_PATTERN)
         if terminated or incomplete:
             raise RuntimeError(
                 f"quickscore failed during reset (terminated={terminated}, incomplete={incomplete}): {raw_bytes!r}"
             )
-        self.persona = parse_quickscore_name(raw_bytes)
+        return parse_quickscore(raw_bytes)
 
     def send(self, command: str) -> None:
         """Send one player's command without waiting for its response."""
@@ -68,8 +65,12 @@ class MudSession:
             # reading. With no pending action there is nothing to recover, so surface the failure.
             if command is None:
                 raise
+        return self.read_pending_response(self.end_of_turn_marker)
+
+    def read_pending_response(self, end_of_turn_marker: re.Pattern) -> tuple[bytes, bool, bool, dict]:
+        """Read the pending command through its own response marker."""
         try:
-            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(self.end_of_turn_marker)
+            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(end_of_turn_marker)
         finally:
             self.pending_command = None
 

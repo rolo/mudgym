@@ -39,12 +39,14 @@ def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key
     connection = connection_class()
     try:
         connection.reset()
+        assert connection.sm.child.delaybeforesend == 0
         _, terminated, _, _ = send_and_read(connection, ["quit"])
         assert terminated is True
         assert connection.sm.state == State.GAME_OVER
 
         connection.reset()
         assert connection.sm.state == State.TEA_SIPPED
+        assert connection.sm.child.delaybeforesend == 0
     finally:
         connection.close()
 

@@ -8,6 +8,10 @@ from mudgym.connections.prompts import PromptSpec, State
 from mudgym.connections.state_machine import ConnectionState
 from mudgym.logs import get_logger
 
+# pexpect's pause before each send (0.05 by default). The scripted login needs one, but
+# echo-anchored game commands do not.
+LOGIN_SEND_DELAY = 0.005
+
 logger = get_logger(__name__)
 
 
@@ -60,8 +64,7 @@ class MudConnection:
             encoding=None,
             use_poll=True,  # poll() instead of select() to avoid FD_SETSIZE limit
         )
-        # reduce pexpect's pause before each send - defaults to 0.05 (in seconds)
-        child.delaybeforesend = 0.005
+        child.delaybeforesend = LOGIN_SEND_DELAY
         return child
 
     def reset(self) -> None:
@@ -88,6 +91,7 @@ class MudConnection:
         )
 
         if self.sm is not None and self.sm.isalive():
+            self.sm.child.delaybeforesend = LOGIN_SEND_DELAY
             # reset-quit: leave The Land but stay in the mudlogin menu if our connection type
             # supports that (ie, not a quicklogin, which exits to DEAD)
             self.sm.quit()
@@ -116,6 +120,7 @@ class MudConnection:
             sm_state=self.sm.state.name,
             last_prompt=self.sm.last_prompt.name if self.sm.last_prompt else None,
         )
+        self.sm.child.delaybeforesend = 0
 
     def send_line(self, line: str) -> None:
         """Send a line without waiting for its response."""

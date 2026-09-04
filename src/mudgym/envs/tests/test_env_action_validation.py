@@ -36,15 +36,19 @@ def test_ordinary_and_speech_actions_remain_valid(scripted_env, action):
     assert scripted_env.action_space.contains(action) is True
 
 
-def test_a_high_wire_byte_in_game_text_fails_loudly(scripted_env_factory):
+@pytest.mark.parametrize(
+    "original_bytes, replacement_bytes",
+    [(b"dusty road", b"caf\xe9 road"), (b"necklace0", b"necklace\xe9")],
+)
+def test_a_high_wire_byte_in_game_text_fails_loudly(scripted_env_factory, original_bytes, replacement_bytes):
     # bytes above 0x7F are protocol codes, never text; silently decoding one would mask the leak
-    body_env = scripted_env_factory(
-        responses={"look": scripted_response(["look", "sql,fes,fex,fei"]).replace(b"dusty road", b"caf\xe9 road")}
+    env = scripted_env_factory(
+        responses={"look": scripted_response(["look", "sql,fes,fex,fei"]).replace(original_bytes, replacement_bytes)}
     )
-    body_env.reset()
+    env.reset()
 
-    with pytest.raises(ValueError, match="Invalid bytes"):
-        body_env.step("look")
+    with pytest.raises(ValueError, match="Invalid text byte"):
+        env.step("look")
 
 
 def test_an_ordinary_step_observation_fits_the_observation_space(scripted_env_factory):

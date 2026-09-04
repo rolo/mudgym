@@ -70,6 +70,8 @@ def scripted_response(lines: Sequence[str], *, reset_step: bool = False) -> byte
     """Build a prompt-delimited game response for the supplied wire lines."""
     lines = list(lines)
     if len(lines) == 1:
+        if lines[0] == QUICKSCORE_COMMAND:
+            return QUICKSCORE_COMMAND.encode("latin-1") + b"\r\n" + QS_RESPONSE + PROMPT
         observation_line = lines[0]
         parts = [observation_line.encode("latin-1"), b"\r\n"]
         for position, observation_command in enumerate(observation_line.split(",")):
@@ -85,8 +87,6 @@ def scripted_response(lines: Sequence[str], *, reset_step: bool = False) -> byte
 
     parts = [lines[0].encode("latin-1"), b"\r\n"]
     if reset_step:
-        parts.append(FES_RESPONSE)
-        parts.append(PROMPT)
         parts.append(TEAROOM_EXIT_TEXT)
 
     if user_command in OBSERVATION_COMMAND_RESPONSES:
@@ -155,7 +155,7 @@ class ScriptedConnection(MudConnection):
     def complete_command(self, lines: list[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
         self.sent_lines.append(lines)
         user_command = lines[0]
-        reset_step = user_command == "fes,move north" and not self.entered_land
+        reset_step = user_command == "move north" and not self.entered_land
         if reset_step:
             self.entered_land = True
 

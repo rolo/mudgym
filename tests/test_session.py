@@ -4,6 +4,7 @@ import pytest
 
 from mudgym.connections.recording import RecordingConnection
 from mudgym.envs.fields.feinventory import FEInventoryField
+from mudgym.featurizers.quickscore import QUICKSCORE_PATTERN
 from mudgym.session import MudSession
 from tests.scripted import ScriptedConnection
 
@@ -72,18 +73,21 @@ def test_send_rejects_a_second_command_while_one_is_pending():
         session.send("dance")
 
 
-def test_reset_uses_the_same_split_protocol_for_the_persona_probe(tmp_path):
+def test_reset_reads_quickscore_without_requesting_an_observation(tmp_path):
     capture_path = tmp_path / "session.jsonl"
-    connection = RecordingConnection(ScriptedConnection(), capture_path)
+    scripted_connection = ScriptedConnection()
+    connection = RecordingConnection(scripted_connection, capture_path)
     session = make_session(connection)
 
-    session.reset()
+    persona, starting_points = session.reset()
     connection.close()
 
-    assert session.persona == "Alexander"
+    assert persona == "Alexander"
+    assert starting_points == 200
     calls = recorded_calls(capture_path)
-    assert [call["call"] for call in calls] == ["reset", "send_line", "send_line", "read_response"]
-    assert [call["line"] for call in calls if call["call"] == "send_line"] == ["qs", OBSERVATION_LINE]
+    assert [call["call"] for call in calls] == ["reset", "send_line", "read_response"]
+    assert [call["line"] for call in calls if call["call"] == "send_line"] == ["qs"]
+    assert scripted_connection.read_markers == [QUICKSCORE_PATTERN]
 
 
 @pytest.mark.parametrize(("terminated", "incomplete"), [(True, False), (False, True)])

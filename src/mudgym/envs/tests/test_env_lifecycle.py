@@ -111,6 +111,7 @@ def test_only_player_actions_advance_the_env_step_count(scripted_env_factory):
         "step",
         "persona",
         "action_rejected",
+        "transport",
     }
 
     env.reset()
