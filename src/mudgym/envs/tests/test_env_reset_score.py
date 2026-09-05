@@ -73,3 +73,27 @@ def test_tearoom_exit_recognises_the_sorcerer_narration(scripted_env_factory):
     cleaned = env.unwrapped.clean_tearoom_exit(raw_bytes)
 
     assert cleaned == b"Dense forest.\r\n"
+
+
+def test_exit_removes_the_observation_echo_from_a_live_capture(scripted_env_factory):
+    # Received bytes from DockerRunConnection on v0.3.3 (7bd9635c7a28), with a 5 ms send delay.
+    raw_bytes = (
+        b"move north\r\nAs you step through the opening, you become swathed in a fine, gossamer mist. "
+        b"The Elizabethan tearoom fades hazily away, and vague, new shapes begin to form around you."
+        b" Their outlines become more defined, their colours grow stronger, and the mist thins out i"
+        b"nto pale wisps, which gradually disperse away to nothingness...\r\n\x1b[32mNarrow road between "
+        b"lands\x1b[37m.\r\n\x1b[0;32;40mYou are stood on a narrow road between The Land and whence you came"
+        b". To the north and south are the small foothills of a pair of majestic mountains, with a l"
+        b"arge wall running round. To the west the road continues, where in the distance you can see"
+        b" a thatched cottage opposite an ancient cemetery. The way out is to the east, where a shro"
+        b"ud of mist covers the secret pass by which you entered The Land. \x1b[1;37;40m\r\n\x1b[0;34;40m\x1b[1"
+        b";34;40m*\x1b[0;34;40m\x1b[1;37;40mfei\r\n\x1b[0;37;40m========\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34"
+        b";40m\x1b[1;37;40m"
+    )
+    env = scripted_env_factory(field_parsers=[FEInventoryField], responses={"move north": raw_bytes})
+
+    observation, _ = env.reset()
+
+    assert observation["portables"] == ()
+    assert observation["inventory"] == ()
+    assert env.observation_space.contains(observation)
