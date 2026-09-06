@@ -275,6 +275,11 @@ class DockerExecProvider(ConnectionProvider):
             try:
                 subprocess.run(["docker", "stop", container_id], check=True, capture_output=True)
             except Exception as exc:
+                # The watchdog can remove an owned --rm container before close.
+                if isinstance(exc, subprocess.CalledProcessError) and exc.stderr.strip() == (
+                    f"Error response from daemon: No such container: {container_id}".encode()
+                ):
+                    continue
                 logger.error(
                     "provider.container.close.stop_failed",
                     container_id=container_id,

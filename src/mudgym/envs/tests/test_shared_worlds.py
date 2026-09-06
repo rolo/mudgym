@@ -1,6 +1,19 @@
+import pytest
 from gymnasium.vector import AutoresetMode
 
 from mudgym.connections.provider import DockerExecProvider
+
+
+@pytest.mark.parametrize("worlds", [1, 2])
+def test_players_only_hear_shouts_from_their_own_world(live_vector_env_factory, worlds):
+    env = live_vector_env_factory(2, provider=DockerExecProvider(worlds=worlds))
+    env.reset()
+
+    observation, _, terminated, truncated, _ = env.step(["shout mudgymisolation", "look"])
+
+    assert not terminated.any() and not truncated.any()
+    assert "mudgymisolation" in observation["text"][0].lower()
+    assert ("mudgymisolation" in observation["text"][1].lower()) is (worlds == 1)
 
 
 def test_shared_world_remains_playable_after_one_child_autoresets(live_vector_env_factory):
