@@ -87,7 +87,8 @@ def test_exit_removes_the_observation_echo_from_a_live_capture(scripted_env_fact
         b"arge wall running round. To the west the road continues, where in the distance you can see"
         b" a thatched cottage opposite an ancient cemetery. The way out is to the east, where a shro"
         b"ud of mist covers the secret pass by which you entered The Land. \x1b[1;37;40m\r\n\x1b[0;34;40m\x1b[1"
-        b";34;40m*\x1b[0;34;40m\x1b[1;37;40mfei\r\n\x1b[0;37;40m========\r\n\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34"
+        b";34;40m*\x1b[0;34;40m\x1b[1;37;40mfei\r\n\x1b[0;37;40m========\r\n\x1b[1;37;40m"
+        b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34"
         b";40m\x1b[1;37;40m"
     )
     env = scripted_env_factory(field_parsers=[FEInventoryField], responses={"move north": raw_bytes})

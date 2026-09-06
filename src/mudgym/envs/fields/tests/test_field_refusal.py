@@ -1,26 +1,33 @@
 import pytest
 
 from mudgym.envs.fields import FEScoreField
+from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES
+from mudgym.featurizers.responses import split_on_echo, split_on_prompt
 
 
-@pytest.mark.parametrize(
-    "chunk",
-    [
-        b"You can't wake yourself up yet!\r\n",
-        b"\x1b[0;37;40mYou can't see a thing, you're blind.\x1b[1;37;40m\r\n",
-    ],
+@pytest.fixture(
+    params=[
+        pytest.param(FORD_COLLAPSE_BYTES, id="unconscious"),
+        pytest.param(VAMPIRE_BLIND_BYTES, id="blind"),
+    ]
 )
-def test_a_refusal_line_is_a_refusal_whatever_its_colour_or_line_ending(chunk):
-    assert FEScoreField().is_refusal(chunk)
+def observation_response(request):
+    _, response = split_on_echo(request.param, "sql,fes,fex,fei")
+    return response
 
 
-@pytest.mark.parametrize(
-    "chunk",
-    [
-        b"You can't wake yourself up yet!\r\nYou drift off again.\r\n",
-        b"\r\n",
-        b"58 58 61 61 61 61 0 58 0200 N N N N 53 F\r\n",
-    ],
-)
-def test_anything_beyond_the_single_refusal_line_is_not_a_refusal(chunk):
-    assert not FEScoreField().is_refusal(chunk)
+def test_recognises_a_refusal_from_real_game_bytes(observation_response):
+    refusal, *_ = split_on_prompt(observation_response)
+
+    assert FEScoreField().is_refusal(refusal)
+
+
+def test_a_refusal_followed_by_other_game_output_is_not_a_refusal(observation_response):
+    assert not FEScoreField().is_refusal(observation_response)
+
+
+def test_other_field_responses_are_not_refusals(observation_response):
+    _, *responses = split_on_prompt(observation_response)
+
+    for response in responses:
+        assert not FEScoreField().is_refusal(response)

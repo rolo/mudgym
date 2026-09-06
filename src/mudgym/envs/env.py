@@ -167,7 +167,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         text_chunks = [*pre_echo_chunks, *payload_text_chunks]
         if not response_complete:
-            # Without the marker we cannot safely line chunks up with fields. Preserve the bytes as text rather than pretending the structured observation is complete.
+            # Without the marker we cannot safely line chunks up with fields. Preserve the bytes as text rather than
+            # pretending the structured observation is complete.
             text_chunks.extend(chunks)
 
         # keeps the game's ANSI colour - text observation space doesn't.
@@ -314,7 +315,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     def observe(self) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         """Receive everything up to this player's end-of-turn marker.
 
-        This includes the earlier action, the observation-command responses, and anything caused by other players since that action was sent.
+        This includes the earlier action, the observation-command responses, and anything caused by other players since
+        that action was sent.
         """
         raw_bytes, terminated, incomplete, debug_info = self.session.receive()
         truncated = incomplete

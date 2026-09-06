@@ -134,7 +134,8 @@ class MudVectorEnv(VectorEnv):
         if len(child_actions) != self.num_envs:
             raise ValueError(f"Expected {self.num_envs} actions, got {len(child_actions)}.")
         live_indices = np.flatnonzero(~resetting).tolist()
-        # Don't fold these loops together. A player can affect another player's observation, so every action must reach the game before any observation commands are sent.
+        # Don't fold these loops together. A player can affect another player's observation, so every action must reach
+        # the game before any observation commands are sent.
         for index in live_indices:
             self.envs[index].act(child_actions[index])
 

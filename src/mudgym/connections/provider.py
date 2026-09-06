@@ -44,7 +44,9 @@ class ConnectionProvider(Protocol):
 class DockerExecProvider(ConnectionProvider):
     """Provides one fixed batch of connections backed by Docker worlds.
 
-    ``worlds`` describes the topology, while the count passed to ``create_connections`` is simply how many connections the caller needs. If ``worlds`` is omitted we use one world per connection. Docker needs the whole count up front to size its containers, so this particular provider only supplies one batch.
+    ``worlds`` describes the topology, while the count passed to ``create_connections`` is simply how many connections
+    the caller needs. If ``worlds`` is omitted we use one world per connection. Docker needs the whole count up front to
+    size its containers, so this particular provider only supplies one batch.
 
     Small child processes renew the owned containers' leases while their owner lives. Each
     container stops itself if its lease expires.
