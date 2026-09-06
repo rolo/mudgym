@@ -3,7 +3,7 @@ from contextlib import suppress
 from typing import Any
 
 import gymnasium as gym
-from gymnasium.vector import VectorEnv
+from gymnasium.vector import AutoresetMode, VectorEnv
 from pettingzoo import ParallelEnv
 
 from mudgym.connections import registry
@@ -127,12 +127,15 @@ def make_vector_env(
     tearoom_commands: str | None = None,
     provider: ConnectionProvider | None = None,
     world_ticker: Callable[[], None] | None = None,
+    autoreset_mode: AutoresetMode | str = AutoresetMode.DISABLED,
 ) -> VectorEnv:
     """Create a Gymnasium vector env. It need not know how worlds are arranged.
 
-    The provider decides where the connections lead. Reset is deliberately all-or-nothing for now, and both reset and step finish the shared action/setup work before collecting observations. A supplied provider becomes the resulting environment's responsibility and is closed with it.
+    The provider decides where the connections lead. Masked reset and opt-in next-step autoreset relogin only selected children. Both reset and step finish shared action/setup work before collecting observations. A supplied provider becomes the resulting environment's responsibility and is closed with it.
 
-    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator alone: the children are built without one.
+    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator alone. Will still run on a step where some slots only relogin, as long as at least one slot acts as the vector env does not know how the provider arranges worlds.
+
+    ``autoreset_mode`` defaults to ``Disabled``. ``NextStep`` returns each terminal transition intact, then ignores that slot's action on the following step and relogins it after every live sibling has observed. ``SameStep`` is not supported.
     """
     if envs < 1:
         raise ValueError("envs must be at least 1.")
@@ -161,7 +164,12 @@ def make_vector_env(
                 )
             )
 
-        base_env = MudVectorEnv(children, provider=provider, world_ticker=world_ticker)
+        base_env = MudVectorEnv(
+            children,
+            provider=provider,
+            world_ticker=world_ticker,
+            autoreset_mode=autoreset_mode,
+        )
         if actions == "directions":
             return VectorDiscreteDirectionsWrapper(base_env)
         return base_env

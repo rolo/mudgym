@@ -1,5 +1,6 @@
 from typing import Any
 
+import numpy as np
 import pytest
 from gymnasium.vector import AutoresetMode
 
@@ -119,17 +120,237 @@ def test_vector_step_sends_every_action_before_receiving_any_observation():
         vector_env.close()
 
 
+@pytest.mark.parametrize("actions", [["look"], ["look", "dance", "bow"]])
+def test_vector_rejects_wrong_action_count_before_sending(actions):
+    vector_env, provider = make_tracking_vector()
+    try:
+        vector_env.reset()
+        provider.events.clear()
+
+        with pytest.raises(ValueError, match="Expected 2 actions"):
+            vector_env.step(actions)
+
+        assert provider.events == []
+    finally:
+        vector_env.close()
+
+
 def test_vector_supports_vector_action_wrappers():
-    vector_env, _ = make_tracking_vector(actions="directions")
+    vector_env, _ = make_tracking_vector(
+        actions="directions",
+        autoreset_mode=AutoresetMode.NEXT_STEP,
+    )
     try:
         vector_env.reset()
         vector_env.step([0, 1])
 
         assert vector_env.single_action_space.n == 14
+        assert vector_env.metadata["autoreset_mode"] is AutoresetMode.NEXT_STEP
     finally:
         vector_env.close()
 
 
-def test_vector_has_no_autoreset_option():
-    with pytest.raises(TypeError, match="autoreset_mode"):
-        make_tracking_vector(autoreset_mode="same_step")
+def test_vector_masked_reset_resets_only_selected_children():
+    vector_env, provider = make_tracking_vector()
+    try:
+        vector_env.reset(seed=17)
+        observations_before_reset, *_ = vector_env.step(["look", "dance"])
+        provider.events.clear()
+        reset_mask = np.asarray([False, True], dtype=np.bool_)
+        options = {"reset_mask": reset_mask}
+
+        observations, infos = vector_env.reset(seed=[101, 202], options=options)
+
+        assert options["reset_mask"] is reset_mask
+        assert not any(event[0] == "provider.reset" for event in provider.events)
+        assert [event for event in provider.events if event[0] == "connection.reset"] == [
+            ("connection.reset", 1),
+        ]
+        assert all(event[1] == 1 for event in provider.events if event[0] in {"send", "receive"})
+        assert observations["text"][0] == observations_before_reset["text"][0]
+        assert vector_env.envs[0].np_random_seed == 17
+        assert vector_env.envs[1].np_random_seed == 202
+        assert infos["_step"].tolist() == [False, True]
+    finally:
+        vector_env.close()
+
+
+def test_vector_first_reset_accepts_a_full_reset_mask():
+    vector_env, provider = make_tracking_vector()
+    try:
+        observations, infos = vector_env.reset(seed=5, options={"reset_mask": np.asarray([True, True])})
+
+        assert provider.events[0] == ("provider.reset", 5)
+        assert [event for event in provider.events if event[0] == "connection.reset"] == [
+            ("connection.reset", 0),
+            ("connection.reset", 1),
+        ]
+        assert len(observations["text"]) == 2
+        assert infos["_step"].tolist() == [True, True]
+    finally:
+        vector_env.close()
+
+
+def test_vector_first_reset_rejects_a_partial_reset_mask():
+    vector_env, _ = make_tracking_vector()
+    try:
+        with pytest.raises(RuntimeError, match="partial reset_mask"):
+            vector_env.reset(options={"reset_mask": np.asarray([True, False])})
+    finally:
+        vector_env.close()
+
+
+def test_vector_masked_reset_of_the_dead_child_lets_the_next_step_proceed():
+    vector_env, provider = make_tracking_vector()
+    provider.connections[0].responses["fuck"] = (
+        b"fuck,sql,fes,fex,fei\r\n"
+        b"In order to keep the game uncorrupted, you have been killed.\r\n"
+        b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\r\n",
+        True,
+        False,
+        {"scripted": True, "marker_arrived": False},
+    )
+    try:
+        vector_env.reset()
+        _, _, terminations, _, _ = vector_env.step(["fuck", "look"])
+        assert terminations.tolist() == [True, False]
+        provider.events.clear()
+
+        vector_env.reset(options={"reset_mask": np.asarray([True, False])})
+        _, rewards, terminations, truncations, _ = vector_env.step(["look", "dance"])
+
+        assert [event for event in provider.events if event[0] == "connection.reset"] == [
+            ("connection.reset", 0),
+        ]
+        assert ("send", 0, "look") in provider.events
+        assert ("send", 1, "dance") in provider.events
+        assert rewards.tolist() == [0.0, 0.0]
+        assert terminations.tolist() == [False, False]
+        assert truncations.tolist() == [False, False]
+    finally:
+        vector_env.close()
+
+
+def test_vector_next_step_autoreset_preserves_terminal_result_then_resets_only_done_child():
+    ticker_calls = []
+
+    def world_ticker():
+        ticker_calls.append([len(connection.pending_lines) for connection in provider.connections])
+
+    vector_env, provider = make_tracking_vector(
+        autoreset_mode=AutoresetMode.NEXT_STEP,
+        world_ticker=world_ticker,
+    )
+    terminal_bytes = b"die\r\nYou have died.\r\n"
+    provider.connections[0].responses["die"] = (
+        terminal_bytes,
+        True,
+        False,
+        {"scripted": True, "marker_arrived": False},
+    )
+    try:
+        vector_env.reset(seed=31)
+        provider.events.clear()
+
+        _, rewards, terminations, truncations, infos = vector_env.step(["die", "look"])
+
+        assert rewards.tolist() == [0.0, 0.0]
+        assert terminations.tolist() == [True, False]
+        assert truncations.tolist() == [False, False]
+        assert infos["raw_bytes"][0] == terminal_bytes
+        assert ticker_calls == [[1, 1]]
+
+        provider.events.clear()
+        ticker_calls.clear()
+        _, rewards, terminations, truncations, _ = vector_env.step(["ignored", "dance"])
+
+        assert rewards.tolist() == [0.0, 0.0]
+        assert terminations.tolist() == [False, False]
+        assert truncations.tolist() == [False, False]
+        assert ("send", 0, "ignored") not in provider.events
+        assert ("send", 1, "dance") in provider.events
+        assert ticker_calls == [[0, 1]]
+        assert [event for event in provider.events if event[0] == "connection.reset"] == [
+            ("connection.reset", 0),
+        ]
+        live_observation = next(
+            position for position, event in enumerate(provider.events) if event[0] == "receive" and event[1] == 1
+        )
+        done_reset = provider.events.index(("connection.reset", 0))
+        assert live_observation < done_reset
+    finally:
+        vector_env.close()
+
+
+def test_vector_next_step_autoreset_does_not_tick_when_every_child_is_resetting():
+    ticker_calls = []
+    vector_env, provider = make_tracking_vector(
+        autoreset_mode=AutoresetMode.NEXT_STEP,
+        world_ticker=lambda: ticker_calls.append("tick"),
+    )
+    for connection in provider.connections:
+        connection.responses["die"] = (
+            b"die\r\nYou have died.\r\n",
+            True,
+            False,
+            {"scripted": True, "marker_arrived": False},
+        )
+    try:
+        vector_env.reset()
+        vector_env.step(["die", "die"])
+        ticker_calls.clear()
+
+        _, rewards, terminations, truncations, _ = vector_env.step(["ignored", "ignored"])
+
+        assert ticker_calls == []
+        assert rewards.tolist() == [0.0, 0.0]
+        assert terminations.tolist() == [False, False]
+        assert truncations.tolist() == [False, False]
+    finally:
+        vector_env.close()
+
+
+def test_vector_default_still_requires_an_explicit_reset_after_a_terminal_result():
+    vector_env, provider = make_tracking_vector()
+    provider.connections[0].responses["die"] = (
+        b"die\r\nYou have died.\r\n",
+        True,
+        False,
+        {"scripted": True, "marker_arrived": False},
+    )
+    try:
+        vector_env.reset()
+        vector_env.step(["die", "look"])
+
+        with pytest.raises(RuntimeError, match=r"children \[0\] are done"):
+            vector_env.step(["ignored", "dance"])
+    finally:
+        vector_env.close()
+
+
+@pytest.mark.parametrize(
+    "autoreset_mode",
+    [AutoresetMode.SAME_STEP, "SameStep", "not-a-mode"],
+)
+def test_vector_rejects_unsupported_autoreset_modes(autoreset_mode):
+    with pytest.raises(ValueError, match="autoreset_mode|AutoresetMode"):
+        make_tracking_vector(autoreset_mode=autoreset_mode)
+
+
+@pytest.mark.parametrize(
+    ("reset_mask", "message"),
+    [
+        ([True, False], "numpy array"),
+        (np.asarray([True]), "shape"),
+        (np.asarray([1, 0]), "dtype"),
+        (np.asarray([False, False]), "at least one child"),
+    ],
+)
+def test_vector_rejects_invalid_reset_masks(reset_mask, message):
+    vector_env, _ = make_tracking_vector()
+    try:
+        vector_env.reset()
+        with pytest.raises((TypeError, ValueError), match=message):
+            vector_env.reset(options={"reset_mask": reset_mask})
+    finally:
+        vector_env.close()
