@@ -44,7 +44,7 @@ release version:
 docs-record *names:
     uv run python docs/record.py {{names}}
 
-# replay committed connection captures through the env stack to rewrite the docs displayed fragments
+# replay committed connection captures to generate the ignored fragments used by the docs
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
 
@@ -67,5 +67,5 @@ docs-watch: docs-derive
 
 # docs/build.py wraps `zensical build --strict` and then scans the built pages: a failed exec code
 # block renders its traceback into the page instead of failing zensical, so the scan fails it loudly
-build-docs: docs-derive
+build-docs:
     uv run python docs/build.py

@@ -7,13 +7,13 @@ runs. Each example runs in two phases:
 - record: the example plays the live game once (requires Docker) and each connection transcript is
   written to `docs/recordings/<name>*.session.jsonl` -- the committed source of truth.
 - derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
-  fragments (`docs/recordings/*.md`, `*.ansi`) are rewritten from the replayed transcript.
+  fragments (`docs/recordings/*.md`, `*.ansi`) are regenerated locally from the replayed transcript.
 
-Because fragments are derived from a committed capture, presentation edits re-derive the same
-world instead of rerolling a random one, and `tests/test_docs_recordings.py` can verify the
-committed fragments still match their captures without touching the game. Replay is strict: if an
-example's commands no longer match its capture, deriving fails loudly and the capture needs
-re-recording.
+The generated fragments are ignored by Git. Because they come from a committed capture,
+presentation edits still re-derive the same world instead of rerolling a random one.
+`tests/test_docs_recordings.py` verifies that every capture replays and produces its fragments
+without touching the game. Replay is strict: if an example's commands no longer match its capture,
+deriving fails loudly and the capture needs re-recording.
 
 Run through the justfile:
 
@@ -21,6 +21,9 @@ Run through the justfile:
     just docs-record actions-text     # ... for a subset by name
     just docs-derive                  # rewrite fragments from the committed captures; no Docker
     just docs-watch                   # serve the docs, refreshing whichever example is saved as you edit
+
+Re-record captures once their code and protocol have settled, then commit the capture refresh
+separately from the implementation changes.
 """
 
 import argparse

@@ -10,7 +10,7 @@ observation, info = env.reset()
 env.close()
 ```
 
-Every built-in observation mode includes `text` and `points`, the persona's current score.
+Every built-in observation mode includes `text` and `points`, the persona's tracked score.
 
 ## `text`
 
@@ -57,11 +57,13 @@ print(show_ansi(Path("docs/recordings/observations-cheats.ansi").read_bytes()).d
 
 ## `bytes`
 
-Adds `raw_bytes`, a fixed-size `uint8` NumPy array zero-padded to 16,384 bytes by default. The unpadded bytes value is available as `info["raw_bytes"]`.
+Adds `raw_bytes`, a `uint8` NumPy array padded or truncated to 16,384 bytes. The full, unpadded bytes are available as `info["raw_bytes"]`.
 
 ```python
-raw = observation["raw_bytes"][: len(info["raw_bytes"])].tobytes()
+raw = info["raw_bytes"]
 ```
+
+Use `RawBytesField(max_bytes=N)` to change the array size. Like `text`, this preset sends `fes` to mark the end of the reply, not to track score.
 
 Shown as a bytes literal here for readability:
 
@@ -96,4 +98,4 @@ You can add your own field parsers in the same way by creating an [`ObservationF
 
 ## Observation commands
 
-Observation fields can declare commands for output to consume. MudGym sends those commands on a separate line after the player's action, and the final one also acts as an end of step marker, so we know when the response is complete.
+Observation fields can declare commands for output to consume. MudGym sends those commands on a separate line after the player's action, and the final one acts as an end of step marker.

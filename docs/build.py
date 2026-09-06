@@ -1,3 +1,14 @@
+"""Build the docs site strictly and refuse a build that rendered a code block error into a page.
+
+zensical's strict mode cannot see a failed `exec="true"` code block: markdown-exec catches the
+exception, logs it to a python logger the Rust issue counter never reads, and renders the traceback
+into the page as if it were the block's output. The built HTML is therefore the reliable seam --
+after a strict build this scans every page (tags stripped, because pygments splits the text across
+spans) and fails loudly if a traceback was published as documentation.
+
+Run through the justfile as `just build-docs`; CI runs the same command.
+"""
+
 import re
 import subprocess
 import sys
@@ -18,6 +29,10 @@ def pages_with_rendered_errors(pages: list[Path]) -> list[Path]:
 
 
 def main() -> None:
+    derive = subprocess.run([sys.executable, "docs/record.py", "--derive-only"], cwd=REPOSITORY_ROOT)
+    if derive.returncode:
+        raise SystemExit(derive.returncode)
+
     build = subprocess.run([sys.executable, "-m", "zensical", "build", "--strict"], cwd=REPOSITORY_ROOT)
     if build.returncode:
         raise SystemExit(build.returncode)

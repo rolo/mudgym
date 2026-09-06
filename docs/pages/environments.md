@@ -1,6 +1,6 @@
 # Environments
 
-`make_env()` is the usual entry point. It builds a Gymnasium environment with one of four observation presets and either text or discrete direction actions.
+`make_env()` is the usual entry point. It builds a Gymnasium environment with one of the observation presets and either text or discrete direction actions.
 
 ```python
 from mudgym import make_env
@@ -14,7 +14,7 @@ env.close()
 
 See [Observations](observations.md) and [Actions](actions.md) for what each mode gives you. The full argument list is in the [API reference](api.md).
 
-The presets are also registered with Gymnasium on import: `MUD2/Parsed-v0`, `MUD2/Text-v0`, `MUD2/Bytes-v0`, `MUD2/Cheats-v0`.
+The presets are also registered with Gymnasium on import: `MUD2/Parsed-v0`, `MUD2/Text-v0`, `MUD2/Bytes-v0` and `MUD2/Cheats-v0`.
 
 ## The episode lifecycle
 
@@ -34,7 +34,7 @@ Every reset and step exposes all three forms below, regardless of observation mo
 
 | Key | What it is |
 |---|---|
-| `info["raw_bytes"]` | The unmodified bytestring, including command echoes and observation-command output. |
+| `info["raw_bytes"]` | The unmodified transition bytestring, including command echoes and any opt-in observation-command output. |
 | `info["render_bytes"]` | Player-visible output, with ANSI retained. |
 | `observation["text"]` | Player-visible plain text, with ANSI stripped. |
 
