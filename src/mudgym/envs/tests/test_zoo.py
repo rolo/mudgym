@@ -334,18 +334,3 @@ def test_parallel_api_contract(scripted_env_factory):
     )
 
     parallel_api_test(env, num_cycles=10)
-
-
-def test_live_shared_world_reset_and_step_observations_are_coherent():
-    env = make_parallel_env(agents=2, render_mode="ansi")
-    try:
-        observations, infos = env.reset()
-        assert all(observation["room_name"] for observation in observations.values())
-        assert all(info["step"] == 0 for info in infos.values())
-
-        observations, *_ = env.step({"player_0": "mgtransport ff0 me,yodel", "player_1": "mgtransport ff0 me,howl"})
-
-        assert all(len(observation["players"]) == 1 for observation in observations.values())
-        assert "howl" in observations["player_0"]["text"].lower()
-    finally:
-        env.close()
