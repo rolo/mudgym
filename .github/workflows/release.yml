@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags: ['v*']
-  # Dry-run the build and smoke jobs without a tag; the publish jobs stay tag-only.
+  # Manual runs only build and test, even when dispatched against a tag.
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +12,8 @@ jobs:
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      is_prerelease: ${{ steps.versions.outputs.is_prerelease }}
     steps:
       - uses: actions/checkout@v5
       # Builds the sdist and wheel with uv build, runs twine check --strict and
@@ -20,18 +22,35 @@ jobs:
       - name: Build, check, and inspect the distributions
         id: baipp
         uses: hynek/build-and-inspect-python-package@2abe76da66d0a6a4a227101f9348ee855797cfa5 # v3.0.1
-      # A mismatched tag is the classic bad release: v0.1.0 must equal the
-      # pyproject.toml version before anything reaches an index.
-      - name: Assert the tag matches the package version
-        if: github.ref_type == 'tag'
+      - name: Validate citation metadata
+        run: uvx cffconvert --validate
+      - name: Assert the package, citation, and tag versions agree
+        id: versions
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           PACKAGE_VERSION: ${{ steps.baipp.outputs.package_version }}
         run: |
-          if [ "$TAG" != "v$PACKAGE_VERSION" ]; then
-            echo "Tag $TAG does not match package version $PACKAGE_VERSION"
-            exit 1
-          fi
+          uv run --no-project --python 3.13 --with pyyaml --with packaging python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          import yaml
+          from packaging.version import Version
+
+          versions = {
+              "pyproject.toml": tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"],
+              "built package": os.environ["PACKAGE_VERSION"],
+              "CITATION.cff": yaml.safe_load(Path("CITATION.cff").read_text())["version"],
+          }
+          if tag := os.environ["TAG"]:
+              versions["tag"] = tag.removeprefix("v")
+          if len(set(versions.values())) != 1:
+              raise SystemExit(f"Release versions do not match: {versions}")
+          is_prerelease = Version(versions["built package"]).is_prerelease
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"is_prerelease={str(is_prerelease).lower()}", file=output)
+          PY
   smoke:
     name: Install the wheel and play an episode
     needs: build
@@ -89,11 +108,14 @@ jobs:
       - name: Resolve the declared lower bounds and run the tests
         run: |
           uv sync --resolution lowest-direct
-          uv run pytest --tb=short
+          uv run --no-sync pytest --tb=short
   publish-testpypi:
     name: Upload to TestPyPI
     needs: [build, smoke]
-    if: github.ref_type == 'tag' && github.server_url == 'https://github.com'
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: testpypi
@@ -112,7 +134,10 @@ jobs:
   publish-pypi:
     name: Upload to PyPI
     needs: [publish-testpypi, lowest-resolution]
-    if: github.ref_type == 'tag' && github.server_url == 'https://github.com'
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
@@ -127,3 +152,21 @@ jobs:
       # Emits PEP 740 attestations by default.
       - name: Upload to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+  github-release:
+    name: Create GitHub release
+    needs: [build, publish-pypi]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          IS_PRERELEASE: ${{ needs.build.outputs.is_prerelease }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --prerelease="$IS_PRERELEASE"

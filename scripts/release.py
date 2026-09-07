@@ -3,13 +3,15 @@
 Run via justfile as `just release 0.4.0`
 """
 
+import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 RELEASE_BRANCH = "main"
-VERSIONED_FILES = ["pyproject.toml", "uv.lock"]
+VERSIONED_FILES = ["CITATION.cff", "pyproject.toml", "uv.lock"]
 LOCAL_GATES = ["lint", "format-check", "test", "check-dist"]
 
 
@@ -80,6 +82,16 @@ def run_local_gates() -> None:
         run(["just", gate])
 
 
+def write_citation_version(path: Path, version: str, release_date: date) -> None:
+    """Update the release fields without rewriting references or other citation metadata."""
+    citation = path.read_text()
+    for field, value in (("version", version), ("date-released", release_date.isoformat())):
+        citation, count = re.subn(rf"^{field}:.*$", f'{field}: "{value}"', citation, flags=re.MULTILINE)
+        if count != 1:
+            raise SystemExit(f"CITATION.cff must contain exactly one top-level {field} field.")
+    path.write_text(citation)
+
+
 def write_version(version: str) -> None:
     run(["uv", "version", version])
 
@@ -87,8 +99,11 @@ def write_version(version: str) -> None:
     if written_version != version:
         raise SystemExit(f"uv wrote package version {written_version} instead of {version}.")
 
+    write_citation_version(REPOSITORY_ROOT / "CITATION.cff", version, date.today())
+    run(["uvx", "cffconvert", "--validate"])
+
     changed_files = read(["git", "diff", "--name-only"]).split()
-    if changed_files != VERSIONED_FILES:
+    if set(changed_files) != set(VERSIONED_FILES):
         listing = "\n".join(f"  {path}" for path in changed_files)
         raise SystemExit(f"Versioning should change exactly {' '.join(VERSIONED_FILES)}; got:\n{listing}")
     run(["git", "diff", "--check"])

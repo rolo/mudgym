@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use MudGym in your research, please cite the software using the metadata below."
+
+title: "MudGym"
+abstract: "A reinforcement learning environment for MUD2."
+type: software
+
+authors:
+  - family-names: "Mawlabaux"
+    given-names: "Rolo"
+    email: "rolo@kingrolo.com"
+
+version: "0.4.6"
+date-released: "2026-09-06"
+
+license: MIT
+url: "https://rolo.github.io/mudgym/"
+repository-code: "https://github.com/rolo/mudgym"
+
+keywords:
+  - reinforcement learning
+  - Gymnasium
+  - multi-agent reinforcement learning
+  - text environments
+  - MUD
+  - MUD2

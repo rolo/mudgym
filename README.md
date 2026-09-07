@@ -36,6 +36,12 @@ env.close()
 
 See the [docs](https://rolo.github.io/mudgym/) for more examples.
 
+## Citing MudGym
+
+If you use MudGym in your research, please cite it using the metadata in [`CITATION.cff`](./CITATION.cff).
+
+Use **Cite this repository** in the GitHub sidebar to copy a citation in APA or BibTeX format. Please cite the version you used.
+
 ## License
 
 The Python code and tooling in this repository are made available under the MIT License.
