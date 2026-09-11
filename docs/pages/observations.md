@@ -10,7 +10,7 @@ observation, info = env.reset()
 env.close()
 ```
 
-Every built-in observation mode includes `text` and `points`, the persona's tracked score.
+Every observation includes `text` and `points`, including custom field selections. The base environment tracks points from the initial quickscore and subsequent game events, and uses that same score to calculate rewards.
 
 ## `text`
 
@@ -63,7 +63,7 @@ Adds `raw_bytes`, a `uint8` NumPy array padded or truncated to 16,384 bytes. The
 raw = info["raw_bytes"]
 ```
 
-Use `RawBytesField(max_bytes=N)` to change the array size. Like `text`, this preset sends `fes` to mark the end of the reply, not to track score.
+Use `RawBytesField(max_bytes=N)` to change the array size.
 
 Shown as a bytes literal here for readability:
 
@@ -88,14 +88,10 @@ from mudgym.envs.fields import FEScoreField, SuperQuickLookField
 env = make_env(
     field_parsers=(
         SuperQuickLookField(include_keys=("room_name", "here")),
-        FEScoreField(include_keys=("points",)),
+        FEScoreField(include_keys=("vitals",)),
     )
 )
 env.close()
 ```
 
 You can add your own field parsers in the same way by creating an [`ObservationField`](api.md#observation-fields) subclass. Take a look at the fields in `mudgym/envs/fields/` to use as a reference.
-
-## Observation commands
-
-Observation fields can declare commands for output to consume. MudGym sends those commands on a separate line after the player's action, and the final one acts as an end of step marker.
