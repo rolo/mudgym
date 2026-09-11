@@ -9,7 +9,7 @@ DEFAULT_ACCOUNT_ID = "W00000001"
 DEFAULT_PASSWORD = "password"
 
 # first listed in AVAILABLE_CONNECTIONS is default
-AVAILABLE_CONNECTIONS = os.getenv("AVAILABLE_CONNECTIONS", "docker_run,docker_exec,wasm")
+AVAILABLE_CONNECTIONS = os.getenv("AVAILABLE_CONNECTIONS", "wasm,docker_run,docker_exec")
 
 
 def configured_docker_exec_container_name() -> str:

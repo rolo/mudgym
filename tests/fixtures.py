@@ -43,7 +43,7 @@ def scripted_env(scripted_env_factory):
 
 @pytest.fixture
 def live_env_factory():
-    """Build live Docker-backed envs and close them at teardown."""
+    """Build live game envs and close them at teardown."""
     yield from tracked_factory(make_env)
 
 

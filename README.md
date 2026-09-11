@@ -18,7 +18,7 @@ Install MudGym from PyPI:
 uv add mudgym
 ```
 
-The default connection uses Docker. Select the local WASM engine with `make_env(connection="wasm")`.
+The default connection runs the local WASM engine, which is installed automatically with MudGym.
 
 ## Quickstart
 

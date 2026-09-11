@@ -4,7 +4,7 @@ A reinforcement learning environment for MUD2.
 
 ## Setup
 
-The game runs in Docker, so you'll need a Docker engine. The image `ghcr.io/rolo/mudgym` is pulled automatically on first use.
+The game runs locally through WASM by default. The engine and runtime are installed automatically with MudGym.
 
 Install the `mudgym` package with your Python package manager of choice.
 

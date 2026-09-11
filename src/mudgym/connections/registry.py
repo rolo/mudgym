@@ -5,8 +5,7 @@ from mudgym.connections.config import AVAILABLE_CONNECTIONS
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
 from mudgym.connections.docker_run import DockerRunConnection
-from mudgym.connections.provider import DockerExecProvider
-from mudgym.connections.wasm import create_connection
+from mudgym.connections.wasm import WasmtimeProvider, create_connection
 
 connections: dict[str, Callable[..., MudConnection]] = {
     "docker_run": DockerRunConnection,
@@ -30,9 +29,9 @@ if default_connection is None:
 
 
 # The env factory resolves both defaults through this module at call time so tooling can replace them.
-default_provider_factory = DockerExecProvider
+default_provider_factory = WasmtimeProvider
 
 
-def default_parallel_provider_factory() -> DockerExecProvider:
+def default_parallel_provider_factory() -> WasmtimeProvider:
     """Create the default provider for players who have explicitly asked to share one world."""
-    return DockerExecProvider(worlds=1)
+    return WasmtimeProvider(worlds=1)
