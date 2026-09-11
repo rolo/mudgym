@@ -16,11 +16,11 @@ class MudSession:
         connection: MudConnection,
         *,
         observation_line: str,
-        end_of_turn_marker: re.Pattern,
+        end_of_turn_marker: re.Pattern | None,
     ) -> None:
         self.connection = connection
 
-        if not observation_line:
+        if not observation_line and connection.requires_end_of_turn_marker:
             raise ValueError("MudSession requires an observation command line.")
         self.observation_line = observation_line
         self.end_of_turn_marker = end_of_turn_marker
@@ -29,10 +29,10 @@ class MudSession:
         # This is for the two step act/observe pattern to ensure we have the latest game text to act on.
         self.pending_command: str | None = None
 
-    def reset(self) -> tuple[str, int]:
+    def reset(self, *, seed: int | None = None) -> tuple[str, int]:
         """Enter the tearoom and return the persona name and points from quickscore."""
+        self.connection.reset(seed=seed)
         self.pending_command = None
-        self.connection.reset()
 
         self.send(QUICKSCORE_COMMAND)
         raw_bytes, terminated, incomplete, _ = self.read_pending_response(QUICKSCORE_PATTERN)
@@ -52,14 +52,15 @@ class MudSession:
         self.pending_command = command
 
     def receive(self) -> tuple[bytes, bool, bool, dict]:
-        """Send the observation commands, then receive one marker ended response.
+        """Send any observation commands, then read the completed response.
 
         This is called without a pending player command during reset for the final observation sweep
         after every player has entered the world.
         """
         command = self.pending_command
         try:
-            self.connection.send_line(self.observation_line)
+            if self.observation_line:
+                self.connection.send_line(self.observation_line)
         except ConnectionClosedError:
             # If the player action made it onto the wire, there may still be a response worth
             # reading. With no pending action there is nothing to recover, so surface the failure.
@@ -67,8 +68,11 @@ class MudSession:
                 raise
         return self.read_pending_response(self.end_of_turn_marker)
 
-    def read_pending_response(self, end_of_turn_marker: re.Pattern) -> tuple[bytes, bool, bool, dict]:
-        """Read the pending command through its own response marker."""
+    def read_pending_response(self, end_of_turn_marker: re.Pattern | None) -> tuple[bytes, bool, bool, dict]:
+        """Read to the supplied boundary without sending observation commands.
+
+        Reset uses this for quickscore and for the tearoom-exit narration through its following prompt.
+        """
         try:
             raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(end_of_turn_marker)
         finally:

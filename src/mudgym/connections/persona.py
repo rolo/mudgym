@@ -6,19 +6,61 @@ import os
 import random
 import re
 
-from faker import Faker
-
 from mudgym.featurizers.strings import decode_text_bytes
 
-faker = Faker()
-
-# the game rejects persona names longer than this or containing anything non-alphabetic
-# ("Use names of 10 characters at most, please")
-PERSONA_NAME_MAX_LENGTH = 10
-
-PERSONA_NAME_BLACKLIST = [
-    "richard",
-]
+# Valid names shared by every connection. Stable order also gives seeded worlds repeatable identities.
+PERSONA_NAMES = (
+    "Ada",
+    "Alba",
+    "Alder",
+    "Amos",
+    "Anouk",
+    "Arden",
+    "Astrid",
+    "Aurelia",
+    "Bly",
+    "Bram",
+    "Bruno",
+    "Caleb",
+    "Calla",
+    "Cassia",
+    "Cedric",
+    "Clio",
+    "Cora",
+    "Cyrus",
+    "Dahlia",
+    "Delia",
+    "Dorian",
+    "Edda",
+    "Edwin",
+    "Elba",
+    "Elena",
+    "Elias",
+    "Esme",
+    "Ewan",
+    "Fabian",
+    "Fenna",
+    "Fern",
+    "Finn",
+    "Flora",
+    "Freya",
+    "Gideon",
+    "Gita",
+    "Greta",
+    "Hal",
+    "Hana",
+    "Harlan",
+    "Hazel",
+    "Hester",
+    "Hugo",
+    "Ida",
+    "Imogen",
+    "Inez",
+    "Ivo",
+    "Jonas",
+    "Juno",
+    "Kaya",
+)
 UNUSED_PERSONA = "**Unused**"
 
 # what the game takes at "What sex do you wish to be?"
@@ -39,18 +81,7 @@ def parse_persona_screen(text: bytes) -> dict[int, str]:
 
 
 def generate_persona_name() -> str:
-    # the game rejects names longer than PERSONA_NAME_MAX_LENGTH or containing anything
-    # non-alphabetic, and faker first names can be hyphenated or accented ("Anne-Marie",
-    # "Renée"), which would wedge persona creation at the name prompt
-    name = ""
-    while (
-        not name.isascii()
-        or not name.isalpha()
-        or len(name) > PERSONA_NAME_MAX_LENGTH
-        or name.lower() in PERSONA_NAME_BLACKLIST
-    ):
-        name = faker.first_name()
-    return name
+    return random.choice(PERSONA_NAMES)
 
 
 def generate_persona_sex() -> bytes:

@@ -43,23 +43,30 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         seed: int | None = None,
         options: dict | None = None,
     ) -> tuple[dict[str, dict[str, Any]], dict[str, dict]]:
-        self._provider.reset(seed=seed)
-        self.agents = list(self.possible_agents)
-        for index, agent in enumerate(self.agents):
-            agent_seed = seed + index if seed is not None else None
-            self.envs[agent].reset(seed=agent_seed, options=options)
-
-        observations = {}
-        infos = {}
-        for agent in self.agents:
-            observation, _, terminated, truncated, info = self.envs[agent].observe()
-            if terminated or truncated:
-                raise RuntimeError(
-                    f"initial shared-world observation failed for {agent} "
-                    f"(terminated={terminated}, truncated={truncated})"
-                )
-            observations[agent] = observation
-            infos[agent] = info
+        agents = list(self.possible_agents)
+        agent = None
+        phase = "provider reset"
+        try:
+            self._provider.reset(seed=seed)
+            self.agents = list(agents)
+            phase = "preparation"
+            for index, agent in enumerate(agents):
+                agent_seed = seed + index if seed is not None else None
+                self.envs[agent]._prepare_reset(seed=agent_seed, options=options)
+            phase = "entry"
+            entries = {}
+            for agent in agents:
+                entries[agent] = self.envs[agent]._enter_world()
+            phase = "observation"
+            observations = {}
+            infos = {}
+            for agent in agents:
+                observations[agent], infos[agent] = self.envs[agent]._finish_reset(*entries[agent])
+        except BaseException as error:
+            error.add_note(f"parallel reset failed during {phase} for agent {agent!r}")
+            for selected_agent in agents:
+                self.envs[selected_agent]._invalidate_reset(error)
+            raise
 
         return observations, infos
 
@@ -80,11 +87,15 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         infos = {}
 
         agents = list(self.agents)
+        if any(child.points is None for child in self.envs.values()):
+            raise RuntimeError("Parallel environment requires a successful reset before stepping.")
+        # Resolve required keys before sending so a missing action leaves sessions ready to retry.
+        agent_actions = [(agent, actions[agent]) for agent in agents]
         # This ordering is the point of the coordinator: everybody acts before anybody runs their
         # observation commands. Folding the loops together would make later players invisible to
         # earlier observations from the same PettingZoo step.
-        for agent in agents:
-            self.envs[agent].act(actions[agent])
+        for agent, action in agent_actions:
+            self.envs[agent].act(action)
 
         if self.world_ticker is not None:
             self.world_ticker()
@@ -103,7 +114,10 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
 
         return observations, rewards, terminations, truncations, infos
 
-    def render_ansi(self) -> str:
+    def render(self) -> str | None:
+        if self.render_mode is None:
+            return None
+
         sections = []
         for agent in self.agents:
             child_frame = self.envs[agent].render()
@@ -113,13 +127,7 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
                 if not section.endswith("\n"):
                     section += "\n"
             sections.append(section)
-        return "".join(sections).rstrip("\n")
-
-    def render(self) -> str | None:
-        if self.render_mode is None:
-            return None
-
-        rendered = self.render_ansi()
+        rendered = "".join(sections).rstrip("\n")
         if self.render_mode == "ansi":
             return rendered
 

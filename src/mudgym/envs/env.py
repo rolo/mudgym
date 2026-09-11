@@ -70,8 +70,9 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         observation_space: dict[str, gym.spaces.Space] = {
             "text": gym.spaces.Text(max_length=TEXT_MAX_LENGTH, min_length=0, charset=TEXT_CHARSET),
+            "points": gym.spaces.Box(low=0, high=WIZARD_POINTS, shape=(), dtype=INT_DTYPE),
         }
-        empty_observation: dict[str, Any] = {"text": ""}
+        empty_observation: dict[str, Any] = {"text": "", "points": INT_DTYPE(0)}
         for field in self.fields:
             field_space = field.space()
             duplicates = observation_space.keys() & field_space.keys()
@@ -85,11 +86,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         command_fields = tuple(field for field in self.fields if field.command is not None)
         commands = tuple(field.command for field in command_fields)
-        if not command_fields:
+        if not command_fields and connection.requires_end_of_turn_marker:
             raise ValueError("At least one observation field must declare a command.")
 
-        final_field = command_fields[-1]
-        if final_field.end_of_turn_marker is None:
+        end_of_turn_marker = command_fields[-1].end_of_turn_marker if command_fields else None
+        if end_of_turn_marker is None and connection.requires_end_of_turn_marker:
             raise ValueError(
                 "The final commanded observation field must declare an end_of_turn_marker (fei, fes, mgcheats, ...)."
             )
@@ -109,7 +110,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.session = MudSession(
             connection=connection,
             observation_line=observation_line,
-            end_of_turn_marker=final_field.end_of_turn_marker,
+            end_of_turn_marker=end_of_turn_marker,
         )
 
     def bytes_to_observation(
@@ -143,7 +144,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         if response_complete:
             # claim in the same order commands were sent. A refusal still consumes, eg, asleep
             pending_fields = list(self.observation_command_fields)
-            for position, chunk in enumerate(chunks):
+            for chunk in chunks:
                 field = pending_fields[0] if pending_fields else None
                 if field is not None and field.is_refusal(chunk):
                     field_refusals[field.__class__.__name__] = chunk
@@ -154,9 +155,6 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                     if not field.remove_on_match:
                         payload_text_chunks.append(chunk)
                     pending_fields.pop(0)
-                elif position == len(chunks) - 1:
-                    # final chunk can be used just as a marker rather than a field
-                    pass
                 else:
                     payload_text_chunks.append(chunk)
             if pending_fields:
@@ -167,8 +165,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         text_chunks = [*pre_echo_chunks, *payload_text_chunks]
         if not response_complete:
-            # Without the marker we cannot safely line chunks up with fields. Preserve the bytes as text rather than
-            # pretending the structured observation is complete.
+            # Without a complete response we cannot safely line chunks up with fields. Preserve the bytes as text
+            # rather than pretending the structured observation is complete.
             text_chunks.extend(chunks)
 
         # keeps the game's ANSI colour - text observation space doesn't.
@@ -181,7 +179,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             logger.warning(f"text length {len(text)} exceeds TEXT_MAX_LENGTH {TEXT_MAX_LENGTH}, truncating")
 
         obs["text"] = text[:TEXT_MAX_LENGTH]
-        if "points" in obs and self.points is not None:
+        if self.points is not None:
             obs["points"] = INT_DTYPE(self.points)
         return obs, render_bytes, field_refusals
 
@@ -230,73 +228,117 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             return None
         return cleaned_text
 
+    def _prepare_reset(self, *, seed: int | None = None, options: dict | None = None) -> None:
+        """Seed and prepare the player in the tearoom, consuming all setup responses."""
+        super().reset(seed=seed, options=options)
+        if seed is not None:
+            self.action_space.seed(seed)
+        self.step_count = 0
+        self.last_render_bytes = b""
+        self.persona, self.points = self.session.reset(seed=seed)
+
+        if self.tearoom_commands:
+            raw_bytes, terminated, incomplete, transport = self.session.command(self.tearoom_commands)
+            self.update_points(raw_bytes, terminated=terminated)
+            if terminated or incomplete:
+                raise RuntimeError(
+                    f"tearoom commands {self.tearoom_commands!r} failed during reset "
+                    f"(terminated={terminated}, incomplete={incomplete}) "
+                    f"raw_bytes={raw_bytes!r}, transport={transport!r}"
+                )
+
+    def _enter_world(self) -> tuple[bytes, bool]:
+        """Complete entry and return retained room bytes and the entry's rejection flag."""
+        self.session.send("move north")
+        raw_bytes, terminated, incomplete, transport = self.session.read_pending_response(TEAROOM_EXIT_NARRATION_END)
+        self.update_points(raw_bytes, terminated=terminated)
+        if terminated or incomplete or self.points == WIZARD_POINTS:
+            raise RuntimeError(
+                f"step out of the tearoom failed during reset "
+                f"(terminated={terminated}, incomplete={incomplete}, points={self.points}) "
+                f"raw_bytes={raw_bytes!r}, transport={transport!r}"
+            )
+        try:
+            return self.clean_tearoom_exit(raw_bytes), bool(transport.get("rejected", False))
+        except ValueError as error:
+            error.add_note(f"entry transport={transport!r}")
+            raise
+
+    def _finish_reset(self, entry_bytes: bytes, entry_rejected: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Collect final fields and assemble the initial observation once all selected players have entered."""
+        observation_bytes, terminated, incomplete, transport = self.session.receive()
+        self.update_points(observation_bytes, terminated=terminated)
+        raw_bytes = entry_bytes + observation_bytes
+        if terminated or incomplete or self.points == WIZARD_POINTS:
+            raise RuntimeError(
+                f"initial observation failed during reset "
+                f"(terminated={terminated}, incomplete={incomplete}, points={self.points}) "
+                f"raw_bytes={raw_bytes!r}, transport={transport!r}"
+            )
+        transport = {
+            **transport,
+            "bytes_length": len(raw_bytes),
+            "rejected": entry_rejected or bool(transport.get("rejected", False)),
+        }
+        try:
+            observation, render_bytes, field_refusals = self.bytes_to_observation(
+                raw_bytes,
+                sent_lines=transport["sent_lines"],
+                response_complete=bool(transport.get("marker_arrived", False)),
+            )
+        except Exception as error:
+            error.add_note(f"reset raw_bytes={raw_bytes!r}, transport={transport!r}")
+            raise
+        info = self.make_info(
+            raw_bytes=raw_bytes,
+            render_bytes=render_bytes,
+            rejected=transport["rejected"],
+            field_refusals=field_refusals,
+        )
+        info["transport"] = {**transport, "incomplete": incomplete}
+        self.last_render_bytes = render_bytes
+        return observation, info
+
+    def _invalidate_reset(self, error: BaseException) -> None:
+        """Abandon reset work without replacing the original failure."""
+        self.points = None
+        self.last_render_bytes = b""
+        try:
+            self.session.connection.invalidate()
+        except BaseException as cleanup_error:
+            error.add_note(f"reset invalidation failed for persona {self.persona!r}: {cleanup_error!r}")
+
     def reset(
         self,
         *,
         seed: int | None = None,
         options: dict | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        super().reset(seed=seed, options=options)
-
-        if seed is not None:
-            self.action_space.seed(seed)
-
-        self.step_count = 0
-
-        self.persona, self.points = self.session.reset()
-
-        # tearoom commands are episode setup, issued before the exit step
-        if self.tearoom_commands:
-            raw_bytes, terminated, truncated, _ = self.session.command(self.tearoom_commands)
-            if terminated or truncated:
-                raise RuntimeError(
-                    f"tearoom commands {self.tearoom_commands!r} failed during reset "
-                    f"(terminated={terminated}, truncated={truncated}); raw_bytes={raw_bytes!r}"
-                )
-            self.update_points(raw_bytes)
-
-        # step out of the tearoom and into The Land
-        command = "move north"
-        raw_bytes, terminated, truncated, debug_info = self.session.command(command)
-
-        if terminated or truncated:
-            raise RuntimeError(
-                f"step out of the tearoom failed during reset "
-                f"(terminated={terminated}, truncated={truncated}); "
-                f"bytes_length={len(raw_bytes)}; "
-                f"raw_bytes={raw_bytes!r}; "
-                f"debug_info={debug_info!r}"
-            )
-
-        self.update_points(raw_bytes)
-        raw_bytes = self.clean_tearoom_exit(raw_bytes)
-
-        obs, render_bytes, field_refusals = self.bytes_to_observation(
-            raw_bytes,
-            # The setup echo was cut, but the observation echo can arrive after the narration.
-            sent_lines=debug_info["sent_lines"][-1:],
-            response_complete=bool(debug_info.get("marker_arrived", False)),
-        )
-        self.last_render_bytes = render_bytes
-        info = self.make_info(
-            raw_bytes=raw_bytes,
-            render_bytes=render_bytes,
-            rejected=bool(debug_info.get("rejected", False)),
-            field_refusals=field_refusals,
-        )
-
+        """Prepare, enter and collect the initial observation without advancing the world clock."""
+        phase = "preparation"
+        try:
+            self._prepare_reset(seed=seed, options=options)
+            phase = "entry"
+            entry_bytes, entry_rejected = self._enter_world()
+            phase = "observation"
+            observation, info = self._finish_reset(entry_bytes, entry_rejected)
+        except BaseException as error:
+            error.add_note(f"reset failed during {phase} for persona {self.persona!r}")
+            self._invalidate_reset(error)
+            raise
         if self.render_mode == "human":
             self.render()
-
-        return obs, info
+        return observation, info
 
     def step(
         self,
         action: str,
     ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
-        """Send one action, then receive its marker-framed observation.
+        """Send one action, then receive its completed observation.
 
-        ``world_ticker`` runs once after the action and before its observation, so a standalone env advances its own world here. Vector and parallel coordinators drive ``act()`` and ``observe()`` themselves and own the joint advancement, so their children are built without one.
+        ``world_ticker`` runs once after the action and before its observation, so a standalone env advances its own
+        world here. Vector and parallel coordinators drive ``act()`` and ``observe()`` themselves and own the joint
+        advancement, so their children are built without one.
         """
         self.act(action)
         if self.world_ticker is not None:
@@ -313,17 +355,16 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.step_count += 1
 
     def observe(self) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
-        """Receive everything up to this player's end-of-turn marker.
+        """Receive everything through this player's completed response.
 
         This includes the earlier action, the observation-command responses, and anything caused by other players since
         that action was sent.
         """
-        raw_bytes, terminated, incomplete, debug_info = self.session.receive()
-        truncated = incomplete
-
         points_before_step = self.points
         if points_before_step is None:
             raise RuntimeError("step called before reset established the persona score")
+        raw_bytes, terminated, incomplete, debug_info = self.session.receive()
+        truncated = incomplete
         event_points = self.update_points(raw_bytes, terminated=terminated)
         if event_points == WIZARD_POINTS:
             # The container saves this score and closes before the observation command can run.

@@ -16,6 +16,7 @@ CAPTURED_RESET_SWEEP = (
 
 def test_database_reset_broadcasts_stay_out_of_text(scripted_env_factory):
     env = scripted_env_factory(observation="text")
+    env.reset()
     obs, render_bytes, _ = env.unwrapped.bytes_to_observation(
         CAPTURED_RESET_SWEEP, sent_lines=["fes"], response_complete=True
     )

@@ -94,7 +94,6 @@ BYTES_CASES = {
     "dally_lane": {
         "raw": DALLY_LANE_BYTES,
         "fes": {
-            "points": 200,
             "vitals": [71, 71, 51, 51, 58, 58, 0, 71],
             "flags": [0, 0, 0, 0],
             "reset_minutes": 53,
@@ -111,7 +110,6 @@ BYTES_CASES = {
     "badly_paved": {
         "raw": BADLY_PAVED_BYTES,
         "fes": {
-            "points": 200,
             "vitals": [43, 43, 69, 69, 68, 68, 0, 43],
             "flags": [0, 0, 0, 0],
             "reset_minutes": 53,
@@ -141,7 +139,6 @@ BYTES_CASES = {
     "janet_dance": {
         "raw": JANET_DANCE_BYTES,
         "fes": {
-            "points": 377,
             "vitals": [60, 60, 53, 61, 56, 59, 0, 60],
             "flags": [0, 0, 0, 0],
             "reset_minutes": 46,

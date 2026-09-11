@@ -9,5 +9,6 @@ Richard Bartle, with kind thanks. The MUD2 game, name, source code, and
 associated story remain the intellectual property of Richard Bartle and
 Roy Trubshaw and may not be used for commercial purposes.
 
-MudGym runs the MUD2 game inside the ghcr.io/rolo/mudgym Docker image; the
-image is pulled at runtime and is not part of this distribution.
+MudGym runs the MUD2 game through a Docker image or embedded engine wheel.
+Neither the image nor the engine are part of this distribution and are not
+covered by MudGym's MIT licence.

@@ -7,7 +7,6 @@ from gymnasium import spaces
 
 from mudgym.connections.prompts import SGR
 from mudgym.db.index import indexed_discrete_size, weather_count, weather_to_index
-from mudgym.db.levels import WIZARD_POINTS
 from mudgym.db.weather import WEATHER_CODE_TO_NAME
 from mudgym.envs.specs import BIT_DTYPE, INDEX_DTYPE, INT_DTYPE, SINGLE_LINE_CHARSET
 
@@ -19,7 +18,6 @@ MAX_RESET_MINUTES = 105
 class FEScoreField(ObservationField):
     """
     Parsed FES line values:
-      - points (scalar)
       - vitals (8-dim) - stamina, max_stamina, effective_strength, strength, effective_dexterity, dexterity, magic, max_magic
       - flags (4-dim) - blind, deaf, crippled, dumb
       - reset_minutes (scalar)
@@ -39,7 +37,7 @@ class FEScoreField(ObservationField):
         (?P<dexterity>\d+)\s+
         (?P<magic>\d+)\s+
         (?P<max_magic>\d+)\s+
-        (?P<points>\d{2,})\s+
+        \d{2,}\s+
         (?P<is_blind>[YN])\s+
         (?P<is_deaf>[YN])\s+
         (?P<is_crippled>[YN])\s+
@@ -72,7 +70,6 @@ class FEScoreField(ObservationField):
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {
-            "points": spaces.Box(low=0, high=WIZARD_POINTS, shape=(), dtype=INT_DTYPE),
             "vitals": spaces.Box(low=0, high=200, shape=(8,), dtype=INT_DTYPE),
             "flags": spaces.MultiBinary(4),
             "reset_minutes": spaces.Box(low=0, high=MAX_RESET_MINUTES, shape=(), dtype=INT_DTYPE),
@@ -83,7 +80,6 @@ class FEScoreField(ObservationField):
     def full_empty(self) -> dict[str, Any]:
         default_weather = "unknown"
         return {
-            "points": INT_DTYPE(0),
             "vitals": np.zeros(8, dtype=INT_DTYPE),
             "flags": np.zeros(4, dtype=BIT_DTYPE),
             "reset_minutes": INT_DTYPE(0),
@@ -127,7 +123,6 @@ class FEScoreField(ObservationField):
         )
 
         return {
-            "points": INT_DTYPE(int(match.group("points"))),
             "vitals": vitals,
             "flags": flags,
             "reset_minutes": INT_DTYPE(int(match.group("reset_minutes"))),

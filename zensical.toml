@@ -63,10 +63,9 @@ line_spans = "__span"
 pygments_lang_class = true
 
 # Includes (`--8<--`) for example regions and recorded game output.
-# Will flip check_paths to true once the examples/*.py notebooks are restored, so a missing or renamed include fails
-# the build otherwise it will silently drop the block.
+# Missing or renamed includes fail the build.
 [project.markdown_extensions.pymdownx.snippets]
-check_paths = false
+check_paths = true
 dedent_subsections = true
 
 [project.markdown_extensions.pymdownx.superfences]

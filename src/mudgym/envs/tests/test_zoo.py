@@ -1,336 +1,223 @@
-from typing import Any
+from contextlib import closing
 
-import gymnasium as gym
 import pytest
 from pettingzoo.test import parallel_api_test
 
-from mudgym import make_parallel_env
-from mudgym.envs.zoo import MudParallelEnv
-from tests.scripted import NoOpProvider, ScriptedProvider, scripted_response
-
-
-def make_test_parallel_env(envs, *, provider=None, render_mode=None):
-    if provider is None:
-        provider = NoOpProvider()
-    return MudParallelEnv(envs, provider=provider, render_mode=render_mode)
-
-
-def test_parallel_env_requires_a_provider():
-    with pytest.raises(TypeError, match="provider"):
-        MudParallelEnv({"player_0": TrackingEnv("player_0")})
+from mudgym import make_parallel_env, make_vector_env
+from mudgym.connections.wasm import WasmtimeProvider
+from tests.scripted import ScriptedProvider
 
 
 @pytest.mark.parametrize(
     ("render_mode", "expected_child_render_mode"),
     [(None, None), ("ansi", "ansi"), ("human", "ansi")],
 )
-def test_parallel_factory_derives_child_render_mode(render_mode, expected_child_render_mode):
-    env = make_parallel_env(agents=1, provider=ScriptedProvider(), render_mode=render_mode)
-    try:
+def test_parallel_construction_forwards_render_mode_and_spaces(render_mode, expected_child_render_mode):
+    with closing(make_parallel_env(2, provider=ScriptedProvider(), render_mode=render_mode)) as env:
         assert env.render_mode == render_mode
-        assert env.envs["player_0"].render_mode == expected_child_render_mode
-    finally:
-        env.close()
+        for agent, child in env.envs.items():
+            assert child.render_mode == expected_child_render_mode
+            assert env.observation_space(agent) is child.observation_space
+            assert env.action_space(agent) is child.action_space
+        if render_mode is None:
+            assert env.render() is None
 
 
-def test_parallel_infos_carry_render_bytes_for_each_agent():
-    env = make_parallel_env(agents=2, provider=ScriptedProvider())
-    try:
-        _, infos = env.reset()
-
-        assert set(infos) == {"player_0", "player_1"}
-        assert all(isinstance(info["render_bytes"], bytes) for info in infos.values())
-    finally:
-        env.close()
-
-
-class TrackingEnv:
-    observation_space = gym.spaces.Dict({"value": gym.spaces.Discrete(10)})
-    action_space = gym.spaces.Discrete(3)
-
-    def __init__(
-        self,
-        name: str,
-        events: list[tuple[str, str, Any]] | None = None,
-        *,
-        terminated: bool = False,
-        truncated: bool = False,
-    ):
-        self.name = name
-        self.events = events if events is not None else []
-        self.terminated = terminated
-        self.truncated = truncated
-        self.reset_calls: list[tuple[int | None, dict | None]] = []
-
-    def reset(self, *, seed: int | None = None, options: dict | None = None):
-        self.reset_calls.append((seed, options))
-        return {"value": 0}, {"seed": seed}
-
-    def act(self, action: Any) -> None:
-        self.events.append(("act", self.name, action))
-
-    def observe(self):
-        self.events.append(("observe", self.name, None))
-        return {"value": 0}, 0.0, self.terminated, self.truncated, {}
-
-    def render(self) -> str | None:
-        return None
-
-    def close(self) -> None:
-        pass
-
-
-def test_parallel_spaces_reference_each_child_space(scripted_env_factory):
-    child_0 = scripted_env_factory()
-    child_1 = scripted_env_factory()
-    env = make_test_parallel_env({"player_0": child_0, "player_1": child_1})
-
-    try:
-        assert env.observation_space("player_0") is child_0.observation_space
-        assert env.observation_space("player_1") is child_1.observation_space
-        assert env.action_space("player_0") is child_0.action_space
-        assert env.action_space("player_1") is child_1.action_space
-    finally:
-        env.close()
-
-
-def test_render_returns_none_when_rendering_is_disabled(scripted_env_factory):
-    child = scripted_env_factory(render_mode="ansi")
-    child.reset()
-    env = make_test_parallel_env({"player_0": child}, render_mode=None)
-
-    try:
-        assert env.render() is None
-    finally:
-        env.close()
-
-
-def test_ansi_render_labels_child_output(scripted_env_factory):
-    child = scripted_env_factory(render_mode="ansi")
-    child.reset()
-    env = make_test_parallel_env({"player_0": child}, render_mode="ansi")
-
-    try:
+def test_ansi_render_labels_child_output(wasm_runtime):
+    with closing(
+        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), render_mode="ansi")
+    ) as env:
+        env.reset(seed=10)
         rendered = env.render()
         assert rendered.startswith("[player_0]\n")
-        assert "Dally Lane" in rendered
-    finally:
-        env.close()
+        assert "[player_1]\n" in rendered
+        assert rendered.count("Badly-paved road") == 2
 
 
-def test_human_render_prints_labeled_child_output(scripted_env_factory, capsys):
-    child = scripted_env_factory(render_mode="ansi")
-    child.reset()
-    capsys.readouterr()
-    env = make_test_parallel_env({"player_0": child}, render_mode="human")
-
-    try:
+def test_human_render_prints_labeled_child_output(wasm_runtime, capsys):
+    with closing(
+        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), render_mode="human")
+    ) as env:
+        env.reset(seed=10)
+        capsys.readouterr()
         assert env.render() is None
         captured = capsys.readouterr()
         assert captured.out.startswith("[player_0]\n")
-        assert "Dally Lane" in captured.out
-    finally:
-        env.close()
+        assert "[player_1]\n" in captured.out
+        assert captured.out.count("Badly-paved road") == 2
 
 
-def test_parallel_step_acts_for_every_agent_before_any_observation():
-    events: list[tuple[str, str, Any]] = []
-    env = make_test_parallel_env(
-        {
-            "player_0": TrackingEnv("player_0", events),
-            "player_1": TrackingEnv("player_1", events),
-            "player_2": TrackingEnv("player_2", events),
+@pytest.mark.parametrize("observation", ["text", "parsed"])
+def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, observation):
+    with closing(
+        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=observation)
+    ) as env:
+        env.reset(seed=10)
+
+        observations, _, terminations, truncations, _ = env.step(
+            {"player_0": 'tell "alpha greeting" to alba', "player_1": 'tell "beta greeting" to ada'}
+        )
+
+        assert 'Alba the protector tells you "beta greeting"' in observations["player_0"]["text"]
+        assert 'Ada the protector tells you "alpha greeting"' in observations["player_1"]["text"]
+        assert not any(terminations.values())
+        assert not any(truncations.values())
+
+
+def test_parallel_step_requires_an_action_for_every_live_agent(wasm_runtime):
+    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        env.reset(seed=10)
+        with pytest.raises(KeyError, match="player_1"):
+            env.step({"player_0": "look"})
+
+        observations, _, terminations, truncations, _ = env.step({"player_0": "look", "player_1": "look"})
+
+        assert set(observations) == {"player_0", "player_1"}
+        assert not any(terminations.values())
+        assert not any(truncations.values())
+
+
+def test_parallel_step_uses_only_live_agent_keys(wasm_runtime):
+    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        env.reset(seed=10)
+
+        observations, _, terminations, truncations, infos = env.step(
+            {"player_0": "look", "player_1": "dance", "player_2": "bow"}
+        )
+
+        assert set(observations) == {"player_0", "player_1"}
+        assert set(infos) == {"player_0", "player_1"}
+        assert "Badly-paved road" in observations["player_0"]["text"]
+        assert "dance" in observations["player_1"]["text"].lower()
+        assert not any(terminations.values()) and not any(truncations.values())
+
+
+def test_step_removes_terminated_and_truncated_agents(wasm_runtime):
+    with closing(make_parallel_env(3, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        initial_observations, _ = env.reset(seed=10)
+
+        # /t asks for terminal width, leaving an unanswered input request that truncates the step.
+        _, _, terminations, truncations, infos = env.step({"player_0": "quit", "player_1": "/t", "player_2": "look"})
+
+        assert terminations == {"player_0": True, "player_1": False, "player_2": False}
+        assert truncations == {"player_0": False, "player_1": True, "player_2": False}
+        assert b"New terminal width" in infos["player_1"]["raw_bytes"]
+        assert env.agents == ["player_2"]
+        observations, _, terminations, truncations, _ = env.step({"player_2": "look"})
+        assert set(observations) == {"player_2"}
+        assert initial_observations["player_2"]["room_name"] in observations["player_2"]["text"].lower()
+        assert terminations == {"player_2": False}
+        assert truncations == {"player_2": False}
+
+
+def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces(wasm_runtime):
+    with closing(make_parallel_env(3, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        env.reset(seed=17)
+        assert [child.np_random_seed for child in env.envs.values()] == [17, 18, 19]
+        actions = [child.action_space.sample() for child in env.envs.values()]
+
+        env.reset(seed=17)
+        assert [child.action_space.sample() for child in env.envs.values()] == actions
+
+
+def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
+    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
+    with closing(make_parallel_env(2, provider=provider)) as env:
+        initial_observations, _ = env.reset(seed=17)
+        env.step({"player_0": "look", "player_1": "look"})
+        assert provider.advance_worlds(0) == {0: 1}
+
+        observations, infos = env.reset(seed=17)
+
+        assert provider.advance_worlds(0) == {0: 0}
+        assert {agent: obs["text"] for agent, obs in observations.items()} == {
+            agent: obs["text"] for agent, obs in initial_observations.items()
         }
-    )
-
-    env.step({"player_0": 0, "player_1": 1, "player_2": 2})
-
-    assert events == [
-        ("act", "player_0", 0),
-        ("act", "player_1", 1),
-        ("act", "player_2", 2),
-        ("observe", "player_0", None),
-        ("observe", "player_1", None),
-        ("observe", "player_2", None),
-    ]
+        assert all(info["step"] == 0 for info in infos.values())
 
 
-def test_parallel_step_uses_live_agent_keys():
-    events: list[tuple[str, str, Any]] = []
-    env = make_test_parallel_env(
-        {
-            "player_0": TrackingEnv("player_0", events),
-            "player_1": TrackingEnv("player_1", events),
-        }
-    )
+def test_parallel_reset_observations_include_every_player(wasm_runtime):
+    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        observations, infos = env.reset(seed=10)
 
-    with pytest.raises(KeyError, match="player_1"):
-        env.step({"player_0": 0})
-    events.clear()
-    env.step({"player_0": 0, "player_1": 1, "player_2": 2})
-
-    assert events == [
-        ("act", "player_0", 0),
-        ("act", "player_1", 1),
-        ("observe", "player_0", None),
-        ("observe", "player_1", None),
-    ]
+        assert observations["player_0"]["room_name"] == observations["player_1"]["room_name"]
+        assert observations["player_0"]["players"] == ("Alba the protector",)
+        assert observations["player_1"]["players"] == ("Ada the protector",)
+        for agent, observation in observations.items():
+            assert observation["text"].count("Badly-paved road") == 1
+            assert infos[agent]["render_bytes"].count(b"Badly-paved road") == 1
+        assert all(info["step"] == 0 for info in infos.values())
 
 
-def test_same_step_actions_are_visible_to_every_shared_world_observation():
-    actions: dict[str, str] = {}
+def test_failed_provider_reset_after_all_agents_finish_blocks_the_step_clock(monkeypatch):
+    provider = ScriptedProvider()
+    ticker_calls = []
+    failure = OSError("provider reset failed")
 
-    class SharedWorldEnv(TrackingEnv):
-        def act(self, action: str) -> None:
-            actions[self.name] = action
+    def fail_reset(*, seed=None):
+        raise failure
 
-        def observe(self):
-            return {"actions": dict(actions)}, 0.0, False, False, {}
+    with closing(make_parallel_env(2, provider=provider, world_ticker=lambda: ticker_calls.append("tick"))) as env:
+        for connection in provider.connections:
+            connection.responses["quit"] = (b"quit\r\nCheerio!\r\n", True, False, {"marker_arrived": False})
+        env.reset()
+        env.step(dict.fromkeys(env.agents, "quit"))
+        assert env.agents == []
+        ticker_calls.clear()
+        original_reset = provider.reset
+        monkeypatch.setattr(provider, "reset", fail_reset)
+        with pytest.raises(OSError) as raised:
+            env.reset()
+        assert raised.value is failure
+        assert all(child.points is None for child in env.envs.values())
+        with pytest.raises(RuntimeError, match="successful reset"):
+            env.step({})
+        assert ticker_calls == []
 
-    env = make_test_parallel_env(
-        {
-            "player_0": SharedWorldEnv("player_0"),
-            "player_1": SharedWorldEnv("player_1"),
-        }
-    )
-
-    observations, *_ = env.step({"player_0": "bow", "player_1": "howl"})
-
-    expected_actions = {"player_0": "bow", "player_1": "howl"}
-    assert observations["player_0"]["actions"] == expected_actions
-    assert observations["player_1"]["actions"] == expected_actions
-
-
-def test_step_removes_terminated_and_truncated_agents():
-    env = make_test_parallel_env(
-        {
-            "player_0": TrackingEnv("player_0", terminated=True),
-            "player_1": TrackingEnv("player_1", truncated=True),
-            "player_2": TrackingEnv("player_2"),
-        }
-    )
-
-    _, _, terminations, truncations, _ = env.step({"player_0": 0, "player_1": 1, "player_2": 2})
-
-    assert terminations == {"player_0": True, "player_1": False, "player_2": False}
-    assert truncations == {"player_0": False, "player_1": True, "player_2": False}
-    assert env.agents == ["player_2"]
+        monkeypatch.setattr(provider, "reset", original_reset)
+        env.reset()
+        _, _, terminations, truncations, _ = env.step(dict.fromkeys(env.agents, "look"))
+        assert ticker_calls == ["tick"]
+        assert not any(terminations.values()) and not any(truncations.values())
 
 
-def test_parallel_reset_uses_distinct_deterministic_seeds_and_shared_options():
-    children = {
-        "player_0": TrackingEnv("player_0"),
-        "player_1": TrackingEnv("player_1"),
-        "player_2": TrackingEnv("player_2"),
-    }
-    env = make_test_parallel_env(children)
-    options = {"nested": {"value": 1}}
-
-    env.reset(seed=17, options=options)
-
-    assert [children[agent].reset_calls for agent in env.possible_agents] == [
-        [(17, options)],
-        [(18, options)],
-        [(19, options)],
-    ]
-    assert all(child.reset_calls[0][1] is options for child in children.values())
+def test_parallel_api_contract(wasm_runtime):
+    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+        parallel_api_test(env, num_cycles=10)
 
 
-def test_single_agent_reset_always_finishes_with_an_authoritative_observation():
-    events: list[tuple[str, str, Any]] = []
-    env = make_test_parallel_env({"player_0": TrackingEnv("player_0", events)})
+@pytest.mark.parametrize("factory", [make_vector_env, make_parallel_env], ids=["vector", "parallel"])
+@pytest.mark.parametrize(
+    ("phase", "command"),
+    [
+        ("preparation", "qs"),
+        ("entry", "move north"),
+        ("observation", "sql,fes,fex,fei"),
+    ],
+)
+def test_coordinated_reset_stops_on_failure_and_can_retry(factory, phase, command, capsys):
+    provider = ScriptedProvider()
+    failure = OSError(f"failed {phase}")
+    with closing(factory(2, provider=provider, render_mode="human")) as env:
+        provider.connections[1].send_errors[command] = failure
+        with pytest.raises(OSError) as raised:
+            env.reset()
+        assert raised.value is failure
+        assert any(phase in note for note in failure.__notes__)
+        assert capsys.readouterr().out == ""
+        assert all(connection.invalidated and not connection.pending_lines for connection in provider.connections)
+        sent = [line for connection in provider.connections for batch in connection.sent_lines for line in batch]
+        if phase == "preparation":
+            assert "move north" not in sent
+        if phase in {"preparation", "entry"}:
+            assert "sql,fes,fex,fei" not in sent
+        actions = ["look", "look"] if factory is make_vector_env else {"player_0": "look", "player_1": "look"}
+        with pytest.raises(RuntimeError, match="reset"):
+            env.step(actions)
+        assert capsys.readouterr().out == ""
 
-    env.reset()
-
-    assert events == [("observe", "player_0", None)]
-
-
-def test_parallel_reset_resets_provider_before_children():
-    events = []
-
-    class ResetTrackingEnv(TrackingEnv):
-        def reset(self, *, seed: int | None = None, options: dict | None = None):
-            events.append(("child", self.name, seed))
-            return super().reset(seed=seed, options=options)
-
-    class ResetTrackingProvider:
-        def reset(self, *, seed=None):
-            events.append(("provider", seed))
-
-        def close(self):
-            pass
-
-    env = make_test_parallel_env(
-        {
-            "player_0": ResetTrackingEnv("player_0"),
-            "player_1": ResetTrackingEnv("player_1"),
-        },
-        provider=ResetTrackingProvider(),
-    )
-
-    env.reset(seed=17)
-
-    assert events[:3] == [
-        ("provider", 17),
-        ("child", "player_0", 17),
-        ("child", "player_1", 18),
-    ]
-
-
-def test_parallel_reset_refreshes_early_observations_after_every_player_enters():
-    present_players: set[str] = set()
-
-    class SharedResetEnv(TrackingEnv):
-        def reset(self, *, seed: int | None = None, options: dict | None = None):
-            present_players.add(self.name)
-            return {"player_count": len(present_players)}, {}
-
-        def act(self, action: str) -> None:
-            raise AssertionError(f"reset issued a player action: {action!r}")
-
-        def observe(self):
-            return {"player_count": len(present_players)}, 0.0, False, False, {}
-
-    env = make_test_parallel_env(
-        {
-            "player_0": SharedResetEnv("player_0"),
-            "player_1": SharedResetEnv("player_1"),
-        }
-    )
-
-    observations, _ = env.reset()
-
-    assert observations == {
-        "player_0": {"player_count": 2},
-        "player_1": {"player_count": 2},
-    }
-
-
-def test_terminated_player_does_not_desynchronise_survivor(scripted_env_factory):
-    response = scripted_response(["quit", "sql,fes,fex,fei"]), True, False, {}
-    children = {
-        "player_0": scripted_env_factory(responses={"quit": response}),
-        "player_1": scripted_env_factory(),
-    }
-    for child in children.values():
-        child.reset()
-    env = make_test_parallel_env(
-        children,
-    )
-
-    _, _, terminations, truncations, infos = env.step({"player_0": "quit", "player_1": "look"})
-
-    assert terminations == {"player_0": True, "player_1": False}
-    assert truncations == {"player_0": False, "player_1": False}
-    assert env.agents == ["player_1"]
-
-
-def test_parallel_api_contract(scripted_env_factory):
-    env = make_test_parallel_env(
-        {
-            "player_0": scripted_env_factory(),
-            "player_1": scripted_env_factory(),
-        }
-    )
-
-    parallel_api_test(env, num_cycles=10)
+        provider.connections[1].send_errors.clear()
+        env.reset()
+        _, _, terminated, truncated, _ = env.step(actions)
+        assert not any(terminated.values() if isinstance(terminated, dict) else terminated)
+        assert not any(truncated.values() if isinstance(truncated, dict) else truncated)

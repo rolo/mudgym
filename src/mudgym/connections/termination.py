@@ -30,6 +30,11 @@ END_OF_STEP_PATTERNS = [
 TRANSPORT_BREAK_PROMPTS = (Prompt.EOF, Prompt.TIMEOUT)
 
 
+def has_game_over_prompt(raw_bytes: bytes) -> bool:
+    """Return whether trusted game bytes contain a game-over prompt."""
+    return any(prompt.value.search(raw_bytes) for prompt in GAME_OVER_PROMPTS)
+
+
 def is_permadeath(raw_bytes: bytes) -> bool:
     """
     Permadeath (eg, combat, touchstone, dragon flee) prints no points change events so we trap it

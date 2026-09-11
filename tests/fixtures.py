@@ -3,10 +3,17 @@ from typing import Any
 
 import pytest
 
+from mudgym.connections.wasm import WasmtimeRuntime
 from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
 from mudgym.envs.fields.tests.payloads import BYTES_CASES
 from mudgym.featurizers.responses import split_on_prompt
 from tests.scripted import make_scripted_env
+
+
+@pytest.fixture(scope="session")
+def wasm_runtime():
+    """Share the compiled module while each provider creates its own worlds and sessions."""
+    return WasmtimeRuntime()
 
 
 def tracked_factory(maker: Callable[..., Any]) -> Iterator[Callable[..., Any]]:

@@ -385,7 +385,7 @@ class ConnectionState:
 
         # Every sent line's echo is a trust boundary. Put echo patterns first so a command such as
         # "Option:" or "Cheerio!" is treated as our input rather than a real game prompt. The final
-        # line is the observation command, so its echo tells us the next marker is ours.
+        # line's echo tells us the next marker is ours, including quickscore and entry-only reads.
         echo_patterns = [
             re.compile(re.escape(encode_command_bytes(line)) + rb"(?:" + LINE_BREAK_RE + rb")") for line in lines
         ]

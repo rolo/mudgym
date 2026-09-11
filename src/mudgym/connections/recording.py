@@ -70,13 +70,19 @@ class RecordingConnection(MudConnection):
         path: str | Path,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        metadata = {"connection": type(connection).__name__, **(metadata or {})}
+        self.requires_end_of_turn_marker = connection.requires_end_of_turn_marker
+        self.tick_for_step = getattr(connection, "tick_for_step", None)
+        metadata = {
+            "connection": type(connection).__name__,
+            **(metadata or {}),
+            "requires_end_of_turn_marker": self.requires_end_of_turn_marker,
+        }
         self.connection = connection
         self.capture = _CaptureWriter(path, metadata)
         logger.debug("recording.start", path=str(path), connection=type(connection).__name__)
 
-    def reset(self) -> None:
-        self.connection.reset()
+    def reset(self, *, seed: int | None = None) -> None:
+        self.connection.reset(seed=seed)
         self.capture.write_call("reset")
 
     def send_line(self, line: str) -> None:
@@ -96,6 +102,7 @@ class RecordingConnection(MudConnection):
             incomplete=bool(incomplete),
             rejected=bool(debug_info.get("rejected", False)),
             marker_arrived=bool(debug_info.get("marker_arrived", False)),
+            sent_lines=debug_info["sent_lines"],
         )
         return raw_bytes, terminated, incomplete, debug_info
 
@@ -116,6 +123,7 @@ class ReplayConnection(MudConnection):
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.header, self.calls = _read_capture(self.path)
+        self.requires_end_of_turn_marker = self.header.get("requires_end_of_turn_marker", True)
         self.cursor = 0
         self._pending_lines: list[str] = []
 
@@ -131,7 +139,7 @@ class ReplayConnection(MudConnection):
         self.cursor += 1
         return call
 
-    def reset(self) -> None:
+    def reset(self, *, seed: int | None = None) -> None:
         self._pending_lines.clear()
         self._take("reset")
 
@@ -148,7 +156,8 @@ class ReplayConnection(MudConnection):
 
     def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
         call = self._take("read_response")
-        sent_lines = list(self._pending_lines)
+        # Older v3 captures predate the explicit backend echo list.
+        sent_lines = call.get("sent_lines", list(self._pending_lines))
         self._pending_lines.clear()
         return (
             call["raw_bytes"],
@@ -167,11 +176,8 @@ class ReplayConnection(MudConnection):
         self._take("invalidate")
         self._pending_lines.clear()
 
-    def remaining_calls(self) -> int:
-        return len(self.calls) - self.cursor
-
     def assert_exhausted(self) -> None:
-        if remaining := self.remaining_calls():
+        if remaining := len(self.calls) - self.cursor:
             raise ReplayMismatchError(f"Replay of {self.path} finished with {remaining} unconsumed calls.")
 
     def close(self) -> None:
@@ -188,6 +194,7 @@ class RecordingProvider(ConnectionProvider):
         metadata: dict[str, Any] | None = None,
     ):
         self.provider = provider
+        self.tick_for_step = getattr(provider, "tick_for_step", None)
         self.capture_path_for_index = capture_path_for_index
         self.metadata = metadata
 

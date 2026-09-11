@@ -1,4 +1,5 @@
 import socket
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
@@ -8,10 +9,41 @@ from mudgym.connections.connection import MudConnection
 from mudgym.connections.errors import ConnectionClosedError
 from mudgym.connections.prompts import INVALID_COMMAND_PROMPTS, Prompt, State
 from mudgym.connections.state_machine import ConnectionState
+from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END
 from mudgym.envs.fields.feinventory import FEInventoryField
+from tests.scripted import ROOM_TEXT, TEAROOM_EXIT_TEXT
 
 END_OF_TURN_MARKER = FEInventoryField.end_of_turn_marker
 GAME_PROMPT = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+
+
+@pytest.mark.parametrize("ending", ["prompt", "eof", "timeout", "missing_narration"])
+def test_fragmented_entry_waits_for_the_prompt_after_narration(ending):
+    connection_socket, game_socket = socket.socketpair()
+    child = fdspawn(connection_socket.detach(), encoding=None, maxread=1)
+    game_socket.sendall(GAME_PROMPT)
+    state_machine = ConnectionState(child=child, initial_prompt=Prompt.GAME)
+    state_machine.state = State.GAME
+    state_machine.expect = partial(state_machine.expect, timeout=1.0)
+    connection = MudConnection()
+    connection.sm = state_machine
+    try:
+        connection.send_line("move north")
+        output = b"move north\r\n" + (TEAROOM_EXIT_TEXT if ending != "missing_narration" else b"") + ROOM_TEXT
+        if ending in {"prompt", "missing_narration"}:
+            output += GAME_PROMPT
+        game_socket.sendall(output)
+        if ending == "eof":
+            game_socket.shutdown(socket.SHUT_WR)
+        raw, terminated, incomplete, transport = connection.read_response(TEAROOM_EXIT_NARRATION_END)
+        assert ROOM_TEXT in raw
+        assert transport["sent_lines"] == ["move north"]
+        assert not terminated
+        assert incomplete is (ending != "prompt")
+        assert transport["marker_arrived"] is (ending == "prompt")
+    finally:
+        child.close()
+        game_socket.close()
 
 
 def test_connection_reads_only_lines_which_were_successfully_sent():

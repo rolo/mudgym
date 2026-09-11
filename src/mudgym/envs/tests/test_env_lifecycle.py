@@ -55,7 +55,8 @@ def test_bare_env_runs_against_the_live_game():
         assert info["raw_bytes"]
 
         obs, reward, terminated, truncated, info = env.step("look")
-        assert set(obs) == {"text"}
+        assert set(obs) == {"text", "points"}
+        assert obs["points"] == env.points
         assert obs["text"]
         assert isinstance(reward, (int, float))
         assert isinstance(terminated, bool)

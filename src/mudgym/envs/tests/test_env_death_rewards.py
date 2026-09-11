@@ -115,7 +115,7 @@ def test_quitting_costs_nothing(scripted_env_factory):
     assert observation["points"] == 200
 
 
-def test_hidden_score_field_still_supports_first_step_permadeath_reward(scripted_env_factory):
+def test_marker_only_field_keeps_points_and_first_step_permadeath_reward(scripted_env_factory):
     env = scripted_env_factory(
         field_parsers=(FEScoreField(include_keys=()),),
         responses={"fod me": terminal_step("fod me", COMBAT_DEATH_BYTES)},
@@ -124,8 +124,10 @@ def test_hidden_score_field_still_supports_first_step_permadeath_reward(scripted
 
     observation, reward, terminated, truncated, info = env.step("fod me")
 
-    assert set(initial_observation) == {"text"}
-    assert set(observation) == {"text"}
+    assert set(initial_observation) == {"text", "points"}
+    assert initial_observation["points"] == 200
+    assert set(observation) == {"text", "points"}
+    assert observation["points"] == 0
     assert terminated is True
     assert truncated is False
     assert reward == -200.0

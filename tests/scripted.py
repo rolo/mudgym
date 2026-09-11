@@ -70,6 +70,8 @@ def scripted_response(lines: Sequence[str], *, reset_step: bool = False) -> byte
     """Build a prompt-delimited game response for the supplied wire lines."""
     lines = list(lines)
     if len(lines) == 1:
+        if reset_step:
+            return lines[0].encode("latin-1") + b"\r\n" + TEAROOM_EXIT_TEXT + ROOM_TEXT + PROMPT
         if lines[0] == QUICKSCORE_COMMAND:
             return QUICKSCORE_COMMAND.encode("latin-1") + b"\r\n" + QS_RESPONSE + PROMPT
         observation_line = lines[0]
@@ -133,7 +135,7 @@ class ScriptedConnection(MudConnection):
         self.invalidated = False
         self.closed = False
 
-    def reset(self) -> None:
+    def reset(self, *, seed: int | None = None) -> None:
         self.pending_lines.clear()
         self.entered_land = False
         self.invalidated = False

@@ -1,18 +1,21 @@
 import os
+from collections.abc import Callable
 
 from mudgym.connections.config import AVAILABLE_CONNECTIONS
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.docker_exec import DockerExecConnection
 from mudgym.connections.docker_run import DockerRunConnection
 from mudgym.connections.provider import DockerExecProvider
+from mudgym.connections.wasm import create_connection
 
-connections: dict[str, type[MudConnection]] = {
+connections: dict[str, Callable[..., MudConnection]] = {
     "docker_run": DockerRunConnection,
     "docker_exec": DockerExecConnection,
+    "wasm": create_connection,
 }
 
 # Connections enabled in the current environment, preserving configured order.
-available_connections_dict: dict[str, type[MudConnection]] = {}
+available_connections_dict: dict[str, Callable[..., MudConnection]] = {}
 for configured_slug in AVAILABLE_CONNECTIONS.split(","):
     slug = configured_slug.strip()
     conn_cls = connections.get(slug)

@@ -1,5 +1,7 @@
+import ast
 import importlib
 import re
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +24,17 @@ def test_every_exported_name_is_importable_from_the_package_root():
     """The browser copies of the examples import these by name from the wheel."""
     for name in mudgym.notebooks.__all__:
         assert getattr(mudgym.notebooks, name, None) is not None, name
+
+
+@pytest.mark.parametrize(
+    "path", sorted((Path(__file__).resolve().parents[1] / "examples").glob("*.py")), ids=lambda path: path.stem
+)
+def test_example_mudgym_imports_are_available(path):
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("mudgym"):
+            module = importlib.import_module(node.module)
+            for alias in node.names:
+                assert hasattr(module, alias.name), f"{path.name}:{node.lineno}: {node.module}.{alias.name}"
 
 
 def test_submodules_are_importable_on_their_own():

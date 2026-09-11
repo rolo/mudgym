@@ -1,29 +1,60 @@
 import pytest
 
-from mudgym.connections.prompts import State
-from mudgym.connections.registry import available_connections_dict, default_connection
+from mudgym.connections.registry import available_connections_dict
+from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END
 from mudgym.envs.fields.feinventory import FEInventoryField
+from mudgym.session import MudSession
 
 
 def send_and_read(connection, lines):
+    """Send separate lines to exercise completion across a split command batch."""
     for line in lines:
         connection.send_line(line)
     return connection.read_response(FEInventoryField.end_of_turn_marker)
 
 
 @pytest.mark.parametrize("connection_key", available_connections_dict)
+def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
+    connection = available_connections_dict[connection_key]()
+    session = MudSession(connection, observation_line="fei", end_of_turn_marker=FEInventoryField.end_of_turn_marker)
+    try:
+        session.reset()
+        if connection.sm is not None:
+            # Exercise the real process reader with the narration and prompt split across reads.
+            connection.sm.child.maxread = 1
+        session.send("move north")
+        raw, terminated, incomplete, transport = session.read_pending_response(TEAROOM_EXIT_NARRATION_END)
+        assert not terminated and not incomplete
+        assert transport["marker_arrived"]
+        assert transport["sent_lines"] == ["move north"]
+        narration = TEAROOM_EXIT_NARRATION_END.search(raw)
+        assert narration is not None
+        assert b"You" in raw[narration.end() :]
+
+        raw, terminated, incomplete, transport = session.receive()
+        assert not terminated and not incomplete
+        assert transport["sent_lines"] == ["fei"]
+        assert b"========" in raw
+        assert TEAROOM_EXIT_NARRATION_END.search(raw) is None
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("connection_key", [key for key in available_connections_dict if key != "wasm"])
 def test_close_releases_the_account_for_the_next_login(connection_key):
     """
     Log in twice in sequence: the second login only works if close() logged the first session out rather than
     abandoning it.
     """
-    connection_class = available_connections_dict[connection_key]
 
     for attempt in ("first", "second"):
-        connection = connection_class()
+        connection = available_connections_dict[connection_key]()
         try:
             connection.reset()
-            assert connection.sm.state == State.TEA_SIPPED, f"{attempt} login did not reach the tearoom"
+            raw_bytes, terminated, incomplete, _ = send_and_read(connection, ["look,sip tea,fei"])
+            assert b"Elizabethan tearoom" in raw_bytes, f"{attempt} login did not reach the tearoom"
+            assert b"You watch the world go by." in raw_bytes
+            assert not terminated and not incomplete
         finally:
             connection.close()
 
@@ -32,21 +63,21 @@ def test_close_releases_the_account_for_the_next_login(connection_key):
 def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key):
     """
     A command that ends the game must come back with terminated=True, and reset() must ready up
-    again from GAME_OVER.
+    again for another episode.
     """
-    connection_class = available_connections_dict[connection_key]
 
-    connection = connection_class()
+    connection = available_connections_dict[connection_key]()
     try:
         connection.reset()
-        assert connection.sm.child.delaybeforesend == 0
-        _, terminated, _, _ = send_and_read(connection, ["quit"])
+        _, terminated, incomplete, _ = send_and_read(connection, ["quit"])
         assert terminated is True
-        assert connection.sm.state == State.GAME_OVER
+        assert incomplete is False
 
         connection.reset()
-        assert connection.sm.state == State.TEA_SIPPED
-        assert connection.sm.child.delaybeforesend == 0
+        raw_bytes, terminated, incomplete, _ = send_and_read(connection, ["look,sip tea,fei"])
+        assert b"Elizabethan tearoom" in raw_bytes
+        assert b"You watch the world go by." in raw_bytes
+        assert not terminated and not incomplete
     finally:
         connection.close()
 
@@ -55,18 +86,14 @@ def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key
 @pytest.mark.parametrize("player_command", ["say Option:", "Option:", "Not updating persona."])
 def test_player_authored_control_text_does_not_close_the_command_window(connection_key, player_command):
     """Known command echoes win over identical input-prompt and game-over text."""
-    connection_class = available_connections_dict[connection_key]
 
-    connection = connection_class()
+    connection = available_connections_dict[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, [player_command, "fei"])
 
-        # debug_info names the prompt that closed the window, which is the only thing that tells
-        # these two failures apart: TIMEOUT means the marker never arrived in time, while OPTION
-        # (or any NO_LONGER_IN_GAME prompt) means the player's text beat its own echo and was read
-        # as the game asking for input. Without it a failure here says only "True is not False".
-        why = f"closed by {debug_info['matched_prompt']}, tail={raw_bytes[-160:]!r}"
+        # Keep the transport's completion details in the failure output.
+        why = f"{debug_info=}, tail={raw_bytes[-160:]!r}"
 
         assert player_command.encode("ascii") in raw_bytes, why
         assert b"========" in raw_bytes, why
@@ -76,9 +103,10 @@ def test_player_authored_control_text_does_not_close_the_command_window(connecti
         connection.close()
 
 
-def test_rejection_before_final_line_echo_is_reported_after_marker_arrives():
+@pytest.mark.parametrize("connection_key", available_connections_dict)
+def test_rejection_before_final_line_echo_is_reported_after_marker_arrives(connection_key):
     """A rejected first line stays visible after a split batch reaches its final marker."""
-    connection = default_connection()
+    connection = available_connections_dict[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, ["xyzzyfrobnicate", "fei"])
@@ -93,9 +121,10 @@ def test_rejection_before_final_line_echo_is_reported_after_marker_arrives():
         connection.close()
 
 
-def test_spoken_rejection_text_is_not_reported_as_a_rejected_command():
+@pytest.mark.parametrize("connection_key", available_connections_dict)
+def test_spoken_rejection_text_is_not_reported_as_a_rejected_command(connection_key):
     """A rejection phrase quoted in player speech is not a front-end response."""
-    connection = default_connection()
+    connection = available_connections_dict[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(
@@ -112,10 +141,11 @@ def test_spoken_rejection_text_is_not_reported_as_a_rejected_command():
         connection.close()
 
 
-def test_player_command_with_too_many_parts_does_not_prevent_the_observation_line():
+@pytest.mark.parametrize("connection_key", available_connections_dict)
+def test_player_command_with_too_many_parts_does_not_prevent_the_observation_line(connection_key):
     command_line = ",".join(["n"] * 25)
 
-    connection = default_connection()
+    connection = available_connections_dict[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, [command_line, "fei"])

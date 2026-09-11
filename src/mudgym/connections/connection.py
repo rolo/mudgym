@@ -33,6 +33,7 @@ class MudConnection:
 
     # initial prompt we expect to see - subclasses can override
     initial_prompt: PromptSpec | None = None
+    requires_end_of_turn_marker = True
 
     def __init__(
         self,
@@ -67,7 +68,7 @@ class MudConnection:
         child.delaybeforesend = LOGIN_SEND_DELAY
         return child
 
-    def reset(self) -> None:
+    def reset(self, *, seed: int | None = None) -> None:
         """
         Resets the connection to be ready to start a new episode (TEA_SIPPED state).
 

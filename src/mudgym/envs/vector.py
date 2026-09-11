@@ -29,6 +29,10 @@ class MudVectorEnv(VectorEnv):
         self.metadata = dict(self.envs[0].metadata)
         self.metadata["autoreset_mode"] = autoreset_mode
         self.render_mode = self.envs[0].render_mode
+        # The coordinator prints each completed observation, including output from later players' arrivals.
+        if self.render_mode == "human":
+            for child in self.envs:
+                child.render_mode = "ansi"
         self.num_envs = len(self.envs)
         self.single_observation_space = self.envs[0].observation_space
         self.single_action_space = self.envs[0].action_space
@@ -83,20 +87,27 @@ class MudVectorEnv(VectorEnv):
         seeds: Sequence[int | None],
         options: dict[str, Any] | None,
     ) -> dict[int, tuple[dict[str, Any], dict[str, Any]]]:
-        """Discard each reset's first observation until every selected child has entered the world."""
+        """Prepare all selected children, complete their entries, then collect final observations."""
         selected_indices = np.flatnonzero(reset_mask).tolist()
-        for index in selected_indices:
-            self.envs[index].reset(seed=seeds[index], options=options)
-
-        results = {}
-        for index in selected_indices:
-            observation, _, terminated, truncated, info = self.envs[index].observe()
-            if terminated or truncated:
-                raise RuntimeError(
-                    f"initial vector observation failed for child {index} "
-                    f"(terminated={terminated}, truncated={truncated})"
-                )
-            results[index] = observation, info
+        phase = "preparation"
+        try:
+            for index in selected_indices:
+                self.envs[index]._prepare_reset(seed=seeds[index], options=options)
+            phase = "entry"
+            entries = {}
+            for index in selected_indices:
+                entries[index] = self.envs[index]._enter_world()
+            phase = "observation"
+            results = {}
+            for index in selected_indices:
+                results[index] = self.envs[index]._finish_reset(*entries[index])
+        except BaseException as error:
+            error.add_note(f"vector reset failed during {phase} for child {index}")
+            for selected_index in selected_indices:
+                self.envs[selected_index]._invalidate_reset(error)
+            raise
+        if self.render_mode == "human":
+            self.render_children(selected_indices)
         return results
 
     def reset(
@@ -110,7 +121,13 @@ class MudVectorEnv(VectorEnv):
             super().reset(seed=seed)
         seeds = self.child_seeds(seed)
         if reset_mask.all():
-            self._provider.reset(seed=seed)
+            try:
+                self._provider.reset(seed=seed)
+            except BaseException as error:
+                error.add_note("vector reset failed while resetting the provider")
+                for child in self.envs:
+                    child._invalidate_reset(error)
+                raise
 
         reset_results = self.reset_children(reset_mask, seeds, child_options)
         observations = list(self.observations) if self.observations is not None else [{} for _ in self.envs]
@@ -123,8 +140,8 @@ class MudVectorEnv(VectorEnv):
 
     def step(self, actions):
         """Send every live child action before observing, then reset children already done."""
-        if self.observations is None:
-            raise RuntimeError("Vector environment has not been reset.")
+        if self.observations is None or any(child.points is None for child in self.envs):
+            raise RuntimeError("Vector environment requires a successful reset before stepping.")
         resetting = self._needs_reset.copy()
         if self.autoreset_mode is AutoresetMode.DISABLED and resetting.any():
             indices = np.flatnonzero(self._needs_reset).tolist()
@@ -142,9 +159,15 @@ class MudVectorEnv(VectorEnv):
         if live_indices and self.world_ticker is not None:
             self.world_ticker()
 
-        results: dict[int, tuple[dict[str, Any], float, bool, bool, dict[str, Any]]] = {
-            index: self.envs[index].observe() for index in live_indices
-        }
+        results: dict[int, tuple[dict[str, Any], float, bool, bool, dict[str, Any]]] = {}
+        for index in live_indices:
+            results[index] = self.envs[index].observe()
+            observation, _, terminated, truncated, _ = results[index]
+            # These transitions have completed even if a later child's autoreset fails.
+            self.observations[index] = observation
+            self._needs_reset[index] = terminated or truncated
+        if self.render_mode == "human":
+            self.render_children(live_indices)
         if resetting.any():
             # A relogin is visible to other players in a shared world. Finish every live observation first so a done
             # child's new episode cannot change another child's preceding transition.
@@ -166,8 +189,16 @@ class MudVectorEnv(VectorEnv):
             self.batch_infos(infos),
         )
 
+    def render_children(self, indices: Sequence[int]):
+        frames = tuple(self.envs[index].render() for index in indices)
+        if self.render_mode == "human":
+            for frame in frames:
+                print(frame, end="", flush=True)
+            return (None,) * len(frames)
+        return frames
+
     def render(self):
-        return tuple(child.render() for child in self.envs)
+        return self.render_children(range(self.num_envs))
 
     def close_extras(self, **kwargs):
         # Children own their connections and the provider owns whatever sits underneath them. Try every close even if one fails, then report the lot rather than leaking the rest.

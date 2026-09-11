@@ -24,8 +24,8 @@ def test_live_reset_and_step_keep_complete_command_echoes(
     ).strip()
 
     class DelayedRecordingConnection(RecordingConnection):
-        def reset(self):
-            super().reset()
+        def reset(self, *, seed=None):
+            super().reset(seed=seed)
             # Only vary game sends. Login retains the connection's normal delay.
             self.connection.sm.child.delaybeforesend = send_delay
 

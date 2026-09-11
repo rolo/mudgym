@@ -12,13 +12,13 @@ So for now, be prepared for interfaces, APIs, specs and defaults to change, some
 
 ## Setup 
 
-A Docker engine is required to run the game. The image `ghcr.io/rolo/mudgym` is pulled automatically on first use.
-
 Install MudGym from PyPI:
 
 ```bash
 uv add mudgym
 ```
+
+The default connection uses Docker. Select the local WASM engine with `make_env(connection="wasm")`.
 
 ## Quickstart
 

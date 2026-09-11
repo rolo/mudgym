@@ -52,19 +52,23 @@ jobs:
               print(f"is_prerelease={str(is_prerelease).lower()}", file=output)
           PY
   smoke:
-    name: Install the wheel and play an episode
+    name: Wheel smoke / Python ${{ matrix.python-version }}
     needs: build
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.13', '3.14']
     steps:
+      # The checkout supplies the smoke script. Isolated Python imports the installed wheel.
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
-      # Deliberately no checkout: everything gates on the built artifact, never
-      # the source tree.
+          python-version: ${{ matrix.python-version }}
       - name: Download the built packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -72,24 +76,11 @@ jobs:
           path: dist
       # Import-only smoke passes even when the environment cannot start, which
       # is this package's most likely failure mode - so play a real episode.
-      - name: Reset, step, and close against the release image
+      - name: Play Docker and WASM episodes from the installed wheel
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
-          /tmp/smoke/bin/python - <<'EOF'
-          import mudgym
-          from mudgym import make_env
-
-          print("mudgym", mudgym.__version__)
-          env = make_env(observation="parsed")
-          try:
-              observation, info = env.reset()
-              observation, reward, terminated, truncated, info = env.step("look")
-              print(observation["text"][:120])
-          finally:
-              env.close()
-          print("smoke OK")
-          EOF
+          /tmp/smoke/bin/python -I scripts/smoke.py
   # CI runs uv sync --frozen everywhere else, so the lower bounds in
   # pyproject.toml are otherwise entirely untested.
   lowest-resolution:
@@ -113,9 +104,7 @@ jobs:
     name: Upload to TestPyPI
     needs: [build, smoke]
     if: >-
-      github.event_name == 'push' &&
-      github.ref_type == 'tag' &&
-      github.server_url == 'https://github.com'
+      github.event_name == 'push' && github.ref_type == 'tag' && github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: testpypi
@@ -135,9 +124,7 @@ jobs:
     name: Upload to PyPI
     needs: [publish-testpypi, lowest-resolution]
     if: >-
-      github.event_name == 'push' &&
-      github.ref_type == 'tag' &&
-      github.server_url == 'https://github.com'
+      github.event_name == 'push' && github.ref_type == 'tag' && github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
@@ -156,9 +143,7 @@ jobs:
     name: Create GitHub release
     needs: [build, publish-pypi]
     if: >-
-      github.event_name == 'push' &&
-      github.ref_type == 'tag' &&
-      github.server_url == 'https://github.com'
+      github.event_name == 'push' && github.ref_type == 'tag' && github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

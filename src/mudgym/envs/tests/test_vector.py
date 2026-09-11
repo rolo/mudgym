@@ -15,9 +15,9 @@ class TrackingConnection(ScriptedConnection):
         self.index = index
         self.events = events
 
-    def reset(self) -> None:
+    def reset(self, *, seed: int | None = None) -> None:
         self.events.append(("connection.reset", self.index))
-        super().reset()
+        super().reset(seed=seed)
 
     def send_line(self, line: str) -> None:
         self.events.append(("send", self.index, line))
@@ -54,20 +54,26 @@ def make_tracking_vector(**kwargs):
     return vector_env, provider
 
 
-def test_vector_reset_resets_provider_before_children():
+def test_vector_reset_prepares_every_child_before_entry_and_final_observations():
     vector_env, provider = make_tracking_vector()
     try:
         vector_env.reset(seed=17)
 
-        assert provider.events[0] == ("provider.reset", 17)
         assert vector_env.np_random_seed == 17
-        assert [event for event in provider.events if event[0] == "connection.reset"] == [
-            ("connection.reset", 0),
-            ("connection.reset", 1),
-        ]
         assert provider.requested_count == 2
         observation_line = "sql,fes,fex,fei"
-        assert provider.events[-4:] == [
+        assert provider.events == [
+            ("provider.reset", 17),
+            ("connection.reset", 0),
+            ("send", 0, "qs"),
+            ("receive", 0, ["qs"]),
+            ("connection.reset", 1),
+            ("send", 1, "qs"),
+            ("receive", 1, ["qs"]),
+            ("send", 0, "move north"),
+            ("receive", 0, ["move north"]),
+            ("send", 1, "move north"),
+            ("receive", 1, ["move north"]),
             ("send", 0, observation_line),
             ("receive", 0, [observation_line]),
             ("send", 1, observation_line),
@@ -278,6 +284,43 @@ def test_vector_next_step_autoreset_preserves_terminal_result_then_resets_only_d
         )
         done_reset = provider.events.index(("connection.reset", 0))
         assert live_observation < done_reset
+    finally:
+        vector_env.close()
+
+
+@pytest.mark.parametrize(("terminated", "truncated"), [(True, False), (False, True)])
+def test_failed_autoreset_keeps_the_live_childs_completed_transition(terminated, truncated):
+    vector_env, provider = make_tracking_vector(autoreset_mode=AutoresetMode.NEXT_STEP)
+    first, second = provider.connections
+    first.responses["die"] = (b"die\r\nYou have died.\r\n", True, False, {"marker_arrived": False})
+    second.responses["finish"] = (
+        b"finish\r\nThe second episode has finished.\r\n",
+        terminated,
+        truncated,
+        {"marker_arrived": False},
+    )
+    failure = OSError("autoreset preparation failed")
+    try:
+        vector_env.reset()
+        vector_env.step(["die", "look"])
+        first.send_errors["qs"] = failure
+        with pytest.raises(OSError) as raised:
+            vector_env.step(["ignored", "finish"])
+        assert raised.value is failure
+        assert vector_env._needs_reset.tolist() == [True, True]
+        completed = vector_env.observations[1]
+        assert "The second episode has finished." in completed["text"]
+
+        first.send_errors.clear()
+        vector_env.reset(options={"reset_mask": np.array([True, False])})
+        assert vector_env._needs_reset.tolist() == [False, True]
+        assert vector_env.observations[1] is completed
+        provider.events.clear()
+        _, rewards, terminations, truncations, infos = vector_env.step(["dance", "must not run"])
+        assert ("send", 1, "must not run") not in provider.events
+        assert ("connection.reset", 1) in provider.events
+        assert infos["step"][1] == 0 and rewards[1] == 0
+        assert not terminations.any() and not truncations.any()
     finally:
         vector_env.close()
 

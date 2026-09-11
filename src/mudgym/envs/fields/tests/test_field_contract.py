@@ -55,15 +55,15 @@ FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 F"
 
 
 def test_space_empty_and_extract_apply_include_keys():
-    field = FEScoreField(include_keys=("points",))
-    assert set(field.space()) == {"points"}
-    assert set(field.empty()) == {"points"}
-    assert set(field.extract([FES_RESPONSE])) == {"points"}
+    field = FEScoreField(include_keys=("vitals",))
+    assert set(field.space()) == {"vitals"}
+    assert set(field.empty()) == {"vitals"}
+    assert set(field.extract([FES_RESPONSE])) == {"vitals"}
 
 
 def test_full_methods_keep_every_parser_key():
-    field = FEScoreField(include_keys=("points",))
-    assert set(field.full_space()) > {"points"}
+    field = FEScoreField(include_keys=("vitals",))
+    assert set(field.full_space()) > {"vitals"}
     assert field.full_space().keys() == field.full_empty().keys()
     assert field.full_extract([FES_RESPONSE]).keys() == field.full_space().keys()
 
@@ -82,14 +82,12 @@ def test_empty_include_keys_contributes_nothing():
     assert field.extract([FES_RESPONSE]) == {}
 
 
-def test_marker_only_field_does_not_parse_unused_values():
+def test_fes_does_not_extract_points_beyond_the_integer_range():
     response = FES_RESPONSE.replace(b"0200", b"3000000000")
-    field = FEScoreField(include_keys=())
+    field = FEScoreField()
 
     assert field.matches(response)
-    assert field.extract([response]) == {}
-    with pytest.raises(OverflowError):
-        field.full_extract([response])
+    assert "points" not in field.extract([response])
 
 
 # Index keys are 1-based with 0 reserved for unknown, so the last member of each collection lands

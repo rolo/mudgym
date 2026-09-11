@@ -141,18 +141,6 @@ wheels = [
 ]
 
 [[package]]
-name = "faker"
-version = "40.31.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/74/e1/adf05724d5838fa9fe2ada64bf390bbf37b77e3714189ae9f17a2c6d0470/faker-40.31.0.tar.gz", hash = "sha256:af163a937aec99dca5abaeb94dd5008c51c26c6e9af1a26c8db4b3c4e7ca4403", size = 2024136, upload-time = "2026-07-14T15:33:32.045Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/f5/e427b19d79e241a51ce6fcd69a47e7a9ca791a8bc3da00d91d5be05e1456/faker-40.31.0-py3-none-any.whl", hash = "sha256:bedc97c292a48a6a1bbe471a9076d7395a196421ede1cedde99d5719f6b91027", size = 2061930, upload-time = "2026-07-14T15:33:29.004Z" },
-]
-
-[[package]]
 name = "farama-notifications"
 version = "0.0.6"
 source = { registry = "https://pypi.org/simple" }
@@ -460,12 +448,13 @@ version = "0.4.6"
 source = { editable = "." }
 dependencies = [
     { name = "ansi2html" },
-    { name = "faker" },
     { name = "gymnasium" },
+    { name = "mudgym-wasm-engine" },
     { name = "numpy" },
     { name = "pettingzoo" },
     { name = "pexpect" },
     { name = "structlog" },
+    { name = "wasmtime" },
 ]
 
 [package.dev-dependencies]
@@ -489,12 +478,13 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "ansi2html", specifier = ">=1.9.2" },
-    { name = "faker", specifier = ">=37.12.0" },
     { name = "gymnasium", specifier = ">=1.3.0" },
+    { name = "mudgym-wasm-engine", specifier = "~=0.1.0" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "pettingzoo", specifier = ">=1.25.0" },
     { name = "pexpect", specifier = ">=4.9.0" },
     { name = "structlog", specifier = ">=25.5.0" },
+    { name = "wasmtime", specifier = ">=48.0.0,<49" },
 ]
 
 [package.metadata.requires-dev]
@@ -513,6 +503,14 @@ docs = [
     { name = "markdown-exec", specifier = ">=1.12.3" },
     { name = "mkdocstrings-python", specifier = ">=2.0.4" },
     { name = "zensical", specifier = ">=0.0.44" },
+]
+
+[[package]]
+name = "mudgym-wasm-engine"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/4a/97b03d7403071eb1b78df2c7e3b6b352b1b5d5c5930036eb5e08f9fb7ff1/mudgym_wasm_engine-0.1.0-py3-none-any.whl", hash = "sha256:c501212b04c2c1dbff4e2baa987d75094370e11d8e9f4de3047abd7f87b3dcf5", size = 1498133, upload-time = "2026-09-08T21:36:12.807Z" },
 ]
 
 [[package]]
@@ -929,12 +927,22 @@ wheels = [
 ]
 
 [[package]]
-name = "tzdata"
-version = "2026.3"
+name = "wasmtime"
+version = "48.0.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/92/ff/5a28bdfd8c3ebec42564ac7d0e54ca3db65044a9314a97f9564fa7a1e926/tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415", size = 198674, upload-time = "2026-07-10T08:50:37.887Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/1f/03a286dc84d83cc3274d5599543558442ba9332b676e6408ee9e1c171199/wasmtime-48.0.0.tar.gz", hash = "sha256:dba27d59209fac703e7d5753af78c2af2c1cd1ed735f520ec76dc31c60a05815", size = 128804, upload-time = "2026-08-20T19:31:57.29Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931", size = 348168, upload-time = "2026-07-10T08:50:36.46Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/e6/39da2f4047a281bce7d4651e21785942d630033931eb397cf734e7ccc048/wasmtime-48.0.0-py3-none-android_26_arm64_v8a.whl", hash = "sha256:a55abf132fe238b843a963c68cd1a30d8f686c1bc75d8fbf042d8b7a1d51ee36", size = 8800816, upload-time = "2026-08-20T19:31:28.761Z" },
+    { url = "https://files.pythonhosted.org/packages/be/d0/f4f107166a65ddf8a6d8cf74f0cea33c06a08c74fe686f8e83b194e57e8b/wasmtime-48.0.0-py3-none-android_26_x86_64.whl", hash = "sha256:d8e94276ff6c0c5ce73ee16ccbacb00b3512a4b3a664749380705d81ee06a23c", size = 9731711, upload-time = "2026-08-20T19:31:31.905Z" },
+    { url = "https://files.pythonhosted.org/packages/95/15/20fad0cb2b9cff130c225bf827e16365e02883f504297eccf172c6bb7228/wasmtime-48.0.0-py3-none-any.whl", hash = "sha256:49c9ee43e9cf59ad7453ac65dce0cc4b885837904dd3cfd45faafe930defe14a", size = 8157926, upload-time = "2026-08-20T19:31:34.74Z" },
+    { url = "https://files.pythonhosted.org/packages/89/93/911434c6c4406e6979b6cb67ba889c85633ff8d92eb0cb569fec6e2a43f7/wasmtime-48.0.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:50e1ea81a3bec537d00e076722dfdc48978a56ea24619d8153aa1f75b11796b9", size = 9395773, upload-time = "2026-08-20T19:31:37.312Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/a6/91c9c19ed7f8e164f4db6405d872c9397be9f53e4f325d0adcd5e67598f4/wasmtime-48.0.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ea69889a3c51702e9da5f5f441027ca934f7758f8926a4ed167b0d6877f092e8", size = 8343024, upload-time = "2026-08-20T19:31:39.922Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/92/e144fcf578fc394678c24b042efe45f3b0614acdb87ea95d8b839b208842/wasmtime-48.0.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:58544d539053dff7bd4cf30c40d7a540862d683013c0dfa6ba46a063f5b682f7", size = 9796354, upload-time = "2026-08-20T19:31:42.325Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/c3/a957b226979daaeb09ec024562e9aac05e475a954537e6f150eb60bca84d/wasmtime-48.0.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:26fce3613fefbe29a28e9d659dca3326e800593858e5758cad086eb802b3b766", size = 8734885, upload-time = "2026-08-20T19:31:44.966Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/bf/00e44d1971307620d6660760ed04796405a5fb1819c8b43ec03ad85efac6/wasmtime-48.0.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:77f6b75db20be065e205e7af814d4e4f06784c3a00eb346e8c76148ecb4afe5a", size = 8786289, upload-time = "2026-08-20T19:31:47.99Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/55/ce68af7734a5a9424dd66a301b11c810215ec7f70230b35bed10ed312e97/wasmtime-48.0.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:62b241c8d5dfb59ff8af1ccaa5351f0ab7aba8cc872f7d80e0e3c95d54c13562", size = 9889697, upload-time = "2026-08-20T19:31:50.854Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/12/5266bebece874ebfa3196c973b917091dd4c55e9e9da55401e312c403044/wasmtime-48.0.0-py3-none-win_amd64.whl", hash = "sha256:21fa500e70f3819a8c0539c3f0be6b3b81ec3c630bb90c47dba4d8a2c1d4c698", size = 8157931, upload-time = "2026-08-20T19:31:53.312Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/a4/bb6c90d99ad893bd42f33aa7fb386deecb55987f012c0c2f5fcaba83106d/wasmtime-48.0.0-py3-none-win_arm64.whl", hash = "sha256:09cd5e14df80a3a8d447428a548583181c568ea2e617419d23600deff21d4b82", size = 7044651, upload-time = "2026-08-20T19:31:55.63Z" },
 ]
 
 [[package]]

@@ -33,7 +33,8 @@ class ObservationField(ABC):
     # None (the default) means the response is not distinctive enough to trust for end of step marking duty.
     end_of_turn_marker: re.Pattern[bytes] | None = None
 
-    # When True (the default), the chunk this field claims is considered consumed and not included in the observation `text` key.
+    # When True (the default), the chunk this field claims is considered consumed and not included in the observation
+    # `text` key.
     remove_on_match: bool = True
 
     # Messages the game emits in place of a command's real output when the persona cannot act
@@ -95,17 +96,16 @@ class ObservationField(ABC):
     def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Parse the turn's response ``chunks`` into every parser key. Pure: a function of its inputs alone.
 
-        ``context`` carries observer facts the env supplies each call (currently ``persona``, the
-        observing persona's bare name); a parser names what it consumes and ignores the rest.
+        ``context`` carries observer facts the env supplies each call, such as ``persona``. A parser consumes what it
+        needs.
         """
         ...
 
     def matches(self, chunk: bytes) -> bool:
         """Whether `chunk` is a valid output of this field's command.
 
-        By default we just return True, but subclasses can override this to make matching more robust, in which case this
-        method should return True for every output the command can really produce, including edge cases (eg, when dark, asleep,
-        blind, etc)
+        By default we return True. Subclasses can override this to make matching more robust, but should accept every
+        output the command can produce, including when the persona is in the dark, asleep or blind.
         """
         return True
 

@@ -47,7 +47,7 @@ jobs:
           github-token: ${{ secrets.GH_PAT || github.token }}
       - name: Install uv (act/local)
         if: ${{ env.ACT }}
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install dependencies
         run: just install
       - name: Verify matrix Python

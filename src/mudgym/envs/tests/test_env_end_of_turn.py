@@ -132,8 +132,8 @@ def test_step_batches_end_with_fei_and_marker_is_stripped(scripted_env_factory):
     assert "========" not in obs["text"]
 
 
-def test_text_mode_ends_with_fes_and_extracts_points(scripted_env_factory):
-    """The text preset declares fes as its batch ender, contributing just the points key."""
+def test_text_mode_uses_fes_as_a_marker_and_keeps_tracked_points(scripted_env_factory):
+    """The text preset uses fes to end the batch while the env supplies points."""
     env = scripted_env_factory(observation="text")
     env.reset()
     obs, _, _, _, info = env.step("look")
@@ -147,7 +147,7 @@ def test_text_mode_ends_with_fes_and_extracts_points(scripted_env_factory):
 
 
 def test_bare_env_defaults_to_a_marker_only_text_field():
-    """A field-less MudEnv() defaults to a marker-only fes field: it steps, and the observation is text-only."""
+    """A field-less MudEnv() uses fes as a marker and includes the common text and points observations."""
     env = MudEnv(connection=ScriptedConnection())
     try:
         env.reset()
@@ -157,7 +157,8 @@ def test_bare_env_defaults_to_a_marker_only_text_field():
         assert env.session.observation_line == "fes"
         assert connection.sent_lines[-1] == ["look", "fes"]
 
-        assert set(obs) == {"text"}
+        assert set(obs) == {"text", "points"}
+        assert obs["points"] == 200
         assert obs["text"]
         assert "75 75" not in obs["text"]
     finally:
@@ -187,7 +188,7 @@ def test_tearoom_exit_uses_the_quickscore_points(field_parsers):
 
         assert env.unwrapped.points == 200
         assert "75 75 52 52" not in observation["text"]
-        assert connection.sent_lines[-1] == ["move north", env.unwrapped.session.observation_line]
+        assert connection.sent_lines == [["qs"], ["move north"], [env.unwrapped.session.observation_line]]
 
         env.step("look")
         assert connection.sent_lines[-1] == ["look", env.unwrapped.session.observation_line]
