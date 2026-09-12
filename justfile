@@ -36,9 +36,13 @@ check-dist: build
     uvx twine check --strict dist/*
     uvx check-wheel-contents dist/*.whl
 
-# validate, version, commit, tag, and push a release; GitHub Actions publishes it via OIDC
+# validate, version, commit, tag, and push a release. GitHub Actions publishes it via OIDC
 release version:
     uv run python scripts/release.py {{version}}
+
+# retry a failed unpublished release from the corrected main commit, keeping the same version
+release-retry version:
+    uv run python scripts/release.py {{version}} --retry
 
 # play the docs examples against the live game to record connection calls in docs/recordings/
 docs-record *names:
