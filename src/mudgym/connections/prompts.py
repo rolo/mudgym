@@ -1,15 +1,8 @@
-"""
-Prompts module for MUD2 connections.
-
-Defines the various matching patterns for pexpect "prompts" to drive the state machine when
-when connecting to and interacting with the MUD2 game and management software.
-"""
+"""Patterns for parsing MUD2 game output and recorded transcripts."""
 
 import enum
 import functools
 import re
-
-import pexpect
 
 # One-or-more variant for named-capture contexts (where matching empty is wrong)
 SGR_ONE_PLUS_STR = r"(?:\x1b\[[0-9;]*m)+"
@@ -116,9 +109,6 @@ def system_line_up_to_next_prompt(needle: bytes) -> re.Pattern:
 
 
 class Prompt(enum.Enum):
-    EOF = pexpect.EOF
-    TIMEOUT = pexpect.TIMEOUT
-
     OPTION = trusted_input_prompt(rb"Option\s*(\(H for help\))?\s*:")
     TEAROOM = TEAROOM_PROMPT
 
@@ -192,67 +182,12 @@ class Prompt(enum.Enum):
     )
 
 
-# A single prompt, or a collection of prompts, as accepted by expect() and the
-# `initial_prompt` hooks. These are passed straight through to pexpect, which is
-# happy with either one pattern or several.
-PromptSpec = Prompt | list[Prompt] | tuple[Prompt, ...]
-
 GAME_OVER_PROMPTS = [
     Prompt.GAME_OVER_EPISODE_POINTS,
     Prompt.GAME_OVER_QUIT_CHEERIO,
     Prompt.GAME_OVER_NOT_UPDATING_PERSONA,
     Prompt.GAME_OVER_KILLED_FOR_SWEARING,
 ]
-
-# the game sends these to every session, one per database slot, so they say nothing about us
-BROADCAST_PROMPTS = frozenset({Prompt.DATABASE_FINISHED_INITIALIZING})
-
-# Use an explicit order for mapping idx -> Prompt
-PROMPTS: tuple[Prompt, ...] = (
-    Prompt.EOF,
-    Prompt.TIMEOUT,
-    Prompt.TEAROOM,
-    Prompt.TEA_SIPPED,
-    Prompt.ENTERED_LAND,
-    Prompt.GAME,
-    Prompt.OPTION,
-    Prompt.SUPERSEDE,
-    Prompt.SESSION_DYING,
-    Prompt.PERSONA_SEX,
-    Prompt.PERSONA_NAME,
-    Prompt.EXAMINE,
-    Prompt.PERSONA_AVAILABLE,
-    Prompt.RESET_IN_PROGRESS,
-    Prompt.BOOT_COMPLETE,
-    Prompt.FECODE_ZERO,
-    Prompt.DATABASE_NOT_INITIALIZED,
-    Prompt.DATABASE_FINISHED_INITIALIZING,
-    Prompt.PAGER,
-    Prompt.LIBRARY,
-    Prompt.GAME_OVER_EPISODE_POINTS,
-    Prompt.GAME_OVER_QUIT_CHEERIO,
-    Prompt.GAME_OVER_NOT_UPDATING_PERSONA,
-    Prompt.GAME_OVER_KILLED_FOR_SWEARING,
-)
-
-
-class State(enum.Enum):
-    INITIAL = enum.auto()
-    LOGIN = enum.auto()
-    OPTION = enum.auto()
-    PERSONA_SELECT = enum.auto()  # choosing slot
-    PERSONA_NAME_INPUT = enum.auto()  # entering name
-    PERSONA_SEX_INPUT = enum.auto()  # choosing sex
-    TEAROOM = enum.auto()  # in the Elizabethan tearoom
-    TEA_SIPPED = enum.auto()  # in the tearoom after sipping tea
-    GAME = enum.auto()  # in game, having stepped out of the tearoom
-    GAME_OVER = enum.auto()  # in game over, having left the game
-    CLOSING = enum.auto()  # backing out of the menus to log the account out
-    RESETTING = enum.auto()  # in the menus, waiting for a reset to complete
-    DEAD = enum.auto()  # ops dead rather than game dead
-
-
-EXPECT_LIST = [p.value for p in PROMPTS]  # for expect()
 
 
 @functools.lru_cache

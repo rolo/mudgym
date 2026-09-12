@@ -14,14 +14,13 @@ from mudgym.notebooks.frames import (
     show_text,
     transition_caption,
 )
-from mudgym.notebooks.panels import docker_is_running, env_setup_panel, notebook_palette
+from mudgym.notebooks.panels import env_setup_panel, notebook_palette
 from mudgym.notebooks.room_map import show_room_map
 from mudgym.notebooks.style import HTML
 from mudgym.notebooks.tables import show_cards, show_stats, show_table, show_turn_bars
 
 __all__ = [
     "HTML",
-    "docker_is_running",
     "env_setup_panel",
     "game_accordion",
     "notebook_palette",

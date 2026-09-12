@@ -76,7 +76,7 @@ jobs:
           path: dist
       # Import-only smoke passes even when the environment cannot start, which
       # is this package's most likely failure mode - so play a real episode.
-      - name: Play Docker and WASM episodes from the installed wheel
+      - name: Play a WASM episode from the installed wheel
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl

@@ -1,7 +1,5 @@
 import numpy as np
-import pytest
 
-from mudgym.envs.fields import FEScoreField
 from mudgym.envs.fields.rawbytes import DEFAULT_MAX_BYTES
 
 CAPTURED_RESET_SWEEP = (
@@ -51,9 +49,8 @@ def test_env_bytes_reset_returns_raw_bytes(scripted_env_factory):
     assert env.observation_space["raw_bytes"].shape == obs["raw_bytes"].shape
 
 
-@pytest.mark.parametrize("connection", ["docker_run", "docker_exec"])
-def test_live_bytes_reset_step_and_reset(live_env_factory, connection):
-    env = live_env_factory(observation="bytes", connection=connection)
+def test_live_bytes_reset_step_and_reset(live_env_factory):
+    env = live_env_factory(observation="bytes")
 
     for _ in range(2):
         observation, _ = env.reset()
@@ -68,4 +65,4 @@ def test_live_bytes_reset_step_and_reset(live_env_factory, connection):
         raw_bytes = info["raw_bytes"]
         assert observation["raw_bytes"][: len(raw_bytes)].tobytes() == raw_bytes
         assert not observation["raw_bytes"][len(raw_bytes) :].any()
-        assert FEScoreField.end_of_turn_marker.search(raw_bytes)
+        assert info["transport"]["sent_lines"] == ["look"]

@@ -1,4 +1,4 @@
-"""Replay every documentation capture and derive its ignored fragments without Docker."""
+"""Replay every documentation capture and derive its ignored fragments without starting a live game."""
 
 import importlib.util
 from pathlib import Path

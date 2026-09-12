@@ -452,7 +452,6 @@ dependencies = [
     { name = "mudgym-wasm-engine" },
     { name = "numpy" },
     { name = "pettingzoo" },
-    { name = "pexpect" },
     { name = "structlog" },
     { name = "wasmtime" },
 ]
@@ -482,7 +481,6 @@ requires-dist = [
     { name = "mudgym-wasm-engine", specifier = "~=0.1.0" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "pettingzoo", specifier = ">=1.25.0" },
-    { name = "pexpect", specifier = ">=4.9.0" },
     { name = "structlog", specifier = ">=25.5.0" },
     { name = "wasmtime", specifier = ">=48.0.0,<49" },
 ]

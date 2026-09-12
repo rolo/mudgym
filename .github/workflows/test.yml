@@ -19,9 +19,6 @@ jobs:
     timeout-minutes: 15
     env:
       UV_PYTHON: ${{ matrix.python-version }}
-      # Matrix jobs that share a Docker daemon would otherwise log the same account
-      # into one game container. A run/attempt/job namespace keeps them apart.
-      MUDGYM_DOCKER_EXEC_CONTAINER_NAME: "m${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python-version }}"
     strategy:
       fail-fast: false
       matrix:

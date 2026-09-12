@@ -79,7 +79,6 @@ class WasmtimeMudConnection(MudConnection):
     requires_end_of_turn_marker = False
 
     def __init__(self, *, provider: WasmtimeProvider, connection_index: int, timeout_ms: int) -> None:
-        super().__init__(db_slot=provider.world_for_connection(connection_index))
         self.provider = provider
         self.connection_index = connection_index
         self.timeout_ms = timeout_ms

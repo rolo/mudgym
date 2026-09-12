@@ -19,9 +19,6 @@ def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
     session = MudSession(connection, observation_line="fei", end_of_turn_marker=FEInventoryField.end_of_turn_marker)
     try:
         session.reset()
-        if connection.sm is not None:
-            # Exercise the real process reader with the narration and prompt split across reads.
-            connection.sm.child.maxread = 1
         session.send("move north")
         raw, terminated, incomplete, transport = session.read_pending_response(TEAROOM_EXIT_NARRATION_END)
         assert not terminated and not incomplete
@@ -38,25 +35,6 @@ def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
         assert TEAROOM_EXIT_NARRATION_END.search(raw) is None
     finally:
         session.close()
-
-
-@pytest.mark.parametrize("connection_key", [key for key in available_connections_dict if key != "wasm"])
-def test_close_releases_the_account_for_the_next_login(connection_key):
-    """
-    Log in twice in sequence: the second login only works if close() logged the first session out rather than
-    abandoning it.
-    """
-
-    for attempt in ("first", "second"):
-        connection = available_connections_dict[connection_key]()
-        try:
-            connection.reset()
-            raw_bytes, terminated, incomplete, _ = send_and_read(connection, ["look,sip tea,fei"])
-            assert b"Elizabethan tearoom" in raw_bytes, f"{attempt} login did not reach the tearoom"
-            assert b"You watch the world go by." in raw_bytes
-            assert not terminated and not incomplete
-        finally:
-            connection.close()
 
 
 @pytest.mark.parametrize("connection_key", available_connections_dict)

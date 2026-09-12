@@ -1,7 +1,6 @@
 """Palette and control-panel widgets for the example notebooks."""
 
 import html as html_lib
-import subprocess
 from collections.abc import Sequence
 from typing import Any
 
@@ -72,15 +71,6 @@ def notebook_palette(
 </style>
 """
     )
-
-
-def docker_is_running() -> bool:
-    """True if the Docker daemon is reachable."""
-    try:
-        completed = subprocess.run(["docker", "info"], capture_output=True)
-    except FileNotFoundError:
-        return False
-    return completed.returncode == 0
 
 
 def env_setup_panel(

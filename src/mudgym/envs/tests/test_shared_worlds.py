@@ -1,12 +1,12 @@
 import pytest
 from gymnasium.vector import AutoresetMode
 
-from mudgym.connections.provider import DockerExecProvider
+from mudgym.connections.wasm import WasmtimeProvider
 
 
 @pytest.mark.parametrize("worlds", [1, 2])
-def test_players_only_hear_shouts_from_their_own_world(live_vector_env_factory, worlds):
-    env = live_vector_env_factory(2, provider=DockerExecProvider(worlds=worlds))
+def test_players_only_hear_shouts_from_their_own_world(live_vector_env_factory, wasm_runtime, worlds):
+    env = live_vector_env_factory(2, provider=WasmtimeProvider(worlds=worlds, runtime=wasm_runtime))
     env.reset()
 
     observation, _, terminated, truncated, _ = env.step(["shout mudgymisolation", "look"])
@@ -16,8 +16,10 @@ def test_players_only_hear_shouts_from_their_own_world(live_vector_env_factory, 
     assert ("mudgymisolation" in observation["text"][1].lower()) is (worlds == 1)
 
 
-def test_shared_world_remains_playable_after_one_child_autoresets(live_vector_env_factory):
-    env = live_vector_env_factory(2, provider=DockerExecProvider(worlds=1), autoreset_mode=AutoresetMode.NEXT_STEP)
+def test_shared_world_remains_playable_after_one_child_autoresets(live_vector_env_factory, wasm_runtime):
+    env = live_vector_env_factory(
+        2, provider=WasmtimeProvider(worlds=1, runtime=wasm_runtime), autoreset_mode=AutoresetMode.NEXT_STEP
+    )
     observation, _ = env.reset()
     assert env.observation_space.contains(observation)
 

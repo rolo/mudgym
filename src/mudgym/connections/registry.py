@@ -1,37 +1,16 @@
-import os
 from collections.abc import Callable
 
-from mudgym.connections.config import AVAILABLE_CONNECTIONS
 from mudgym.connections.connection import MudConnection
-from mudgym.connections.docker_exec import DockerExecConnection
-from mudgym.connections.docker_run import DockerRunConnection
 from mudgym.connections.wasm import WasmtimeProvider, create_connection
 
-connections: dict[str, Callable[..., MudConnection]] = {
-    "docker_run": DockerRunConnection,
-    "docker_exec": DockerExecConnection,
-    "wasm": create_connection,
-}
+connections: dict[str, Callable[..., MudConnection]] = {"wasm": create_connection}
+available_connections_dict = connections
 
-# Connections enabled in the current environment, preserving configured order.
-available_connections_dict: dict[str, Callable[..., MudConnection]] = {}
-for configured_slug in AVAILABLE_CONNECTIONS.split(","):
-    slug = configured_slug.strip()
-    conn_cls = connections.get(slug)
-    if conn_cls is not None:
-        available_connections_dict[slug] = conn_cls
-
-# default connection can be specified as a slug, or defaults to the first configured connection
-_default_slug = os.getenv("MUDGYM_DEFAULT_CONNECTION")
-default_connection = available_connections_dict.get(_default_slug) if _default_slug else None
-if default_connection is None:
-    default_connection = next(iter(available_connections_dict.values()))
-
-
-# The env factory resolves both defaults through this module at call time so tooling can replace them.
+# The env factory resolves these defaults at call time so recording tools can replace them.
+default_connection = create_connection
 default_provider_factory = WasmtimeProvider
 
 
 def default_parallel_provider_factory() -> WasmtimeProvider:
-    """Create the default provider for players who have explicitly asked to share one world."""
+    """Create the default provider for players who share one world."""
     return WasmtimeProvider(worlds=1)

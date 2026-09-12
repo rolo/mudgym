@@ -54,10 +54,10 @@
 
 ::: mudgym.connections.connection.MudConnection
 
-::: mudgym.connections.docker_run.DockerRunConnection
+::: mudgym.connections.wasm.wasmtime_provider.WasmtimeMudConnection
 
-::: mudgym.connections.docker_exec.DockerExecConnection
+::: mudgym.connections.wasm.create_connection
 
 ::: mudgym.connections.provider.ConnectionProvider
 
-::: mudgym.connections.provider.DockerExecProvider
+::: mudgym.connections.wasm.WasmtimeProvider

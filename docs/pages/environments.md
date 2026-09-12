@@ -40,9 +40,9 @@ Pass `render_mode="human"` to print the player-visible output after each reset a
 
 ```python
 from mudgym import make_vector_env
-from mudgym.connections.provider import DockerExecProvider
+from mudgym.connections.wasm import WasmtimeProvider
 
-envs = make_vector_env(envs=8, provider=DockerExecProvider(worlds=2))
+envs = make_vector_env(envs=8, provider=WasmtimeProvider(worlds=2))
 obs, info = envs.reset()
 envs.close()
 ```

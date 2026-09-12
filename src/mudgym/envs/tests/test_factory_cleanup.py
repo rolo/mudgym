@@ -8,17 +8,19 @@ from tests.scripted import ScriptedConnection, ScriptedProvider
 
 
 def test_make_env_invalid_actions_rejected_before_constructing_env():
-    conn = MudConnection()
+    conn = ScriptedConnection()
     with pytest.raises(ValueError, match="actions must be one of"):
         make_env(connection=conn, actions="sideways")
-    assert conn.sm is None
+    assert conn.sent_lines == []
+    assert not conn.closed
 
 
 def test_make_envconnection_kwargs_with_instance_rejected():
-    conn = MudConnection()
+    conn = ScriptedConnection()
     with pytest.raises(ValueError, match="connection_kwargs is not valid"):
-        make_env(connection=conn, connection_kwargs={"account_id": "x"})
-    assert conn.sm is None
+        make_env(connection=conn, connection_kwargs={"timeout_ms": 1000})
+    assert conn.sent_lines == []
+    assert not conn.closed
 
 
 def test_make_env_resolves_the_registry_default_at_call_time(monkeypatch):

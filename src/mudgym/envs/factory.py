@@ -82,8 +82,7 @@ def make_env(
 ) -> gym.Env:
     """Build one Gymnasium environment.
 
-    ``world_ticker`` runs once after the action for a step and before its observation. When omitted, a local
-    connection supplies its step clock. Docker worlds pace themselves and need no callback.
+    ``world_ticker`` runs once after the action for a step and before its observation. When omitted, the WASM connection supplies its step clock.
     """
     if actions not in {"text", "directions"}:
         raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")

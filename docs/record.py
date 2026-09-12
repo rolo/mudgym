@@ -4,8 +4,7 @@ The example code shown on the docs pages lives in `docs/code/`, one file per exa
 `--8<--` snippet regions the pages include -- so the code a reader sees is exactly the code that
 runs. Each example runs in two phases:
 
-- record: the example plays the live game once (requires Docker) and each connection transcript is
-  written to `docs/recordings/<name>*.session.jsonl` -- the committed source of truth.
+- record: the example plays the live game through WASM and each connection transcript is written to `docs/recordings/<name>*.session.jsonl`, the committed source of truth.
 - derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
   fragments (`docs/recordings/*.md`, `*.ansi`) are regenerated locally from the replayed transcript.
 
@@ -19,7 +18,7 @@ Run through the justfile:
 
     just docs-record                  # play the examples against the live game, rewrite captures + fragments
     just docs-record actions-text     # ... for a subset by name
-    just docs-derive                  # rewrite fragments from the committed captures; no Docker
+    just docs-derive                  # rewrite fragments from the committed captures without a live game
     just docs-watch                   # serve the docs, refreshing whichever example is saved as you edit
 
 Re-record captures once their code and protocol have settled, then commit the capture refresh
@@ -42,7 +41,6 @@ from pathlib import Path
 import numpy as np
 
 from mudgym.connections import registry
-from mudgym.connections.provider import DockerExecProvider
 from mudgym.connections.recording import (
     RecordingConnection,
     RecordingProvider,
@@ -229,6 +227,8 @@ def record(name: str, version: str) -> None:
     """
     metadata = {"recorded_by": f"just docs-record {name}", "mudgym": version}
     live_connection = registry.default_connection
+    live_provider = registry.default_provider_factory
+    live_parallel_provider = registry.default_parallel_provider_factory
     env_counter = itertools.count()
     written: list[Path] = []
 
@@ -243,10 +243,10 @@ def record(name: str, version: str) -> None:
         return path
 
     def provider_factory():
-        return RecordingProvider(DockerExecProvider(), agent_capture_path_written, metadata)
+        return RecordingProvider(live_provider(), agent_capture_path_written, metadata)
 
     def parallel_provider_factory():
-        return RecordingProvider(DockerExecProvider(worlds=1), agent_capture_path_written, metadata)
+        return RecordingProvider(live_parallel_provider(), agent_capture_path_written, metadata)
 
     with swapped_default_backends(connection_factory, provider_factory, parallel_provider_factory):
         EXAMPLES[name](FragmentWriters(name, RECORDINGS_DIR, RECORDINGS_DIR))

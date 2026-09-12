@@ -18,7 +18,7 @@ Install MudGym from PyPI:
 uv add mudgym
 ```
 
-The default connection runs the local WASM engine, which is installed automatically with MudGym.
+MudGym runs the local WASM engine, which is installed automatically with MudGym.
 
 ## Quickstart
 
