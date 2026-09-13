@@ -174,10 +174,7 @@ def make_parallel_env(
 ) -> ParallelEnv:
     """Create a PettingZoo environment whose players share one MUD world.
 
-    The registry supplies a one-world default. A provider that exposes ``world_for_connection`` must map every
-    connection to that same world. Providers without that capability retain their existing topology behavior. The
-    resulting environment owns that provider, and action wrappers sit around the joint environment rather than around
-    each player.
+    The registry supplies a one-world default. A provider that exposes ``world_for_connection`` must map every connection to that same world. Providers without that capability retain their existing topology behavior. The resulting environment owns that provider, and action wrappers sit around the joint environment rather than around each player.
 
     ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator
     alone. When omitted, the provider's ``tick_for_step`` hook supplies the clock if present.
