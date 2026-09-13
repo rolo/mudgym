@@ -4,7 +4,7 @@ A reinforcement learning environment for MUD2.
 
 ## Setup
 
-The game runs locally through WASM. The engine and runtime are installed automatically with MudGym.
+The game runs locally through WASM.
 
 Install the `mudgym` package with your Python package manager of choice.
 

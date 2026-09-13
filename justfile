@@ -52,8 +52,7 @@ docs-record *names:
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
 
-# both docs recipes re-derive the fragments first (fast, no live game), so editing pages or the
-# fragment-writing code in docs/code/ never needs a separate derive step
+# Regenerate the displayed fragments from committed captures before previewing.
 docs: docs-derive
     uv run zensical serve
 

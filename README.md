@@ -18,7 +18,7 @@ Install MudGym from PyPI:
 uv add mudgym
 ```
 
-MudGym runs the local WASM engine, which is installed automatically with MudGym.
+By default, MudGym now runs the MUD2 game engine via WASM, which is installed as a dependency.
 
 ## Quickstart
 

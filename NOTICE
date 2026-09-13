@@ -4,9 +4,11 @@ Copyright (c) 2026 Rolo Mawlabaux
 The Python code and tooling are made available under the MIT License (see
 LICENSE).
 
+MudGym runs the MUD2 game which is not part of this distribution and is not
+covered by MudGym's MIT licence.
+
 Permission to use the MUD2 game for research purposes has been provided by
 Richard Bartle, with kind thanks. The MUD2 game, name, source code, and
 associated story remain the intellectual property of Richard Bartle and
 Roy Trubshaw and may not be used for commercial purposes.
 
-MudGym runs the MUD2 game through the WASM engine wheel. The engine is not part of this distribution and is not covered by MudGym's MIT licence.

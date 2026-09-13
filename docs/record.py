@@ -4,7 +4,7 @@ The example code shown on the docs pages lives in `docs/code/`, one file per exa
 `--8<--` snippet regions the pages include -- so the code a reader sees is exactly the code that
 runs. Each example runs in two phases:
 
-- record: the example plays the live game through WASM and each connection transcript is written to `docs/recordings/<name>*.session.jsonl`, the committed source of truth.
+- record: the example plays the live game through the configured connection backend and each connection transcript is written to `docs/recordings/<name>*.session.jsonl`, the committed source of truth.
 - derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
   fragments (`docs/recordings/*.md`, `*.ansi`) are regenerated locally from the replayed transcript.
 
@@ -189,8 +189,7 @@ class FragmentWriters:
 @contextlib.contextmanager
 def swapped_default_backends(
     connection_factory,
-    provider_factory,
-    parallel_provider_factory=None,
+    parallel_provider_factory,
 ) -> Iterator[None]:
     """Point the factory defaults at different backends while an example runs.
 
@@ -198,23 +197,17 @@ def swapped_default_backends(
     code readers see -- so the swap happens at the registry defaults the factory resolves at call
     time, restored on the way out.
     """
-    if parallel_provider_factory is None:
-        parallel_provider_factory = provider_factory
-
     previous = (
         registry.default_connection,
-        registry.default_provider_factory,
         registry.default_parallel_provider_factory,
     )
     registry.default_connection = connection_factory
-    registry.default_provider_factory = provider_factory
     registry.default_parallel_provider_factory = parallel_provider_factory
     try:
         yield
     finally:
         (
             registry.default_connection,
-            registry.default_provider_factory,
             registry.default_parallel_provider_factory,
         ) = previous
 
@@ -227,7 +220,6 @@ def record(name: str, version: str) -> None:
     """
     metadata = {"recorded_by": f"just docs-record {name}", "mudgym": version}
     live_connection = registry.default_connection
-    live_provider = registry.default_provider_factory
     live_parallel_provider = registry.default_parallel_provider_factory
     env_counter = itertools.count()
     written: list[Path] = []
@@ -242,13 +234,10 @@ def record(name: str, version: str) -> None:
         written.append(path)
         return path
 
-    def provider_factory():
-        return RecordingProvider(live_provider(), agent_capture_path_written, metadata)
-
     def parallel_provider_factory():
         return RecordingProvider(live_parallel_provider(), agent_capture_path_written, metadata)
 
-    with swapped_default_backends(connection_factory, provider_factory, parallel_provider_factory):
+    with swapped_default_backends(connection_factory, parallel_provider_factory):
         EXAMPLES[name](FragmentWriters(name, RECORDINGS_DIR, RECORDINGS_DIR))
 
     # only after a successful run: captures the example no longer produces (a removed agent, fewer

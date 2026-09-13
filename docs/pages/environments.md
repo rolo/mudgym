@@ -36,15 +36,22 @@ Every reset and step exposes all three forms below, regardless of observation mo
 
 Pass `render_mode="human"` to print the player-visible output after each reset and step. With `"ansi"`, `env.render()` returns it as an ANSI string.
 
-## Vector environments
+## Independent worlds
+
+`SyncVectorEnv` collects scalar environments sequentially:
 
 ```python
-from mudgym import make_vector_env
-from mudgym.connections.wasm import WasmtimeProvider
+from gymnasium.vector import AutoresetMode, SyncVectorEnv
+from mudgym import make_env
 
-envs = make_vector_env(envs=8, provider=WasmtimeProvider(worlds=2))
-obs, info = envs.reset()
+envs = SyncVectorEnv(
+    [lambda: make_env(observation="parsed") for _ in range(8)],
+    autoreset_mode=AutoresetMode.DISABLED,
+)
+observations, infos = envs.reset(seed=123)
 envs.close()
 ```
 
-See [Multi-agent (MARL)](multiagent.md) for multi-agent support.
+## Shared worlds
+
+Use `make_parallel_env()` to control multiple players in one shared world through PettingZoo. Actions and observations are dictionaries keyed by agent ID. See [Multi-agent](multiagent.md) for the step and reset contracts.
