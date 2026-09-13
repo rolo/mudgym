@@ -54,14 +54,14 @@ def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, o
     ) as env:
         env.reset(seed=10)
 
-        observations, _, terminations, truncations, _ = env.step(
+        obs, _, terminates, truncates, _ = env.step(
             {"player_0": 'tell "alpha greeting" to alba', "player_1": 'tell "beta greeting" to ada'}
         )
 
-        assert 'Alba the protector tells you "beta greeting"' in observations["player_0"]["text"]
-        assert 'Ada the protector tells you "alpha greeting"' in observations["player_1"]["text"]
-        assert not any(terminations.values())
-        assert not any(truncations.values())
+        assert 'Alba the protector tells you "beta greeting"' in obs["player_0"]["text"]
+        assert 'Ada the protector tells you "alpha greeting"' in obs["player_1"]["text"]
+        assert not any(terminates.values())
+        assert not any(truncates.values())
 
 
 def test_parallel_step_requires_an_action_for_every_live_agent(wasm_runtime):
@@ -70,44 +70,42 @@ def test_parallel_step_requires_an_action_for_every_live_agent(wasm_runtime):
         with pytest.raises(KeyError, match="player_1"):
             env.step({"player_0": "look"})
 
-        observations, _, terminations, truncations, _ = env.step({"player_0": "look", "player_1": "look"})
+        obs, _, terminates, truncates, _ = env.step({"player_0": "look", "player_1": "look"})
 
-        assert set(observations) == {"player_0", "player_1"}
-        assert not any(terminations.values())
-        assert not any(truncations.values())
+        assert set(obs) == {"player_0", "player_1"}
+        assert not any(terminates.values())
+        assert not any(truncates.values())
 
 
 def test_parallel_step_uses_only_live_agent_keys(wasm_runtime):
     with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
         env.reset(seed=10)
 
-        observations, _, terminations, truncations, infos = env.step(
-            {"player_0": "look", "player_1": "dance", "player_2": "bow"}
-        )
+        obs, _, terminates, truncates, infos = env.step({"player_0": "look", "player_1": "dance", "player_2": "bow"})
 
-        assert set(observations) == {"player_0", "player_1"}
+        assert set(obs) == {"player_0", "player_1"}
         assert set(infos) == {"player_0", "player_1"}
-        assert "Badly-paved road" in observations["player_0"]["text"]
-        assert "dance" in observations["player_1"]["text"].lower()
-        assert not any(terminations.values()) and not any(truncations.values())
+        assert "Badly-paved road" in obs["player_0"]["text"]
+        assert "dance" in obs["player_1"]["text"].lower()
+        assert not any(terminates.values()) and not any(truncates.values())
 
 
 def test_step_removes_terminated_and_truncated_agents(wasm_runtime):
     with closing(make_parallel_env(3, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
-        initial_observations, _ = env.reset(seed=10)
+        initial_obs, _ = env.reset(seed=10)
 
         # /t asks for terminal width, leaving an unanswered input request that truncates the step.
-        _, _, terminations, truncations, infos = env.step({"player_0": "quit", "player_1": "/t", "player_2": "look"})
+        _, _, terminates, truncates, infos = env.step({"player_0": "quit", "player_1": "/t", "player_2": "look"})
 
-        assert terminations == {"player_0": True, "player_1": False, "player_2": False}
-        assert truncations == {"player_0": False, "player_1": True, "player_2": False}
+        assert terminates == {"player_0": True, "player_1": False, "player_2": False}
+        assert truncates == {"player_0": False, "player_1": True, "player_2": False}
         assert b"New terminal width" in infos["player_1"]["raw_bytes"]
         assert env.agents == ["player_2"]
-        observations, _, terminations, truncations, _ = env.step({"player_2": "look"})
-        assert set(observations) == {"player_2"}
-        assert initial_observations["player_2"]["room_name"] in observations["player_2"]["text"].lower()
-        assert terminations == {"player_2": False}
-        assert truncations == {"player_2": False}
+        obs, _, terminates, truncates, _ = env.step({"player_2": "look"})
+        assert set(obs) == {"player_2"}
+        assert initial_obs["player_2"]["room_name"] in obs["player_2"]["text"].lower()
+        assert terminates == {"player_2": False}
+        assert truncates == {"player_2": False}
 
 
 def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces(wasm_runtime):
@@ -123,27 +121,27 @@ def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces(
 def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
     with closing(make_parallel_env(2, provider=provider)) as env:
-        initial_observations, _ = env.reset(seed=17)
+        initial_obs, _ = env.reset(seed=17)
         env.step({"player_0": "look", "player_1": "look"})
         assert provider.advance_worlds(0) == {0: 1}
 
-        observations, infos = env.reset(seed=17)
+        obs, infos = env.reset(seed=17)
 
         assert provider.advance_worlds(0) == {0: 0}
-        assert {agent: obs["text"] for agent, obs in observations.items()} == {
-            agent: obs["text"] for agent, obs in initial_observations.items()
+        assert {agent: observation["text"] for agent, observation in obs.items()} == {
+            agent: observation["text"] for agent, observation in initial_obs.items()
         }
         assert all(info["step"] == 0 for info in infos.values())
 
 
 def test_parallel_reset_observations_include_every_player(wasm_runtime):
     with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
-        observations, infos = env.reset(seed=10)
+        obs, infos = env.reset(seed=10)
 
-        assert observations["player_0"]["room_name"] == observations["player_1"]["room_name"]
-        assert observations["player_0"]["players"] == ("Alba the protector",)
-        assert observations["player_1"]["players"] == ("Ada the protector",)
-        for agent, observation in observations.items():
+        assert obs["player_0"]["room_name"] == obs["player_1"]["room_name"]
+        assert obs["player_0"]["players"] == ("Alba the protector",)
+        assert obs["player_1"]["players"] == ("Ada the protector",)
+        for agent, observation in obs.items():
             assert observation["text"].count("Badly-paved road") == 1
             assert infos[agent]["render_bytes"].count(b"Badly-paved road") == 1
         assert all(info["step"] == 0 for info in infos.values())
@@ -176,9 +174,9 @@ def test_failed_provider_reset_after_all_agents_finish_blocks_the_step_clock(mon
 
         monkeypatch.setattr(provider, "reset", original_reset)
         env.reset()
-        _, _, terminations, truncations, _ = env.step(dict.fromkeys(env.agents, "look"))
+        _, _, terminates, truncates, _ = env.step(dict.fromkeys(env.agents, "look"))
         assert ticker_calls == ["tick"]
-        assert not any(terminations.values()) and not any(truncations.values())
+        assert not any(terminates.values()) and not any(truncates.values())
 
 
 def test_parallel_api_contract(wasm_runtime):
@@ -217,6 +215,6 @@ def test_coordinated_reset_stops_on_failure_and_can_retry(phase, command, capsys
 
         provider.connections[1].send_errors.clear()
         env.reset()
-        _, _, terminated, truncated, _ = env.step(actions)
-        assert not any(terminated.values())
-        assert not any(truncated.values())
+        _, _, terminates, truncates, _ = env.step(actions)
+        assert not any(terminates.values())
+        assert not any(truncates.values())

@@ -44,13 +44,15 @@ def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, 
         action = {"player_0": "look", "player_1": "look"}
     try:
         environment.reset(seed=123)
-        observations, _, terminated, truncated, info = environment.step(action)
+        result = environment.step(action)
         if mode == "scalar":
-            pairs = [(observations, info)]
+            observation, _, terminated, truncated, info = result
+            pairs = [(observation, info)]
             assert not terminated and not truncated
         else:
-            pairs = [(observations[key], info[key]) for key in observations]
-            assert not any(terminated.values()) and not any(truncated.values())
+            obs, _, terminates, truncates, infos = result
+            pairs = [(obs[key], infos[key]) for key in obs]
+            assert not any(terminates.values()) and not any(truncates.values())
         for observation, details in pairs:
             assert observation["text"] and observation["points"] == 200
             assert details["transport"]["sent_lines"] == ["look"]

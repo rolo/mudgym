@@ -69,6 +69,14 @@ def test_capture_version_deliberately_rejects_v2(tmp_path):
         ReplayConnection(path)
 
 
+def test_replay_rejects_v3_before_reading_transport_fields(tmp_path):
+    path = tmp_path / "old.jsonl"
+    path.write_text(json.dumps({"format": CAPTURE_FORMAT, "version": 3}) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="version 3"):
+        ReplayConnection(path)
+
+
 @pytest.mark.parametrize("missing_field", ["sent_lines", "requires_end_of_turn_marker"])
 def test_replay_requires_the_recorded_transport_contract(tmp_path, missing_field):
     path = tmp_path / "capture.jsonl"

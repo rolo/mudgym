@@ -10,15 +10,15 @@ def test_parallel_players_hear_each_other_and_continue_after_one_quits(live_para
     env = live_parallel_env_factory(agents=2)
     env.reset()
 
-    observations, _, terminated, truncated, _ = env.step({"player_0": "shout mudgymcoherence", "player_1": "look"})
-    assert "mudgymcoherence" in observations["player_1"]["text"].lower()
-    assert not any(terminated.values()) and not any(truncated.values())
+    obs, _, terminates, truncates, _ = env.step({"player_0": "shout mudgymcoherence", "player_1": "look"})
+    assert "mudgymcoherence" in obs["player_1"]["text"].lower()
+    assert not any(terminates.values()) and not any(truncates.values())
 
     env.step({"player_0": "quit", "player_1": "look"})
     assert env.agents == ["player_1"]
-    observations, _, terminated, truncated, _ = env.step({"player_1": "look"})
-    assert env.observation_space("player_1").contains(observations["player_1"])
-    assert not any(terminated.values()) and not any(truncated.values())
+    obs, _, terminates, truncates, _ = env.step({"player_1": "look"})
+    assert env.observation_space("player_1").contains(obs["player_1"])
+    assert not any(terminates.values()) and not any(truncates.values())
 
 
 @pytest.mark.parametrize("worlds", [1, 2])

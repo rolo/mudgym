@@ -38,7 +38,7 @@ Pass `render_mode="human"` to print the player-visible output after each reset a
 
 ## Independent worlds
 
-`SyncVectorEnv` collects scalar environments sequentially:
+`SyncVectorEnv` collects scalar environments sequentially. Pass a mask to `reset` to only reset the completed episodes and allow the rest to continue.
 
 ```python
 from gymnasium.vector import AutoresetMode, SyncVectorEnv
@@ -48,7 +48,14 @@ envs = SyncVectorEnv(
     [lambda: make_env(observation="parsed") for _ in range(8)],
     autoreset_mode=AutoresetMode.DISABLED,
 )
-observations, infos = envs.reset(seed=123)
+obs, infos = envs.reset(seed=123)
+obs, rewards, terminates, truncates, infos = envs.step(["dance"] * 8)
+
+# Save this transition for training before resetting finished slots.
+done = terminates | truncates
+if done.any():
+    obs, infos = envs.reset(options={"reset_mask": done})
+
 envs.close()
 ```
 

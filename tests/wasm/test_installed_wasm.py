@@ -107,10 +107,12 @@ def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, 
         runs = []
         for seed in (123, 456, 123):
             environment.reset(seed=seed)
-            _, _, _, _, info = environment.step(action)
-            first = info["raw_bytes"] if mode == "scalar" else info["player_0"]["raw_bytes"]
-            _, _, _, _, info = environment.step(action)
-            second = info["raw_bytes"] if mode == "scalar" else info["player_0"]["raw_bytes"]
+            result = environment.step(action)
+            info = result[-1] if mode == "scalar" else result[-1]["player_0"]
+            first = info["raw_bytes"]
+            result = environment.step(action)
+            info = result[-1] if mode == "scalar" else result[-1]["player_0"]
+            second = info["raw_bytes"]
             assert b"It feels about one o'clock." in first
             assert b"It feels about five past one." in second
             runs.append((first, second))
@@ -227,9 +229,9 @@ def test_a_copied_module_needs_no_neighbouring_game_data(tmp_path):
     environment = make_parallel_env(1, provider=provider)
     try:
         environment.reset(seed=123)
-        _, _, terminated, truncated, info = environment.step({"player_0": "faq 1"})
-        assert not any(terminated.values()) and not any(truncated.values())
-        assert b"Elizabethan Tearoom" in info["player_0"]["raw_bytes"]
+        _, _, terminates, truncates, infos = environment.step({"player_0": "faq 1"})
+        assert not any(terminates.values()) and not any(truncates.values())
+        assert b"Elizabethan Tearoom" in infos["player_0"]["raw_bytes"]
         assert list(tmp_path.iterdir()) == [module]
     finally:
         environment.close()
@@ -263,15 +265,15 @@ def test_bytes_observation_retains_peer_output(wasm_runtime):
     environment = make_parallel_env(2, observation="bytes", provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))
     try:
         environment.reset(seed=211)
-        observations, _, terminated, truncated, info = environment.step(
+        obs, _, terminates, truncates, infos = environment.step(
             {"player_0": 'tell "packaging trial" to alba', "player_1": "look"}
         )
-        assert not any(terminated.values()) and not any(truncated.values())
-        assert b"packaging trial" in info["player_1"]["raw_bytes"]
-        for agent, observation in observations.items():
-            raw = info[agent]["raw_bytes"]
+        assert not any(terminates.values()) and not any(truncates.values())
+        assert b"packaging trial" in infos["player_1"]["raw_bytes"]
+        for agent, observation in obs.items():
+            raw = infos[agent]["raw_bytes"]
             assert observation["raw_bytes"].tobytes()[: len(raw)] == raw
-            assert info[agent]["transport"]["sent_lines"] == (
+            assert infos[agent]["transport"]["sent_lines"] == (
                 ['tell "packaging trial" to alba'] if agent == "player_0" else ["look"]
             )
     finally:

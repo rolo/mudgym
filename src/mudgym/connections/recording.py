@@ -12,7 +12,7 @@ from mudgym.logs import get_logger
 logger = get_logger(__name__)
 
 CAPTURE_FORMAT = "mudgym-connection-capture"
-CAPTURE_VERSION = 3
+CAPTURE_VERSION = 4
 
 
 class ReplayMismatchError(RuntimeError):

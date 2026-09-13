@@ -8,11 +8,11 @@ def example(fragments) -> None:
         from mudgym import make_parallel_env
 
         env = make_parallel_env(agents=2)
-        observations, infos = env.reset()
+        obs, infos = env.reset()
         actions = dict.fromkeys(env.agents, "yodel")
-        observations, rewards, terminations, truncations, infos = env.step(actions)
-        for agent in sorted(observations):
-            print(agent, observations[agent]["room_name"], rewards[agent])
+        obs, rewards, terminates, truncates, infos = env.step(actions)
+        for agent in sorted(obs):
+            print(agent, obs[agent]["room_name"], rewards[agent])
         env.close()
         # --8<-- [end:index-multiagent]
     fragments.write_fenced("index-multiagent", stdout.getvalue())

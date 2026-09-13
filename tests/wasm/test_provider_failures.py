@@ -289,9 +289,9 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
         second.act("look")
         provider.tick_for_step()
         results = [first.observe(), second.observe()]
-        observations, rewards, terminated, truncated, infos = zip(*results, strict=True)
-        assert terminated == (True, False)
-        assert not any(truncated)
+        obs, rewards, terminates, truncates, infos = zip(*results, strict=True)
+        assert terminates == (True, False)
+        assert not any(truncates)
         assert rewards == (300, 0)
         assert infos[0]["raw_bytes"].count(b"Auto-reset initiated") == 1
         assert provider._ordered_worlds[1].current_tick() == 1 + advance_directly

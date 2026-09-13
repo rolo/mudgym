@@ -21,10 +21,10 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
     provider = RecordingProvider(WasmtimeProvider(runtime=wasm_runtime, worlds=1), capture_path)
     with closing(make_parallel_env(2, provider=provider, observation=preset, render_mode="ansi")) as environment:
         # With all players prepared first, seed 10 places Ada and Alba in the same room.
-        observations, infos = environment.reset(seed=10)
+        obs, infos = environment.reset(seed=10)
         children = list(environment.envs.values())
         for index, child in enumerate(children):
-            observation = observations[f"player_{index}"]
+            observation = obs[f"player_{index}"]
             raw = infos[f"player_{index}"]["raw_bytes"]
             rendered = infos[f"player_{index}"]["render_bytes"]
             assert observation["text"].count("Badly-paved road") == 1
@@ -47,9 +47,9 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
                 assert observation["raw_bytes"].tobytes()[: len(raw)] == raw
 
         actions = {"player_0": "dance", "player_1": "dance"}
-        following, _, terminated, truncated, _ = environment.step(actions)
-        assert not any(terminated.values()) and not any(truncated.values())
-        texts = [observation["text"] for observation in following.values()]
+        obs, _, terminates, truncates, _ = environment.step(actions)
+        assert not any(terminates.values()) and not any(truncates.values())
+        texts = [observation["text"] for observation in obs.values()]
         assert all("Badly-paved road" not in text for text in texts)
 
 

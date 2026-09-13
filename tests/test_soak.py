@@ -60,17 +60,17 @@ def test_soak_parallel_post_death_resets_survive_live(wasm_runtime, live_paralle
     provider = WasmtimeProvider(worlds=1, runtime=wasm_runtime)
     env = live_parallel_env_factory(agents=3, provider=provider)
     rounds = max(SOAK_ITERATIONS // 2, 5)
-    observations, infos = env.reset(seed=0)
+    obs, infos = env.reset(seed=0)
     reset_durations: list[float] = []
 
     for round_index in range(rounds):
         with subtests.test(round=round_index):
             commands = {agent: DEATH_ACTIONS[round_index % len(DEATH_ACTIONS)] for agent in env.agents}
-            observations, rewards, terminations, truncations, infos = env.step(commands)
-            assert all(terminations.values()), f"round {round_index}: not all agents terminated"
+            obs, rewards, terminates, truncates, infos = env.step(commands)
+            assert all(terminates.values()), f"round {round_index}: not all agents terminated"
 
             started = time.monotonic()
-            observations, infos = env.reset(seed=round_index + 1)
+            obs, infos = env.reset(seed=round_index + 1)
             reset_durations.append(time.monotonic() - started)
             assert env.agents, "parallel reset came back with no agents"
 

@@ -1,4 +1,4 @@
-{"format": "mudgym-connection-capture", "version": 3, "connection": "DockerExecConnection", "recorded_by": "just docs-record index-multiagent", "mudgym": "v0.4.6-19-g1475a65-dirty", "requires_end_of_turn_marker": true}
+{"format": "mudgym-connection-capture", "version": 4, "connection": "DockerExecConnection", "recorded_by": "just docs-record index-multiagent", "mudgym": "v0.4.6-19-g1475a65-dirty", "requires_end_of_turn_marker": true}
 {"call": "reset"}
 {"call": "send_line", "line": "qs"}
 {"call": "read_response", "raw_text": "qs\r\n\u001b[0;37;40mHester the protector\r\neff str 55      eff dex 66      sta \u001b[1;32;40m59\u001b[0;37;40m/\u001b[1;32;40m59\u001b[0;37;40m       pts 200 gam 1\u001b[1;37;40m\r\n\u001b[0;34;40m\u001b[1;34;40m*\u001b[0;34;40m\u001b[1;37;40m", "terminated": false, "incomplete": false, "rejected": false, "marker_arrived": true, "sent_lines": ["qs"]}

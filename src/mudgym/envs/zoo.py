@@ -52,10 +52,10 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
             options,
         )
         self.agents = agents
-        observations = {agent: result[0] for agent, result in results.items()}
+        obs = {agent: result[0] for agent, result in results.items()}
         infos = {agent: result[1] for agent, result in results.items()}
 
-        return observations, infos
+        return obs, infos
 
     def step(
         self,
@@ -67,10 +67,10 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         dict[str, bool],
         dict[str, dict],
     ]:
-        observations = {}
+        obs = {}
         rewards = {}
-        terminations = {}
-        truncations = {}
+        terminates = {}
+        truncates = {}
         infos = {}
 
         agents = list(self.agents)
@@ -79,12 +79,12 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         # Resolve required keys before sending so a missing action leaves sessions ready to retry.
         agent_actions = {agent: actions[agent] for agent in agents}
         for agent, result in step_players(self.envs, agent_actions, self.world_ticker):
-            observations[agent], rewards[agent], terminations[agent], truncations[agent], infos[agent] = result
+            obs[agent], rewards[agent], terminates[agent], truncates[agent], infos[agent] = result
 
         # An agent stays live until its own child says it is done. Keep the snapshot above for the result dictionaries, then update the public live-agent list for the next step.
-        self.agents = [agent for agent in agents if not terminations[agent] and not truncations[agent]]
+        self.agents = [agent for agent in agents if not terminates[agent] and not truncates[agent]]
 
-        return observations, rewards, terminations, truncations, infos
+        return obs, rewards, terminates, truncates, infos
 
     def render(self) -> str | None:
         if self.render_mode is None:
