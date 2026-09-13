@@ -52,7 +52,7 @@ def test_parallel_close_attempts_every_player_then_provider_and_preserves_errors
             if self.env is children[0]:
                 raise player_error
 
-    provider = ClosingProvider(runtime=wasm_runtime)
+    provider = ClosingProvider(runtime=wasm_runtime, worlds=1)
     environment = make_parallel_env(2, provider=provider)
     try:
         environment.reset(seed=123)

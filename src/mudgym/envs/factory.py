@@ -129,6 +129,8 @@ def create_players(
     field_parsers: Sequence[FieldSpec] | None,
     render_mode: str | None,
     tearoom_commands: str | None,
+    *,
+    require_shared_world: bool = False,
 ) -> list[MudEnv]:
     """Adopt one provider batch and close everything if construction fails."""
     connections: list[MudConnection] = []
@@ -137,6 +139,11 @@ def create_players(
         connections = provider.create_connections(count)
         if len(connections) != count:
             raise RuntimeError(f"Provider returned {len(connections)} connections, expected {count}.")
+        world_for_connection = getattr(provider, "world_for_connection", None)
+        if require_shared_world and world_for_connection is not None:
+            world_indexes = {world_for_connection(index) for index in range(len(connections))}
+            if len(world_indexes) != 1:
+                raise ValueError("Parallel environment connections must share one world.")
         for connection in connections:
             children.append(
                 MudEnv(
@@ -167,9 +174,10 @@ def make_parallel_env(
 ) -> ParallelEnv:
     """Create a PettingZoo environment whose players share one MUD world.
 
-    The registry supplies a one-world default. If a caller passes a provider we trust that it honours the same promise.
-    The resulting environment owns that provider, and action wrappers sit around the joint environment rather than
-    around each player.
+    The registry supplies a one-world default. A provider that exposes ``world_for_connection`` must map every
+    connection to that same world. Providers without that capability retain their existing topology behavior. The
+    resulting environment owns that provider, and action wrappers sit around the joint environment rather than around
+    each player.
 
     ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator
     alone. When omitted, the provider's ``tick_for_step`` hook supplies the clock if present.
@@ -189,7 +197,15 @@ def make_parallel_env(
     children = {
         f"player_{index}": child
         for index, child in enumerate(
-            create_players(agents, provider, observation, field_parsers, child_render_mode, tearoom_commands)
+            create_players(
+                agents,
+                provider,
+                observation,
+                field_parsers,
+                child_render_mode,
+                tearoom_commands,
+                require_shared_world=True,
+            )
         )
     }
     try:

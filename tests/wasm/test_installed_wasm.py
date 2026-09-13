@@ -11,6 +11,37 @@ import pytest
 
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
+from mudgym.envs.factory import create_players
+
+
+def test_parallel_env_rejects_multiple_wasm_worlds_and_closes_provider(wasm_runtime):
+    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
+
+    with pytest.raises(ValueError, match="connections must share one world"):
+        make_parallel_env(2, provider=provider)
+
+    assert provider._closed
+    assert provider._connections == []
+    assert provider._executor is None
+
+
+def test_parallel_env_accepts_connections_in_one_wasm_world(wasm_runtime):
+    environment = make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))
+    try:
+        environment.reset(seed=123)
+    finally:
+        environment.close()
+
+
+def test_create_players_allows_independent_wasm_worlds(wasm_runtime):
+    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
+    children = create_players(2, provider, "text", None, None, None)
+    try:
+        assert [provider.world_for_connection(index) for index in range(2)] == [0, 1]
+    finally:
+        for child in children:
+            child.close()
+        provider.close()
 
 
 @pytest.mark.parametrize(
