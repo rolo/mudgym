@@ -4,7 +4,7 @@ from contextlib import closing
 
 import pytest
 
-from mudgym import make_env, make_parallel_env, make_vector_env
+from mudgym import make_env, make_parallel_env
 from mudgym.connections.recording import RecordingConnection, ReplayConnection
 from mudgym.connections.wasm import WasmtimeProvider
 from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
@@ -32,14 +32,11 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
 
 
 @pytest.mark.parametrize("preset", ["text", "bytes"])
-@pytest.mark.parametrize("mode", ["scalar", "vector", "parallel"])
+@pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, preset):
     if mode == "scalar":
         environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
         action = "look"
-    elif mode == "vector":
-        environment = make_vector_env(2, provider=WasmtimeProvider(runtime=wasm_runtime), observation=preset)
-        action = ["look", "look"]
     else:
         environment = make_parallel_env(
             2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=preset
@@ -51,18 +48,6 @@ def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, 
         if mode == "scalar":
             pairs = [(observations, info)]
             assert not terminated and not truncated
-        elif mode == "vector":
-            pairs = [
-                (
-                    {key: value[index] for key, value in observations.items()},
-                    {
-                        "raw_bytes": info["raw_bytes"][index],
-                        "transport": {key: values[index] for key, values in info["transport"].items()},
-                    },
-                )
-                for index in range(2)
-            ]
-            assert not terminated.any() and not truncated.any()
         else:
             pairs = [(observations[key], info[key]) for key in observations]
             assert not any(terminated.values()) and not any(truncated.values())

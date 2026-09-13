@@ -73,7 +73,7 @@ class WasmtimeResponse:
     incomplete: bool
 
 
-class WasmtimeMudConnection(MudConnection):
+class WasmtimeConnection(MudConnection):
     """One stable MudGym connection rebound to each fresh WASI session."""
 
     requires_end_of_turn_marker = False
@@ -284,7 +284,7 @@ class WasmtimeProvider:
         self.timeout_ms = timeout_ms
         self._lock = threading.RLock()
         self._executor: ThreadPoolExecutor | None = None
-        self._connections: list[WasmtimeMudConnection] = []
+        self._connections: list[WasmtimeConnection] = []
         self._world_slots: list[list[int]] = []
         self._ordered_worlds: list[WasmtimeWorld] = []
         self._world_seeds: tuple[int, ...] = ()
@@ -297,7 +297,7 @@ class WasmtimeProvider:
             raise IndexError(f"connection index {connection_index} is outside {len(self._connections)} connections")
         return connection_index % self.worlds
 
-    def create_connections(self, count: int) -> list[WasmtimeMudConnection]:
+    def create_connections(self, count: int) -> list[WasmtimeConnection]:
         with self._lock:
             if self._closed:
                 raise RuntimeError("provider is closed")
@@ -316,7 +316,7 @@ class WasmtimeProvider:
             self._world_seeds = tuple(self.seed + world_index for world_index in range(resolved_worlds))
             self._world_slots = [list(range(index, count, resolved_worlds)) for index in range(resolved_worlds)]
             self._connections = [
-                WasmtimeMudConnection(provider=self, connection_index=index, timeout_ms=self.timeout_ms)
+                WasmtimeConnection(provider=self, connection_index=index, timeout_ms=self.timeout_ms)
                 for index in range(count)
             ]
             self._executor = ThreadPoolExecutor(
@@ -373,7 +373,7 @@ class WasmtimeProvider:
 
     def _replace_connection_session(
         self,
-        connection: WasmtimeMudConnection,
+        connection: WasmtimeConnection,
         world_index: int,
     ) -> None:
         """Replace one departed player without changing its active world."""
@@ -440,7 +440,7 @@ class WasmtimeProvider:
             if shutdown_errors := _shutdown_worlds(old_worlds):
                 raise BaseExceptionGroup("previous WASI world shutdown failed after reset", shutdown_errors)
 
-    def _prepare_connection(self, connection: WasmtimeMudConnection, *, seed: int | None = None) -> None:
+    def _prepare_connection(self, connection: WasmtimeConnection, *, seed: int | None = None) -> None:
         with self._lock:
             if connection not in self._connections:
                 raise RuntimeError("connection does not belong to this provider")
@@ -524,7 +524,7 @@ class WasmtimeProvider:
                 raise BaseExceptionGroup("WASI provider close failed", errors)
 
 
-def create_connection(**provider_options: Any) -> WasmtimeMudConnection:
+def create_connection(**provider_options: Any) -> WasmtimeConnection:
     """Create a standalone connection that owns and closes its entire provider."""
     provider = WasmtimeProvider(**provider_options)
     try:

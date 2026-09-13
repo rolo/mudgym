@@ -4,7 +4,7 @@ import argparse
 import sys
 
 from mudgym.connections.connection import MudConnection
-from mudgym.connections.registry import available_connections_dict, default_connection
+from mudgym.connections.registry import connections, default_connection
 from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.featurizers.strings import decode_text_bytes
 from mudgym.logs import setup_logging
@@ -42,12 +42,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Play a MUD session")
     parser.add_argument(
         "--connection",
-        choices=list(available_connections_dict),
+        choices=list(connections),
         metavar="SLUG",
-        help=f"Connection type to use. Available: {', '.join(available_connections_dict)}",
+        help=f"Connection type to use. Available: {', '.join(connections)}",
     )
     args = parser.parse_args()
-    play(available_connections_dict[args.connection] if args.connection else default_connection)
+    play(connections[args.connection] if args.connection else default_connection)
 
 
 if __name__ == "__main__":

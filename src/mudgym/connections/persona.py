@@ -1,4 +1,4 @@
-"""Stable persona names for seeded WASM worlds."""
+"""Stable persona names for seeded game worlds."""
 
 # Valid names shared by every connection. Stable order also gives seeded worlds repeatable identities.
 PERSONA_NAMES = (

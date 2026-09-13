@@ -2,11 +2,11 @@ import time
 
 import pytest
 
-from mudgym.connections.registry import available_connections_dict
+from mudgym.connections.registry import connections
 from mudgym.envs.fields.feinventory import FEInventoryField
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_tea(connection_key, tea_results):
     """
     The tea test checks that the connection can get us into the game and that we are
@@ -28,7 +28,7 @@ def test_tea(connection_key, tea_results):
         }
         last_mark = now
 
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         log_time("tea")

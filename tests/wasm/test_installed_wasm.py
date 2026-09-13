@@ -7,11 +7,9 @@ from datetime import UTC, datetime, timedelta, timezone
 from importlib import metadata
 from importlib.resources import files
 
-import numpy as np
 import pytest
-from gymnasium.vector import AutoresetMode
 
-from mudgym import make_env, make_parallel_env, make_vector_env
+from mudgym import make_env, make_parallel_env
 from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
 
 
@@ -92,7 +90,7 @@ def test_civil_anchor_controls_halloween_startup_and_seeded_replay(wasm_runtime)
         assert runs[0] != runs[1]
 
 
-@pytest.mark.parametrize("mode", ["scalar", "vector"])
+@pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, mode):
     anchor = datetime(2026, 1, 15, 1, 1, 58, tzinfo=timezone(timedelta(hours=5, minutes=30)))
     if mode == "scalar":
@@ -101,16 +99,18 @@ def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, 
         )
         action = "time"
     else:
-        environment = make_vector_env(1, provider=WasmtimeProvider(runtime=wasm_runtime, civil_time_anchor=anchor))
-        action = ["time"]
+        environment = make_parallel_env(
+            1, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor)
+        )
+        action = {"player_0": "time"}
     try:
         runs = []
         for seed in (123, 456, 123):
             environment.reset(seed=seed)
             _, _, _, _, info = environment.step(action)
-            first = info["raw_bytes"] if mode == "scalar" else info["raw_bytes"][0]
+            first = info["raw_bytes"] if mode == "scalar" else info["player_0"]["raw_bytes"]
             _, _, _, _, info = environment.step(action)
-            second = info["raw_bytes"] if mode == "scalar" else info["raw_bytes"][0]
+            second = info["raw_bytes"] if mode == "scalar" else info["player_0"]["raw_bytes"]
             assert b"It feels about one o'clock." in first
             assert b"It feels about five past one." in second
             runs.append((first, second))
@@ -161,7 +161,7 @@ def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm
         environment.close()
 
 
-@pytest.mark.parametrize("mode", ["scalar", "vector", "parallel"])
+@pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
 
@@ -171,9 +171,6 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     if mode == "scalar":
         environment = make_env(connection=provider.create_connections(1)[0], world_ticker=ticker)
         action = "look"
-    elif mode == "vector":
-        environment = make_vector_env(2, provider=provider, world_ticker=ticker)
-        action = ["look", "look"]
     else:
         environment = make_parallel_env(2, provider=provider, world_ticker=ticker)
         action = {"player_0": "look", "player_1": "look"}
@@ -184,20 +181,6 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     finally:
         environment.close()
         provider.close()
-
-
-def test_partial_vector_reset_preserves_the_other_world_and_observation(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime)
-    environment = make_vector_env(2, provider=provider)
-    try:
-        environment.reset(seed=[123, 456])
-        previous, *_ = environment.step(["look", "look"])
-        observation, info = environment.reset(options={"reset_mask": np.array([True, False])})
-        assert provider.advance_worlds(0) == {0: 0, 1: 1}
-        assert observation["text"][1] == previous["text"][1]
-        assert info["_raw_bytes"].tolist() == [True, False]
-    finally:
-        environment.close()
 
 
 @pytest.mark.parametrize(
@@ -220,61 +203,10 @@ def test_command_rejection_comes_from_game_output(wasm_runtime, command, rejecte
         environment.close()
 
 
-def test_wasm_vector_next_step_autoreset_preserves_the_terminal_transition(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime)
-    environment = make_vector_env(2, provider=provider, observation="bytes", autoreset_mode=AutoresetMode.NEXT_STEP)
-    try:
-        environment.reset(seed=211)
-        provider.advance_worlds(7)
-        _, rewards, terminated, truncated, info = environment.step(["mgquit", "look"])
-        assert rewards.tolist() == [0, 0]
-        assert terminated.tolist() == [True, False]
-        assert truncated.tolist() == [False, False]
-        assert info["raw_bytes"][0]
-        terminal_bytes = info["raw_bytes"][0]
-        _, rewards, terminated, truncated, info = environment.step(["ignored reset action", "look"])
-        assert rewards.tolist() == [0, 0]
-        assert not terminated.any() and not truncated.any()
-        assert info["raw_bytes"][0] != terminal_bytes
-        assert b"ignored reset action" not in info["raw_bytes"][0]
-        # Relogin after a player's departure retains even an independent slot's existing world and clock.
-        assert provider.advance_worlds(0) == {0: 9, 1: 9}
-        _, _, terminated, truncated, _ = environment.step(["look", "look"])
-        assert not terminated.any() and not truncated.any()
-    finally:
-        environment.close()
-
-
-def test_eight_wasm_worlds_can_reset_step_and_reset_again(wasm_runtime):
-    environment = make_vector_env(8, provider=WasmtimeProvider(runtime=wasm_runtime))
-    try:
-        for seed in (41, 42):
-            environment.reset(seed=seed)
-            observations, rewards, terminated, truncated, _ = environment.step(["look"] * 8)
-            assert len(observations["text"]) == 8
-            assert all(observations["text"])
-            assert rewards.tolist() == [0] * 8
-            assert not terminated.any() and not truncated.any()
-    finally:
-        environment.close()
-
-
-def test_wasm_vector_worlds_do_not_deliver_messages_to_each_other(wasm_runtime):
-    environment = make_vector_env(2, observation="bytes", provider=WasmtimeProvider(runtime=wasm_runtime))
-    try:
-        environment.reset(seed=211)
-        _, _, terminated, truncated, info = environment.step(['tell "isolated trial" to alba', "look"])
-        assert not terminated.any() and not truncated.any()
-        assert b"isolated trial" not in info["raw_bytes"][1]
-    finally:
-        environment.close()
-
-
 def test_closing_the_wasm_environments_releases_their_workers(wasm_runtime):
     before = set(threading.enumerate())
     for environment in (
         make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}),
-        make_vector_env(2, provider=WasmtimeProvider(runtime=wasm_runtime)),
         make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1)),
     ):
         try:
@@ -291,32 +223,27 @@ def test_a_copied_module_needs_no_neighbouring_game_data(tmp_path):
     module = tmp_path / "mud2-wasi.wasm"
     shutil.copyfile(str(files("mudgym_wasm_engine").joinpath("wasi/mud2-wasi.wasm")), module)
     runtime = WasmtimeRuntime(wasm_path=module)
-    provider = WasmtimeProvider(runtime=runtime)
-    environment = make_vector_env(1, provider=provider)
+    provider = WasmtimeProvider(runtime=runtime, worlds=1)
+    environment = make_parallel_env(1, provider=provider)
     try:
         environment.reset(seed=123)
-        _, _, terminated, truncated, info = environment.step(["faq 1"])
-        assert not terminated.any() and not truncated.any()
-        assert b"Elizabethan Tearoom" in info["raw_bytes"][0]
+        _, _, terminated, truncated, info = environment.step({"player_0": "faq 1"})
+        assert not any(terminated.values()) and not any(truncated.values())
+        assert b"Elizabethan Tearoom" in info["player_0"]["raw_bytes"]
         assert list(tmp_path.iterdir()) == [module]
     finally:
         environment.close()
 
 
-@pytest.mark.parametrize("mode", ["scalar", "vector", "parallel"])
+@pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runtime, mode):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1 if mode == "parallel" else None)
+    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
     if mode == "scalar":
         connection = provider.create_connections(1)[0]
         environment = make_env(connection=connection)
         action = "look"
         initial_ticks = {0: 0}
         next_ticks = {0: 1}
-    elif mode == "vector":
-        environment = make_vector_env(2, provider=provider)
-        action = ["look", "look"]
-        initial_ticks = {0: 0, 1: 0}
-        next_ticks = {0: 1, 1: 1}
     else:
         environment = make_parallel_env(2, provider=provider)
         action = {"player_0": "look", "player_1": "look"}
@@ -330,22 +257,6 @@ def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runt
     finally:
         environment.close()
         provider.close()
-
-
-def test_scalar_and_vector_reset_apply_the_same_engine_seed(wasm_runtime):
-    scalar = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
-    vector = make_vector_env(1, provider=WasmtimeProvider(runtime=wasm_runtime))
-    try:
-        for seed in (123, 456, 123):
-            scalar_observation, _ = scalar.reset(seed=seed)
-            vector_observation, _ = vector.reset(seed=seed)
-            assert scalar_observation["room_name_index"] == vector_observation["room_name_index"][0]
-            scalar_observation, *_ = scalar.step("look")
-            vector_observation, *_ = vector.step(["look"])
-            assert scalar_observation["text"] == vector_observation["text"][0]
-    finally:
-        scalar.close()
-        vector.close()
 
 
 def test_bytes_observation_retains_peer_output(wasm_runtime):

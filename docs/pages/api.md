@@ -4,8 +4,6 @@
 
 ::: mudgym.envs.factory.make_env
 
-::: mudgym.envs.factory.make_vector_env
-
 ::: mudgym.envs.factory.make_parallel_env
 
 ---
@@ -13,8 +11,6 @@
 ## Environments
 
 ::: mudgym.envs.env.MudEnv
-
-::: mudgym.envs.vector.MudVectorEnv
 
 ::: mudgym.envs.zoo.MudParallelEnv
 
@@ -54,7 +50,7 @@
 
 ::: mudgym.connections.connection.MudConnection
 
-::: mudgym.connections.wasm.wasmtime_provider.WasmtimeMudConnection
+::: mudgym.connections.wasm.wasmtime_provider.WasmtimeConnection
 
 ::: mudgym.connections.wasm.create_connection
 

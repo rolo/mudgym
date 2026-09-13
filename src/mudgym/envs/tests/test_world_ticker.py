@@ -1,4 +1,4 @@
-from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
+from mudgym.envs.factory import make_env, make_parallel_env
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
 
@@ -25,34 +25,6 @@ def test_scalar_step_ticks_between_the_action_and_its_observation():
         assert world_ticker.calls == [[1]]
         env.step("dance")
         assert world_ticker.calls == [[1], [1]]
-    finally:
-        env.close()
-
-
-def test_vector_ticks_once_per_joint_step_after_every_action():
-    provider = ScriptedProvider()
-    world_ticker = WorldTickerRecorder(lambda: provider.connections)
-    env = make_vector_env(2, provider=provider, world_ticker=world_ticker)
-    try:
-        env.reset()
-        assert world_ticker.calls == []
-        env.step(["look", "dance"])
-        # Both children had acted (one unread action line each) before the single advancement.
-        assert world_ticker.calls == [[1, 1]]
-    finally:
-        env.close()
-
-
-def test_vector_children_never_advance_shared_world_time():
-    provider = ScriptedProvider()
-    world_ticker = WorldTickerRecorder(lambda: provider.connections)
-    env = make_vector_env(2, provider=provider, world_ticker=world_ticker)
-    try:
-        env.reset()
-        env.envs[0].step("look")
-        assert world_ticker.calls == []
-        env.step(["look", "dance"])
-        assert world_ticker.calls == [[1, 1]]
     finally:
         env.close()
 

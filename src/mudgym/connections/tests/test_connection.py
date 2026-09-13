@@ -1,6 +1,6 @@
 import pytest
 
-from mudgym.connections.registry import available_connections_dict
+from mudgym.connections.registry import connections
 from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END
 from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.session import MudSession
@@ -13,9 +13,9 @@ def send_and_read(connection, lines):
     return connection.read_response(FEInventoryField.end_of_turn_marker)
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     session = MudSession(connection, observation_line="fei", end_of_turn_marker=FEInventoryField.end_of_turn_marker)
     try:
         session.reset()
@@ -37,14 +37,14 @@ def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
         session.close()
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key):
     """
     A command that ends the game must come back with terminated=True, and reset() must ready up
     again for another episode.
     """
 
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         _, terminated, incomplete, _ = send_and_read(connection, ["quit"])
@@ -60,12 +60,12 @@ def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key
         connection.close()
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 @pytest.mark.parametrize("player_command", ["say Option:", "Option:", "Not updating persona."])
 def test_player_authored_control_text_does_not_close_the_command_window(connection_key, player_command):
     """Known command echoes win over identical input-prompt and game-over text."""
 
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, [player_command, "fei"])
@@ -81,10 +81,10 @@ def test_player_authored_control_text_does_not_close_the_command_window(connecti
         connection.close()
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_rejection_before_final_line_echo_is_reported_after_marker_arrives(connection_key):
     """A rejected first line stays visible after a split batch reaches its final marker."""
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, ["xyzzyfrobnicate", "fei"])
@@ -99,10 +99,10 @@ def test_rejection_before_final_line_echo_is_reported_after_marker_arrives(conne
         connection.close()
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_spoken_rejection_text_is_not_reported_as_a_rejected_command(connection_key):
     """A rejection phrase quoted in player speech is not a front-end response."""
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(
@@ -119,11 +119,11 @@ def test_spoken_rejection_text_is_not_reported_as_a_rejected_command(connection_
         connection.close()
 
 
-@pytest.mark.parametrize("connection_key", available_connections_dict)
+@pytest.mark.parametrize("connection_key", connections)
 def test_player_command_with_too_many_parts_does_not_prevent_the_observation_line(connection_key):
     command_line = ",".join(["n"] * 25)
 
-    connection = available_connections_dict[connection_key]()
+    connection = connections[connection_key]()
     try:
         connection.reset()
         raw_bytes, terminated, incomplete, debug_info = send_and_read(connection, [command_line, "fei"])

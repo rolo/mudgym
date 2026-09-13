@@ -14,8 +14,8 @@ from mudgym.envs.fields import (
 )
 
 PRESET_FIELD_TYPES = {
-    "bytes": {RawBytesField, FEScoreField},
-    "text": {FEScoreField},
+    "bytes": {RawBytesField},
+    "text": set(),
     "parsed": {SuperQuickLookField, FEScoreField, FEXitsField, FEInventoryField},
     "cheats": {FEScoreField, FEXitsField, FEInventoryField, MGCheatsField},
 }

@@ -4,7 +4,7 @@ from typing import Any
 
 
 class MudConnection(ABC):
-    """Connection interface for live WASM sessions and recorded transcripts.
+    """Connection interface for game sessions and recorded transcripts.
 
     Reset prepares a session in the tearoom. Sending and reading are separate so several players can act before collecting their observations. Closing releases the connection's resources.
     """

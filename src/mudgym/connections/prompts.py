@@ -1,7 +1,6 @@
 """Patterns for parsing MUD2 game output and recorded transcripts."""
 
 import enum
-import functools
 import re
 
 # One-or-more variant for named-capture contexts (where matching empty is wrong)
@@ -26,23 +25,6 @@ SGR_ONE_PLUS_STR = r"(?:\x1b\[[0-9;]*m)+"
 SGR = rb"(?:\x1b\[[0-9;]*m)*"
 SGR_ONE_PLUS_BYTES = rb"(?:\x1b\[[0-9;]*m)+"
 
-# Optional terminal CSI controls at the start of a raw wire line. Besides colour changes, menu
-# redraws can emit screen-clear and cursor-positioning controls before their input prompt.
-CSI_CONTROLS = rb"(?:\x1b\[[0-9;?]*[ -/]*[@-~])*"
-
-
-def trusted_input_prompt(pattern: bytes, flags: int = 0) -> re.Pattern:
-    """
-    Compile an input prompt against its trusted raw-wire prefix.
-
-    MUD2 emits menu, login, and pager input points at the start of a physical line, sometimes
-    after terminal controls. Spoken or incidental copies have narrative text before the
-    player-controlled words. Command echoes need an additional dynamic trust boundary: the
-    command loop consumes every known echo before it considers these prompt patterns.
-    """
-    return re.compile(rb"(?m)^" + CSI_CONTROLS + pattern, flags)
-
-
 # Prompt pieces (bytes)
 DASHES = rb"-{4,}"
 
@@ -64,24 +46,6 @@ DATABASE_BROADCAST_LINE = rb"(?:\r?\n)+\+- (?:Database \d+|The database) has fin
 DANGLES = rb"(?:(?![\r\n])|(?=" + DATABASE_BROADCAST_LINE + rb"))"
 
 NEXT_PROMPT_BOUNDARY = rb"(?m:^)" + SGR + PROMPT_CORE + SGR_POSSESSIVE + DANGLES
-
-TEAROOM_PROMPT_PATTERN = (
-    rb"^"
-    + SGR
-    + rb"(?:Elizabethan tearoom|Wizzes' room|Control room)"
-    + SGR
-    + rb".*?"
-    + SGR
-    + rb"Players:"
-    + SGR
-    + rb"\r?\n"
-    + rb"(?P<players>.*?)"
-    + rb"(?="
-    + NEXT_PROMPT_BOUNDARY
-    + rb")"
-)
-
-TEAROOM_PROMPT = re.compile(TEAROOM_PROMPT_PATTERN, re.DOTALL | re.MULTILINE)
 
 
 def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
@@ -109,62 +73,6 @@ def system_line_up_to_next_prompt(needle: bytes) -> re.Pattern:
 
 
 class Prompt(enum.Enum):
-    OPTION = trusted_input_prompt(rb"Option\s*(\(H for help\))?\s*:")
-    TEAROOM = TEAROOM_PROMPT
-
-    # where we chop the text at episode start upon entering The Land
-    ENTERED_LAND = re.compile(rb"nothingness...")
-
-    # * - mortal
-    # (*) - invisible mortal
-    # ((*)) - double invisible mortal (is this possible?)
-    # ----* - wizard
-    # (----*) - invisible wizard
-    # ((----*)) - double invisible wizard
-    # (((----*))) - triple invisible wizard
-    # we anchor them like NEXT_PROMPT_BOUNDARY (line start, never a complete line).
-    # A bare star stays bold-only because the login menus reprint a plain star ahead of
-    # each echoed answer, which must not read as being in game. Possessive repeats so a spoof
-    # can't shed its own trailing characters to satisfy the lookahead.
-    GAME = re.compile(
-        rb"(?m:^)"
-        + SGR
-        + rb"(?:"
-        + rb"\({1,3}+"
-        + SGR
-        + rb"(?:-{4,}+)?\*"
-        + SGR
-        + rb"\){1,3}+"  # (*), ((----*)), ...
-        + rb"|-{4,}+\*"  # ----*
-        + rb"|\x1b\[1;[0-9;]*m\*\x1b\[[0-9;]*m"  # bold coloured mortal star
-        + rb")"
-        + SGR_POSSESSIVE
-        + DANGLES
-    )
-
-    TEA_SIPPED = regex_up_to_next_prompt(rb"You watch the world go by\.")
-
-    # login prompts
-    SUPERSEDE = trusted_input_prompt(rb"Do you want to supersede this other session\?")
-    SESSION_DYING = trusted_input_prompt(rb"Session is dying")
-
-    # persona selection prompts
-    PERSONA_AVAILABLE = trusted_input_prompt(rb"By what name shall I call you \(Q to quit\)\?")
-    PERSONA_NAME = trusted_input_prompt(rb"What shall I call you[^\r\n]*\?")
-    PERSONA_SEX = trusted_input_prompt(rb"What sex do you wish to be\?")
-
-    # consolidate variants into single patterns:
-    RESET_IN_PROGRESS = re.compile(rb"(?:Reset in progress\.|The database is still initialising\.)")
-    BOOT_COMPLETE = b"Boot complete."
-
-    DATABASE_NOT_INITIALIZED = re.compile(rb"Database \d+ is not initialised\.")
-    DATABASE_FINISHED_INITIALIZING = re.compile(rb"(?:Database \d+ has|The database has) finished initialising")
-    FECODE_ZERO = b"\r\n\x9b\xff"
-
-    # non game prompts
-    EXAMINE = trusted_input_prompt(rb"EXAMINE>")
-    LIBRARY = trusted_input_prompt(rb"LIBRARY>")
-    PAGER = trusted_input_prompt(rb"\[Return to continue, S to stop\]" + SGR, re.I)
     # Prompts which explicitly mark the end of an episode. Each is anchored to a whole wire line
     # (optionally colour-wrapped) because the bare words are forgeable: a player speaking
     # "Cheerio!" puts the text mid-line inside the speech quoting, and the command echo repeats
@@ -188,12 +96,6 @@ GAME_OVER_PROMPTS = [
     Prompt.GAME_OVER_NOT_UPDATING_PERSONA,
     Prompt.GAME_OVER_KILLED_FOR_SWEARING,
 ]
-
-
-@functools.lru_cache
-def marker_up_to_next_prompt(marker: re.Pattern) -> re.Pattern:
-    """Wire form of an end-of-turn marker: the marker's line then everything up to the next prompt."""
-    return regex_up_to_next_prompt(marker.pattern, extra_flags=marker.flags)
 
 
 COMMAND_REJECTION_LINE_PATTERNS = (

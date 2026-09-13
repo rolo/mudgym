@@ -3,7 +3,7 @@ from contextlib import closing
 import pytest
 from pettingzoo.test import parallel_api_test
 
-from mudgym import make_parallel_env, make_vector_env
+from mudgym import make_parallel_env
 from mudgym.connections.wasm import WasmtimeProvider
 from tests.scripted import ScriptedProvider
 
@@ -186,7 +186,6 @@ def test_parallel_api_contract(wasm_runtime):
         parallel_api_test(env, num_cycles=10)
 
 
-@pytest.mark.parametrize("factory", [make_vector_env, make_parallel_env], ids=["vector", "parallel"])
 @pytest.mark.parametrize(
     ("phase", "command"),
     [
@@ -195,10 +194,10 @@ def test_parallel_api_contract(wasm_runtime):
         ("observation", "sql,fes,fex,fei"),
     ],
 )
-def test_coordinated_reset_stops_on_failure_and_can_retry(factory, phase, command, capsys):
+def test_coordinated_reset_stops_on_failure_and_can_retry(phase, command, capsys):
     provider = ScriptedProvider()
     failure = OSError(f"failed {phase}")
-    with closing(factory(2, provider=provider, render_mode="human")) as env:
+    with closing(make_parallel_env(2, provider=provider, render_mode="human")) as env:
         provider.connections[1].send_errors[command] = failure
         with pytest.raises(OSError) as raised:
             env.reset()
@@ -211,7 +210,7 @@ def test_coordinated_reset_stops_on_failure_and_can_retry(factory, phase, comman
             assert "move north" not in sent
         if phase in {"preparation", "entry"}:
             assert "sql,fes,fex,fei" not in sent
-        actions = ["look", "look"] if factory is make_vector_env else {"player_0": "look", "player_1": "look"}
+        actions = {"player_0": "look", "player_1": "look"}
         with pytest.raises(RuntimeError, match="reset"):
             env.step(actions)
         assert capsys.readouterr().out == ""
@@ -219,5 +218,5 @@ def test_coordinated_reset_stops_on_failure_and_can_retry(factory, phase, comman
         provider.connections[1].send_errors.clear()
         env.reset()
         _, _, terminated, truncated, _ = env.step(actions)
-        assert not any(terminated.values() if isinstance(terminated, dict) else terminated)
-        assert not any(truncated.values() if isinstance(truncated, dict) else truncated)
+        assert not any(terminated.values())
+        assert not any(truncated.values())

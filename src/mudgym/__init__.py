@@ -6,7 +6,7 @@ Importing this package registers the Gymnasium env IDs.
 
 from importlib.metadata import PackageNotFoundError, version
 
-from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
+from mudgym.envs.factory import make_env, make_parallel_env
 from mudgym.envs.registration import register_envs as _register_envs
 
 try:
@@ -20,5 +20,4 @@ __all__ = [
     "__version__",
     "make_env",
     "make_parallel_env",
-    "make_vector_env",
 ]

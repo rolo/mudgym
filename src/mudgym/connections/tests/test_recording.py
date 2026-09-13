@@ -69,6 +69,21 @@ def test_capture_version_deliberately_rejects_v2(tmp_path):
         ReplayConnection(path)
 
 
+@pytest.mark.parametrize("missing_field", ["sent_lines", "requires_end_of_turn_marker"])
+def test_replay_requires_the_recorded_transport_contract(tmp_path, missing_field):
+    path = tmp_path / "capture.jsonl"
+    recording = RecordingConnection(ScriptedConnection(), path)
+    drive_conversation(recording)
+    recording.close()
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    for record in records:
+        record.pop(missing_field, None)
+    path.write_text("\n".join(json.dumps(record) for record in records) + "\n")
+
+    with pytest.raises(KeyError, match=missing_field):
+        drive_conversation(ReplayConnection(path))
+
+
 def test_recorded_connection_transcript_replays_identically(tmp_path):
     path = tmp_path / "capture.jsonl"
     recording = RecordingConnection(ScriptedConnection(), path)

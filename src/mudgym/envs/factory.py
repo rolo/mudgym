@@ -3,7 +3,6 @@ from contextlib import suppress
 from typing import Any
 
 import gymnasium as gym
-from gymnasium.vector import AutoresetMode, VectorEnv
 from pettingzoo import ParallelEnv
 
 from mudgym.connections import registry
@@ -12,7 +11,6 @@ from mudgym.connections.provider import ConnectionProvider
 from mudgym.envs.actions.discrete import (
     DiscreteDirectionsWrapper,
     ParallelDiscreteDirectionsWrapper,
-    VectorDiscreteDirectionsWrapper,
 )
 from mudgym.envs.env import MudEnv
 from mudgym.envs.fields import (
@@ -24,13 +22,11 @@ from mudgym.envs.fields import (
     RawBytesField,
     SuperQuickLookField,
 )
-from mudgym.envs.vector import MudVectorEnv
 from mudgym.envs.zoo import MudParallelEnv
 
 OBSERVATION_PRESETS: dict[str, tuple[FieldSpec, ...]] = {
-    # Every preset must end with a field that can tell the transport its read window is complete.
-    "bytes": (RawBytesField, FEScoreField(include_keys=())),
-    "text": (FEScoreField(include_keys=()),),
+    "bytes": (RawBytesField,),
+    "text": (),
     "parsed": (
         SuperQuickLookField(include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")),
         FEScoreField,
@@ -62,12 +58,11 @@ def _resolve_field_parsers(
 ) -> tuple[FieldSpec, ...]:
     if field_parsers is not None:
         return tuple(field_parsers)
-    if not requires_end_of_turn_marker:
-        if observation == "text":
-            return ()
-        if observation == "bytes":
-            return (RawBytesField,)
-    return OBSERVATION_PRESETS[observation]
+    fields = OBSERVATION_PRESETS[observation]
+    if requires_end_of_turn_marker and observation in {"text", "bytes"}:
+        # Marker-based transports still need a command that closes the read window.
+        return (*fields, FEScoreField(include_keys=()))
+    return fields
 
 
 def make_env(
@@ -82,7 +77,7 @@ def make_env(
 ) -> gym.Env:
     """Build one Gymnasium environment.
 
-    ``world_ticker`` runs once after the action for a step and before its observation. When omitted, the WASM connection supplies its step clock.
+    ``world_ticker`` runs once after the action for a step and before its observation. When omitted, the connection's ``tick_for_step`` hook supplies the clock if present.
     """
     if actions not in {"text", "directions"}:
         raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
@@ -127,56 +122,21 @@ def make_env(
         raise
 
 
-def make_vector_env(
-    envs: int,
-    *,
-    observation: str = "parsed",
-    field_parsers: Sequence[FieldSpec] | None = None,
-    actions: str = "text",
-    render_mode: str | None = None,
-    tearoom_commands: str | None = None,
-    provider: ConnectionProvider | None = None,
-    world_ticker: Callable[[], None] | None = None,
-    autoreset_mode: AutoresetMode | str = AutoresetMode.DISABLED,
-) -> VectorEnv:
-    """Create a Gymnasium vector env. It need not know how worlds are arranged.
-
-    The provider decides where the connections lead. Masked reset and opt-in next-step autoreset relogin only selected
-    children. Both reset and step finish shared action/setup work before collecting observations. A supplied provider
-    becomes the resulting environment's responsibility and is closed with it.
-
-    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator
-    alone. Will still run on a step where some slots only relogin, as long as at least one slot acts as the vector env
-    does not know how the provider arranges worlds.
-
-    When omitted, the provider's ``tick_for_step`` hook supplies the clock if present.
-
-    ``autoreset_mode`` defaults to ``Disabled``. ``NextStep`` returns each terminal transition intact, then ignores that
-    slot's action on the following step and relogins it after every live sibling has observed. ``SameStep`` is not
-    supported.
-    """
-    if envs < 1:
-        raise ValueError("envs must be at least 1.")
-    if actions not in {"text", "directions"}:
-        raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
-    if field_parsers is None and observation not in OBSERVATION_PRESETS:
-        raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})")
-
-    if provider is None:
-        provider = registry.default_provider_factory()
-    if world_ticker is None:
-        world_ticker = getattr(provider, "tick_for_step", None)
+def create_players(
+    count: int,
+    provider: ConnectionProvider,
+    observation: str,
+    field_parsers: Sequence[FieldSpec] | None,
+    render_mode: str | None,
+    tearoom_commands: str | None,
+) -> list[MudEnv]:
+    """Adopt one provider batch and close everything if construction fails."""
     connections: list[MudConnection] = []
     children: list[MudEnv] = []
-
     try:
-        # The provider returns the whole batch in one go so it can size any shared resources. We still check the length
-        # here: a custom provider should fail loudly rather than create a vector whose actual shape disagrees with its
-        # public shape.
-        connections = provider.create_connections(envs)
-        if len(connections) != envs:
-            raise RuntimeError(f"Provider returned {len(connections)} connections, expected {envs}.")
-
+        connections = provider.create_connections(count)
+        if len(connections) != count:
+            raise RuntimeError(f"Provider returned {len(connections)} connections, expected {count}.")
         for connection in connections:
             children.append(
                 MudEnv(
@@ -188,20 +148,8 @@ def make_vector_env(
                     tearoom_commands=tearoom_commands,
                 )
             )
-
-        base_env = MudVectorEnv(
-            children,
-            provider=provider,
-            world_ticker=world_ticker,
-            autoreset_mode=autoreset_mode,
-        )
-        if actions == "directions":
-            return VectorDiscreteDirectionsWrapper(base_env)
-        return base_env
+        return children
     except BaseException:
-        # Every successful child owns its matching connection. Anything after that prefix never made it into a MudEnv
-        # and still needs closing directly; the provider owns the resources underneath both groups. Cleanup errors are
-        # secondary to the construction failure.
         close_quietly(*children, *connections[len(children) :], provider)
         raise
 
@@ -238,25 +186,13 @@ def make_parallel_env(
         provider = registry.default_parallel_provider_factory()
     if world_ticker is None:
         world_ticker = getattr(provider, "tick_for_step", None)
-    connections: list[MudConnection] = []
-    children: dict[str, MudEnv] = {}
-
+    children = {
+        f"player_{index}": child
+        for index, child in enumerate(
+            create_players(agents, provider, observation, field_parsers, child_render_mode, tearoom_commands)
+        )
+    }
     try:
-        # As with the vector factory, batch size is worth checking even though the protocol promises it.
-        connections = provider.create_connections(agents)
-        if len(connections) != agents:
-            raise RuntimeError(f"Provider returned {len(connections)} connections, expected {agents}.")
-
-        for index, connection in enumerate(connections):
-            children[f"player_{index}"] = MudEnv(
-                connection=connection,
-                field_parsers=_resolve_field_parsers(
-                    observation, field_parsers, requires_end_of_turn_marker=connection.requires_end_of_turn_marker
-                ),
-                render_mode=child_render_mode,
-                tearoom_commands=tearoom_commands,
-            )
-
         base_env = MudParallelEnv(
             children,
             provider=provider,
@@ -267,7 +203,5 @@ def make_parallel_env(
             return ParallelDiscreteDirectionsWrapper(base_env)
         return base_env
     except BaseException:
-        # Dict insertion order follows the connection batch. Successful children own the prefix;
-        # the remaining connections were allocated but never made it into a MudEnv.
-        close_quietly(*children.values(), *connections[len(children) :], provider)
+        close_quietly(*children.values(), provider)
         raise

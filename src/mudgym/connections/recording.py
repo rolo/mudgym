@@ -123,9 +123,8 @@ class ReplayConnection(MudConnection):
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.header, self.calls = _read_capture(self.path)
-        self.requires_end_of_turn_marker = self.header.get("requires_end_of_turn_marker", True)
+        self.requires_end_of_turn_marker = self.header["requires_end_of_turn_marker"]
         self.cursor = 0
-        self._pending_lines: list[str] = []
 
     def _take(self, expected: str) -> dict[str, Any]:
         if self.cursor >= len(self.calls):
@@ -140,7 +139,6 @@ class ReplayConnection(MudConnection):
         return call
 
     def reset(self, *, seed: int | None = None) -> None:
-        self._pending_lines.clear()
         self._take("reset")
 
     def send_line(self, line: str) -> None:
@@ -152,13 +150,9 @@ class ReplayConnection(MudConnection):
             )
         if call.get("error") == "connection_closed":
             raise ConnectionClosedError(f"Recorded connection closed while sending {line!r}.")
-        self._pending_lines.append(line)
 
     def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
         call = self._take("read_response")
-        # Older v3 captures predate the explicit backend echo list.
-        sent_lines = call.get("sent_lines", list(self._pending_lines))
-        self._pending_lines.clear()
         return (
             call["raw_bytes"],
             call["terminated"],
@@ -168,13 +162,12 @@ class ReplayConnection(MudConnection):
                 "marker_arrived": call["marker_arrived"],
                 "replayed": True,
                 "capture": str(self.path),
-                "sent_lines": sent_lines,
+                "sent_lines": call["sent_lines"],
             },
         )
 
     def invalidate(self) -> None:
         self._take("invalidate")
-        self._pending_lines.clear()
 
     def assert_exhausted(self) -> None:
         if remaining := len(self.calls) - self.cursor:

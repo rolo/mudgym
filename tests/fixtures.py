@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from mudgym.connections.wasm import WasmtimeRuntime
-from mudgym.envs.factory import make_env, make_parallel_env, make_vector_env
+from mudgym.envs.factory import make_env, make_parallel_env
 from mudgym.envs.fields.tests.payloads import BYTES_CASES
 from mudgym.featurizers.responses import split_on_prompt
 from tests.scripted import make_scripted_env
@@ -45,11 +45,6 @@ def scripted_env(scripted_env_factory):
 def live_env_factory():
     """Build live game envs and close them at teardown."""
     yield from tracked_factory(make_env)
-
-
-@pytest.fixture
-def live_vector_env_factory():
-    yield from tracked_factory(make_vector_env)
 
 
 @pytest.fixture

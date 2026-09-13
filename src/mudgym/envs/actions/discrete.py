@@ -1,7 +1,5 @@
 import gymnasium as gym
 from gymnasium.core import ActionWrapper
-from gymnasium.vector import VectorActionWrapper, VectorEnv
-from gymnasium.vector.utils import batch_space
 from pettingzoo import ParallelEnv
 from pettingzoo.utils.wrappers import BaseParallelWrapper
 
@@ -75,21 +73,6 @@ class ParallelDiscreteActionSpaceWrapper(BaseParallelWrapper):
         return self.env.step(commands)
 
 
-class VectorDiscreteActionSpaceWrapper(VectorActionWrapper):
-    """Map every discrete vector action to a text command."""
-
-    def __init__(self, env: VectorEnv, commands):
-        super().__init__(env)
-        self.discrete_actions = DiscreteActions(commands)
-        self.commands = self.discrete_actions.commands
-        self.action_count = len(self.commands)
-        self.single_action_space = self.discrete_actions.space
-        self.action_space = batch_space(self.single_action_space, self.num_envs)
-
-    def actions(self, actions):
-        return tuple(self.discrete_actions.command(action) for action in actions)
-
-
 DIRECTION_COMMANDS = tuple(f"move {direction}" for direction in DIRECTIONS)
 
 
@@ -104,13 +87,6 @@ class DiscreteDirectionsWrapper(DiscreteActionSpaceWrapper):
 
 class ParallelDiscreteDirectionsWrapper(ParallelDiscreteActionSpaceWrapper):
     """Set every agent's action space to the movement directions."""
-
-    def __init__(self, env):
-        super().__init__(env, commands=DIRECTION_COMMANDS)
-
-
-class VectorDiscreteDirectionsWrapper(VectorDiscreteActionSpaceWrapper):
-    """Set every vector entry's action space to movement directions."""
 
     def __init__(self, env):
         super().__init__(env, commands=DIRECTION_COMMANDS)

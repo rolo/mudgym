@@ -1,43 +1,9 @@
+from contextlib import ExitStack, closing
+
 import pytest
-from gymnasium.vector import AutoresetMode
 
+from mudgym import make_env
 from mudgym.connections.wasm import WasmtimeProvider
-
-
-@pytest.mark.parametrize("worlds", [1, 2])
-def test_players_only_hear_shouts_from_their_own_world(live_vector_env_factory, wasm_runtime, worlds):
-    env = live_vector_env_factory(2, provider=WasmtimeProvider(worlds=worlds, runtime=wasm_runtime))
-    env.reset()
-
-    observation, _, terminated, truncated, _ = env.step(["shout mudgymisolation", "look"])
-
-    assert not terminated.any() and not truncated.any()
-    assert "mudgymisolation" in observation["text"][0].lower()
-    assert ("mudgymisolation" in observation["text"][1].lower()) is (worlds == 1)
-
-
-def test_shared_world_remains_playable_after_one_child_autoresets(live_vector_env_factory, wasm_runtime):
-    env = live_vector_env_factory(
-        2, provider=WasmtimeProvider(worlds=1, runtime=wasm_runtime), autoreset_mode=AutoresetMode.NEXT_STEP
-    )
-    observation, _ = env.reset()
-    assert env.observation_space.contains(observation)
-
-    observation, _, terminated, truncated, _ = env.step(["shout mudgymcoherence", "look"])
-    assert "mudgymcoherence" in observation["text"][1].lower()
-    assert not terminated.any() and not truncated.any()
-
-    _, _, terminated, _, _ = env.step(["quit", "look"])
-    assert terminated.tolist() == [True, False]
-
-    observation, reward, terminated, truncated, info = env.step(["quit", "look"])
-    assert env.observation_space.contains(observation)
-    assert reward[0] == 0
-    assert info["step"].tolist() == [0, 3]
-    assert not terminated.any() and not truncated.any()
-
-    _, _, terminated, truncated, _ = env.step(["look", "look"])
-    assert not terminated.any() and not truncated.any()
 
 
 def test_parallel_players_hear_each_other_and_continue_after_one_quits(live_parallel_env_factory):
@@ -53,3 +19,23 @@ def test_parallel_players_hear_each_other_and_continue_after_one_quits(live_para
     observations, _, terminated, truncated, _ = env.step({"player_1": "look"})
     assert env.observation_space("player_1").contains(observations["player_1"])
     assert not any(terminated.values()) and not any(truncated.values())
+
+
+@pytest.mark.parametrize("worlds", [1, 2])
+def test_players_only_hear_shouts_from_their_own_world(wasm_runtime, worlds):
+    with ExitStack() as stack:
+        provider = stack.enter_context(closing(WasmtimeProvider(worlds=worlds, runtime=wasm_runtime)))
+        first, second = [
+            stack.enter_context(make_env(connection=connection)) for connection in provider.create_connections(2)
+        ]
+        first.reset()
+        second.reset()
+        first.act("shout mudgymisolation")
+        second.act("look")
+        provider.tick_for_step()
+        first_observation, _, first_terminated, first_truncated, _ = first.observe()
+        second_observation, _, second_terminated, second_truncated, _ = second.observe()
+
+        assert not any((first_terminated, first_truncated, second_terminated, second_truncated))
+        assert "mudgymisolation" in first_observation["text"].lower()
+        assert ("mudgymisolation" in second_observation["text"].lower()) is (worlds == 1)

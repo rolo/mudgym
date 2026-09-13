@@ -6,12 +6,11 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import closing
+from contextlib import ExitStack, closing
 
-import numpy as np
 import pytest
 
-from mudgym import make_env, make_vector_env
+from mudgym import make_env
 from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
 from mudgym.connections.wasm.wasmtime_provider import WorldAdvancementFailed
 from mudgym.connections.wasm.wasmtime_runtime import WasmtimeTerminalTick, WasmtimeWorld
@@ -27,27 +26,6 @@ class InstrumentedRuntime(WasmtimeRuntime):
         world = self.world_class(self, **options)
         self.created_worlds.append(world)
         return world
-
-
-@pytest.mark.parametrize("seed", [99, [99, None]])
-@pytest.mark.parametrize("departed", [False, True])
-def test_masked_reset_reseeds_only_the_selected_independent_world(wasm_runtime, seed, departed):
-    provider = WasmtimeProvider(runtime=wasm_runtime)
-    with make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation="text") as scalar:
-        expected, expected_info = scalar.reset(seed=99)
-    with closing(make_vector_env(2, provider=provider, observation="text")) as vector:
-        vector.reset(seed=10)
-        vector.step(["mgquit" if departed else "look", "look"])
-        previous_worlds = list(provider._ordered_worlds)
-        actual, info = vector.reset(seed=seed, options={"reset_mask": np.array([True, False])})
-        assert provider._world_seeds == (99, 11)
-        assert provider._ordered_worlds[0] is not previous_worlds[0]
-        assert provider._ordered_worlds[1] is previous_worlds[1]
-        assert actual["text"][0] == expected["text"]
-        assert info["raw_bytes"][0] == expected_info["raw_bytes"]
-        assert provider.advance_worlds(0) == {0: 0, 1: 1}
-        vector.reset()
-        assert provider._world_seeds == (99, 11)
 
 
 def test_provider_allows_one_valid_batch_after_rejecting_an_invalid_topology(wasm_runtime):
@@ -67,20 +45,6 @@ def test_provider_allows_one_valid_batch_after_rejecting_an_invalid_topology(was
         assert first.advance_world_ticks(1) == 1
         assert peer.advance_world_ticks(0) == 1
         assert independent.advance_world_ticks(0) == 0
-
-
-def test_shared_partial_reset_rejects_reseeding_without_replacing_any_session(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
-    with closing(make_vector_env(2, provider=provider, observation="text")) as vector:
-        vector.reset(seed=10)
-        sessions = [connection._session for connection in provider._connections]
-        with pytest.raises(ValueError, match="shared world"):
-            vector.reset(seed=99, options={"reset_mask": np.array([True, False])})
-        assert [connection._session for connection in provider._connections] == sessions
-        assert provider._world_seeds == (10,)
-        vector.reset(seed=99)
-        assert provider._world_seeds == (99,)
-        assert not vector.step(["look", "look"])[2].any()
 
 
 def test_provider_timeout_reaches_native_ticks_and_session_admission():
@@ -302,9 +266,15 @@ def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runt
 
 @pytest.mark.parametrize("advance_directly", [False, True])
 def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm_runtime, advance_directly):
-    provider = WasmtimeProvider(runtime=wasm_runtime)
-    with closing(make_vector_env(2, provider=provider, observation="text")) as vector:
-        vector.reset(seed=[51, 123])
+    with ExitStack() as stack:
+        provider = stack.enter_context(closing(WasmtimeProvider(runtime=wasm_runtime, worlds=2)))
+        first, second = [
+            stack.enter_context(make_env(connection=connection, observation="text"))
+            for connection in provider.create_connections(2)
+        ]
+        provider.reset(seed=[51, 123])
+        first.reset()
+        second.reset()
         provider._connections[0].advance_world_ticks(3208)
         if advance_directly:
             with pytest.raises(WorldAdvancementFailed) as raised:
@@ -315,19 +285,23 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
             assert isinstance(terminal, WasmtimeTerminalTick)
             assert terminal.tick_failure["requested_ticks"] == 1
             assert terminal.tick_failure["completed_ticks"] == 0
-        _, rewards, terminated, truncated, info = vector.step(["look", "look"])
-        assert terminated.tolist() == [True, False]
-        assert not truncated.any()
-        assert rewards.tolist() == [300, 0]
-        assert info["raw_bytes"][0].count(b"Auto-reset initiated") == 1
+        first.act("look")
+        second.act("look")
+        provider.tick_for_step()
+        results = [first.observe(), second.observe()]
+        observations, rewards, terminated, truncated, infos = zip(*results, strict=True)
+        assert terminated == (True, False)
+        assert not any(truncated)
+        assert rewards == (300, 0)
+        assert infos[0]["raw_bytes"].count(b"Auto-reset initiated") == 1
         assert provider._ordered_worlds[1].current_tick() == 1 + advance_directly
-        assert info["transport"]["sent_lines"].tolist() == [["look"], ["look"]]
+        assert [info["transport"]["sent_lines"] for info in infos] == [["look"], ["look"]]
 
 
 @pytest.mark.parametrize("advance_connection", [False, True])
 def test_step_clock_does_not_suppress_runtime_errors(wasm_runtime, advance_connection):
     with closing(WasmtimeProvider(runtime=wasm_runtime)) as provider:
-        connection, _ = provider.create_connections(2)
+        (connection,) = provider.create_connections(1)
         provider.reset(seed=123)
         provider._ordered_worlds[0].shutdown()
 
@@ -336,7 +310,6 @@ def test_step_clock_does_not_suppress_runtime_errors(wasm_runtime, advance_conne
                 connection.tick_for_step()
             else:
                 provider.tick_for_step()
-        assert provider._ordered_worlds[1].current_tick() == (0 if advance_connection else 1)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from pettingzoo import ParallelEnv
 
 from mudgym.connections.provider import ConnectionProvider
 from mudgym.envs.env import MudEnv
+from mudgym.envs.lifecycle import close_players, reset_players, reset_worlds, step_players
 
 
 class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
@@ -44,29 +45,15 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         options: dict | None = None,
     ) -> tuple[dict[str, dict[str, Any]], dict[str, dict]]:
         agents = list(self.possible_agents)
-        agent = None
-        phase = "provider reset"
-        try:
-            self._provider.reset(seed=seed)
-            self.agents = list(agents)
-            phase = "preparation"
-            for index, agent in enumerate(agents):
-                agent_seed = seed + index if seed is not None else None
-                self.envs[agent]._prepare_reset(seed=agent_seed, options=options)
-            phase = "entry"
-            entries = {}
-            for agent in agents:
-                entries[agent] = self.envs[agent]._enter_world()
-            phase = "observation"
-            observations = {}
-            infos = {}
-            for agent in agents:
-                observations[agent], infos[agent] = self.envs[agent]._finish_reset(*entries[agent])
-        except BaseException as error:
-            error.add_note(f"parallel reset failed during {phase} for agent {agent!r}")
-            for selected_agent in agents:
-                self.envs[selected_agent]._invalidate_reset(error)
-            raise
+        reset_worlds(self.envs, self._provider, seed)
+        results = reset_players(
+            self.envs,
+            {agent: seed + index if seed is not None else None for index, agent in enumerate(agents)},
+            options,
+        )
+        self.agents = agents
+        observations = {agent: result[0] for agent, result in results.items()}
+        infos = {agent: result[1] for agent, result in results.items()}
 
         return observations, infos
 
@@ -90,24 +77,9 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         if any(child.points is None for child in self.envs.values()):
             raise RuntimeError("Parallel environment requires a successful reset before stepping.")
         # Resolve required keys before sending so a missing action leaves sessions ready to retry.
-        agent_actions = [(agent, actions[agent]) for agent in agents]
-        # This ordering is the point of the coordinator: everybody acts before anybody runs their
-        # observation commands. Folding the loops together would make later players invisible to
-        # earlier observations from the same PettingZoo step.
-        for agent, action in agent_actions:
-            self.envs[agent].act(action)
-
-        if self.world_ticker is not None:
-            self.world_ticker()
-
-        for agent in agents:
-            (
-                observations[agent],
-                rewards[agent],
-                terminations[agent],
-                truncations[agent],
-                infos[agent],
-            ) = self.envs[agent].observe()
+        agent_actions = {agent: actions[agent] for agent in agents}
+        for agent, result in step_players(self.envs, agent_actions, self.world_ticker):
+            observations[agent], rewards[agent], terminations[agent], truncations[agent], infos[agent] = result
 
         # An agent stays live until its own child says it is done. Keep the snapshot above for the result dictionaries, then update the public live-agent list for the next step.
         self.agents = [agent for agent in agents if not terminations[agent] and not truncations[agent]]
@@ -136,17 +108,4 @@ class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
         return None
 
     def close(self) -> None:
-        # Children own their connections; the provider owns the shared world beneath them. Attempt every close even if one fails so one awkward child does not leak everybody else's state.
-        errors: list[Exception] = []
-        for env in self.envs.values():
-            try:
-                env.close()
-            except Exception as exc:
-                errors.append(exc)
-        try:
-            self._provider.close()
-        except Exception as exc:
-            errors.append(exc)
-
-        if errors:
-            raise ExceptionGroup("MudParallelEnv close failed", errors)
+        close_players(self.envs, self._provider)
