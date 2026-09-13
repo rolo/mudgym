@@ -1,20 +1,23 @@
-"""Exercise the shipped module without any WASI filesystem preopens."""
+"""Exercise the packaged module without any WASI filesystem preopens."""
 
 from importlib import metadata
 from importlib.resources import files
+from itertools import batched
 
 import pytest
 from packaging.requirements import Requirement
 from wasmtime import Config, Engine, Linker, Module, Store, WasiConfig
 
 from mudgym.connections.persona import PERSONA_NAMES
+from mudgym.connections.wasm.engine_contract import MAX_WORLD_SESSIONS
 
 
-def test_all_shared_persona_names_can_join_the_same_world(wasm_runtime):
-    world = wasm_runtime.create_world(max_players=len(PERSONA_NAMES), seed=123)
+@pytest.mark.parametrize("names", tuple(batched(PERSONA_NAMES, MAX_WORLD_SESSIONS)))
+def test_all_shared_persona_names_can_join_in_supported_world_batches(wasm_runtime, names):
+    world = wasm_runtime.create_world(max_players=len(names), seed=123)
     try:
-        players = [world.add_session(name) for name in PERSONA_NAMES]
-        assert len({player.player_id for player in players}) == len(PERSONA_NAMES)
+        players = [world.add_session(name) for name in names]
+        assert len({player.player_id for player in players}) == len(names)
         for player in players:
             assert b"Elizabethan tearoom" in player.send("look", timeout_ms=5000).output
     finally:

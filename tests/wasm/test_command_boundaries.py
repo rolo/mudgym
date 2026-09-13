@@ -16,7 +16,7 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
         player, peer = provider.create_connections(2)
         player.reset()
         peer.reset()
-        peer.send_line('tell "pending message" to Ada')
+        peer.send_line('tell "pending message" to Aaron')
         peer.read_response(None)
 
         with pytest.raises(ValueError, match="outside ASCII"):
@@ -133,7 +133,7 @@ def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wa
         opponent.reset()
         opponent.send_line("north")
         opponent.read_response(None)
-        for command in ("west", "kill Alba"):
+        for command in ("west", "kill Abbie"):
             observation, reward, terminated, truncated, _ = step(command)
             assert observation["points"] == 200 and reward == 0
             assert not terminated and not truncated
@@ -143,18 +143,18 @@ def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wa
         assert observation["points"] == info["points"] == 149 and reward == -51
         assert not terminated and not truncated
 
-        for command in ("west", "kill Alba"):
+        for command in ("west", "kill Abbie"):
             observation, reward, terminated, truncated, _ = step(command)
             assert observation["points"] == 149 and reward == 0
             assert not terminated and not truncated
         for _ in range(40):
             observation, reward, terminated, truncated, info = step("look")
             assert not terminated and not truncated
-            if b"You have killed Alba" in info["raw_bytes"]:
+            if b"You have killed Abbie" in info["raw_bytes"]:
                 break
             assert observation["points"] == 149 and reward == 0
         else:
-            pytest.fail("Seeded combat did not produce Alba's defeat within 40 steps")
+            pytest.fail("Seeded combat did not produce Abbie's defeat within 40 steps")
         assert b"Persona saved on +120 = \x1b[0;32;40m269" in info["raw_bytes"]
         assert observation["points"] == info["points"] == 269 and reward == 120
 

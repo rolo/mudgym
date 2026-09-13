@@ -20,7 +20,7 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
 
     provider = RecordingProvider(WasmtimeProvider(runtime=wasm_runtime, worlds=1), capture_path)
     with closing(make_parallel_env(2, provider=provider, observation=preset, render_mode="ansi")) as environment:
-        # With all players prepared first, seed 10 places Ada and Alba in the same room.
+        # With all players prepared first, seed 10 places Aaron and Abbie in the same room.
         obs, infos = environment.reset(seed=10)
         children = list(environment.envs.values())
         for index, child in enumerate(children):
@@ -41,7 +41,7 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
             ]
             if preset == "parsed":
                 np.testing.assert_array_equal(
-                    observation["players"], ["Alba the protector" if index == 0 else "Ada the protector"]
+                    observation["players"], ["Abbie the protector" if index == 0 else "Aaron the protector"]
                 )
             if preset == "bytes":
                 assert observation["raw_bytes"].tobytes()[: len(raw)] == raw

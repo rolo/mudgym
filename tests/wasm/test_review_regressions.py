@@ -38,8 +38,8 @@ def test_pending_combat_death_survives_the_next_command_and_reset(wasm_runtime, 
         survivor.read_response(None)
         victim.send_line("west")
         assert b"Beaten track near cliff" in victim.read_response(None)[0]
-        victim.send_line("kill Alba")
-        assert b"You attack Alba" in victim.read_response(None)[0]
+        victim.send_line("kill Abbie")
+        assert b"You attack Abbie" in victim.read_response(None)[0]
         if phase == "observation":
             environment.unwrapped.act("look")
 
@@ -47,16 +47,16 @@ def test_pending_combat_death_survives_the_next_command_and_reset(wasm_runtime, 
         old_session = victim._session
         for _ in range(40):
             provider.advance_worlds(1)
-            if b"You have killed Ada" in survivor._session.receive():
+            if b"You have killed Aaron" in survivor._session.receive():
                 break
         else:
-            pytest.fail("Seeded combat did not kill Ada within 40 ticks")
+            pytest.fail("Seeded combat did not kill Aaron within 40 ticks")
         assert world.is_alive() and not old_session.departed
 
         result = environment.step("look") if phase == "action" else environment.unwrapped.observe()
         observation, reward, terminated, truncated, info = result
         final_result = result
-        final_message = b"You have been killed by Alba"
+        final_message = b"You have been killed by Abbie"
         assert terminated and not truncated
         assert reward == -200 and observation["points"] == 0
         assert info["raw_bytes"].count(final_message) == 1

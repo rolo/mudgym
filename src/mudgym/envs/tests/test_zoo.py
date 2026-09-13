@@ -55,11 +55,11 @@ def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, o
         env.reset(seed=10)
 
         obs, _, terminates, truncates, _ = env.step(
-            {"player_0": 'tell "alpha greeting" to alba', "player_1": 'tell "beta greeting" to ada'}
+            {"player_0": 'tell "alpha greeting" to abbie', "player_1": 'tell "beta greeting" to aaron'}
         )
 
-        assert 'Alba the protector tells you "beta greeting"' in obs["player_0"]["text"]
-        assert 'Ada the protector tells you "alpha greeting"' in obs["player_1"]["text"]
+        assert 'Abbie the protector tells you "beta greeting"' in obs["player_0"]["text"]
+        assert 'Aaron the protector tells you "alpha greeting"' in obs["player_1"]["text"]
         assert not any(terminates.values())
         assert not any(truncates.values())
 
@@ -139,8 +139,8 @@ def test_parallel_reset_observations_include_every_player(wasm_runtime):
         obs, infos = env.reset(seed=10)
 
         assert obs["player_0"]["room_name"] == obs["player_1"]["room_name"]
-        assert obs["player_0"]["players"] == ("Alba the protector",)
-        assert obs["player_1"]["players"] == ("Ada the protector",)
+        assert obs["player_0"]["players"] == ("Abbie the protector",)
+        assert obs["player_1"]["players"] == ("Aaron the protector",)
         for agent, observation in obs.items():
             assert observation["text"].count("Badly-paved road") == 1
             assert infos[agent]["render_bytes"].count(b"Badly-paved road") == 1

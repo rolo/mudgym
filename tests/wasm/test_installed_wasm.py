@@ -55,7 +55,7 @@ def test_pending_peer_output_precedes_the_observation_command_echo(wasm_runtime)
         sender.reset()
         observer.reset()
         observer.send_line("look")
-        sender.send_line('tell "queued before probe" to alba')
+        sender.send_line('tell "queued before probe" to abbie')
         sender.read_response(None)
         observer.send_line("fes")
         raw_bytes, terminated, incomplete, info = observer.read_response(None)
@@ -150,7 +150,7 @@ def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm
     try:
         initial, info = environment.reset(seed=123)
         assert environment.observation_space.contains(initial)
-        assert info["persona"] == "Ada"
+        assert info["persona"] == "Aaron"
         assert initial["points"] == 200
         result, reward, terminated, truncated, info = environment.step("look")
         assert environment.observation_space.contains(result)
@@ -266,7 +266,7 @@ def test_bytes_observation_retains_peer_output(wasm_runtime):
     try:
         environment.reset(seed=211)
         obs, _, terminates, truncates, infos = environment.step(
-            {"player_0": 'tell "packaging trial" to alba', "player_1": "look"}
+            {"player_0": 'tell "packaging trial" to abbie', "player_1": "look"}
         )
         assert not any(terminates.values()) and not any(truncates.values())
         assert b"packaging trial" in infos["player_1"]["raw_bytes"]
@@ -274,7 +274,7 @@ def test_bytes_observation_retains_peer_output(wasm_runtime):
             raw = infos[agent]["raw_bytes"]
             assert observation["raw_bytes"].tobytes()[: len(raw)] == raw
             assert infos[agent]["transport"]["sent_lines"] == (
-                ['tell "packaging trial" to alba'] if agent == "player_0" else ["look"]
+                ['tell "packaging trial" to abbie'] if agent == "player_0" else ["look"]
             )
     finally:
         environment.close()
