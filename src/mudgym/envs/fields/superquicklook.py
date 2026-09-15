@@ -16,11 +16,7 @@ from .field import ObservationField
 ROOM_MARKER = "The place known as "
 ROOM_MARKER_BYTES = ROOM_MARKER.encode("ascii")
 
-TOKEN_RE = re.compile(
-    rf"^(?P<sgr>{SGR_ONE_PLUS_STR})?"
-    r"(?P<text>[^\x1b]+?)"
-    rf"(?:{SGR_ONE_PLUS_STR})*$"
-)
+SGR_RE = re.compile(SGR_ONE_PLUS_STR)
 ROOM_LINE_RE = re.compile(
     rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^"]+)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
@@ -48,10 +44,9 @@ FG_TO_CATEGORY: dict[int, str] = {
 def parse_token(chunk: str) -> tuple[str | None, str]:
     """Extract the SGR prefix and clean text from a token chunk."""
     chunk = chunk.strip()
-    match = TOKEN_RE.match(chunk)
-    if match is None:
-        return None, chunk
-    return match.group("sgr"), match.group("text").strip()
+    match = SGR_RE.match(chunk)
+    # Orangery changes colour inside its name, between "orange" and "ry".
+    return match.group() if match else None, SGR_RE.sub("", chunk).strip()
 
 
 def sgr_foreground(sgr: str | None) -> int | None:

@@ -1,5 +1,6 @@
 import pytest
 
+from mudgym.db.index import room_name_to_index
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
 
 COAL_BUNKER_CHUNK = (
@@ -34,6 +35,24 @@ def test_classifies_coal_bunker_contents():
     assert obs["mobiles"] == ("4 rats",)
     assert obs["features"] == ()
     assert obs["inventory"] == ()
+
+
+def test_orangery_colours_are_removed_without_losing_content_classification():
+    raw = (
+        b'\x1b[0;37;40mThe place known as "\x1b[1;32;40m\x1b[0;33;40morange'
+        b'\x1b[1;32;40mry\x1b[0;37;40m" contains \x1b[31mAbbie the protector\x1b[37m '
+        b"and \x1b[32mrain\x1b[37m.\nYou are carrying the following:\n        nothing.\n"
+    )
+    field = SuperQuickLookField()
+    observation = field.extract([raw], persona="Abbie")
+
+    assert observation["room_name"] == "orangery"
+    assert observation["room_name_index"] == room_name_to_index("orangery") > 0
+    assert observation["here"] == ("Abbie the protector", "rain")
+    assert observation["features"] == ("rain",)
+    assert observation["players"] == ()
+    assert observation["inventory"] == ()
+    assert field.full_space()["room_name"].contains(observation["room_name"])
 
 
 TWO_MORTALS_CHUNK = (

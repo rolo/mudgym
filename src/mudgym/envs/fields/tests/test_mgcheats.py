@@ -121,3 +121,17 @@ def test_room_names_are_lowercased_to_match_the_room_tables():
 
     assert out["room_name"] == "dally lane"
     assert out["room_name_index"] == room_name_to_index("dally lane") > 0
+
+
+def test_orangery_colours_are_removed_before_room_name_lookup():
+    raw = (
+        b"[mgcheats]room_id=gorange; room_name=\x1b[0;33;40morange\x1b[1;37;40mry; fighting=0; "
+        b"dark=0; glowing=0; asleep=0; gifted=0; here=[rain]; inventory=[][/mgcheats]\n"
+    )
+    field = MGCheatsField()
+    observation = field.extract([raw])
+
+    assert observation["room_name"] == "orangery"
+    assert observation["room_name_index"] == room_name_to_index("orangery") > 0
+    assert observation["here"] == ("rain",)
+    assert field.full_space()["room_name"].contains(observation["room_name"])

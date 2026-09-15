@@ -20,6 +20,7 @@ from mudgym.envs.specs import (
     ROOM_NAME_MAX_LENGTH,
     SINGLE_LINE_CHARSET,
 )
+from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.strings import decode_text_bytes
 
 from .field import ObservationField
@@ -72,7 +73,7 @@ class MGCheatsField(ObservationField):
     def parse(self, payload_bytes: bytes) -> dict[str, str]:
         """Read the wire pairs without accepting duplicate keys."""
         values: dict[str, str] = {}
-        for pair in decode_text_bytes(payload_bytes).split("; "):
+        for pair in decode_text_bytes(strip_ansi(payload_bytes)).split("; "):
             key, value = pair.split("=", 1)
             if key in values:
                 raise ValueError(f"mgcheats block contains duplicate key {key!r}")
