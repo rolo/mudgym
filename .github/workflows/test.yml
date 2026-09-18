@@ -54,15 +54,25 @@ jobs:
           PY
       - name: Run tests (with coverage)
         run: just test
+      # Forgejo needs upload-artifact v3. GitHub uses v7.
+      - name: Select artifact uploader
+        uses: actions/checkout@v5
+        with:
+          repository: actions/upload-artifact
+          ref: ${{ github.server_url == 'https://github.com' && 'v7' || 'v3' }}
+          github-server-url: https://github.com
+          token: ${{ secrets.GH_PAT || github.token }}
+          path: .github/actions/upload-artifact
+          persist-credentials: false
       - name: Upload coverage data
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/upload-artifact
         with:
           name: coverage-data-${{ matrix.python-version }}
           path: '${{ github.workspace }}/.coverage*'
           include-hidden-files: true
           if-no-files-found: error
       - name: Upload HTML coverage report
-        uses: actions/upload-artifact@v7
+        uses: ./.github/actions/upload-artifact
         with:
           name: coverage-report-${{ matrix.python-version }}
           path: |
