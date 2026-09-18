@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import threading
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -274,7 +275,7 @@ class WasmtimeProvider:
         *,
         runtime: WasmtimeRuntime | None = None,
         worlds: int | None = None,
-        seed: int = 0,
+        seed: int | None = None,
         civil_time_anchor: datetime = datetime(2026, 1, 1, tzinfo=UTC),
         timeout_ms: int = 5_000,
         personas: Sequence[tuple[str] | tuple[str | None, str | None]] | None = None,
@@ -286,6 +287,9 @@ class WasmtimeProvider:
             raise ValueError("worlds must be a positive integer or None")
         if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms < 1:
             raise ValueError("timeout_ms must be a positive integer")
+        if seed is None:
+            # Leave room for world-index offsets within the engine's 53-bit seed range.
+            seed = secrets.randbits(32)
         validate_seed(seed, label="seed")
         if worlds is not None:
             validate_seed(seed + worlds - 1, label="seed plus the final world index")
