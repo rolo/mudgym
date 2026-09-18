@@ -287,9 +287,6 @@ FEMALE_PERSONA_NAMES = (
 )
 
 
-PERSONA_NAMES = tuple(sorted(set(MALE_PERSONA_NAMES + FEMALE_PERSONA_NAMES)))
-
-
 def unique_persona_names(personas: Sequence[Persona]) -> set[str]:
     names = [persona.name.casefold() for persona in personas if persona.name is not None]
     unique = set(names)

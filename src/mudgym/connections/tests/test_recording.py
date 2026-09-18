@@ -54,6 +54,7 @@ def test_connection_capture_round_trips_every_byte_value(tmp_path):
     assert replay.header["purpose"] == "test"
     assert replayed_result[:3] == recorded_result[:3]
     assert replayed_result[0] == bytes(range(256))
+    assert replayed_result[3]["persona"] is None
     # normal json.dumps keeps awkward C1 controls out of the JSONL itself
     assert "\\u0085" in path.read_text(encoding="utf-8")
 

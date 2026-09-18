@@ -16,10 +16,11 @@ def test_make_env_invalid_actions_rejected_before_constructing_env():
     assert not conn.closed
 
 
-def test_make_envconnection_kwargs_with_instance_rejected():
+@pytest.mark.parametrize("options", [{"connection_kwargs": {"timeout_ms": 1000}}, {"sex": "f"}])
+def test_make_env_rejects_connection_options_with_an_existing_connection(options):
     conn = ScriptedConnection()
-    with pytest.raises(ValueError, match="connection_kwargs is not valid"):
-        make_env(connection=conn, connection_kwargs={"timeout_ms": 1000})
+    with pytest.raises(ValueError, match="Configure connection options"):
+        make_env(connection=conn, **options)
     assert conn.sent_lines == []
     assert not conn.closed
 
@@ -29,8 +30,8 @@ def test_make_env_resolves_the_registry_default_at_call_time(monkeypatch):
 
     env = make_env(observation="parsed")
     try:
-        observation, _ = env.reset()
-        assert observation["room_name"]
+        obs, _ = env.reset()
+        assert obs["room_name"]
     finally:
         env.close()
 
@@ -40,6 +41,16 @@ def test_invalid_observation_is_rejected_before_adopting_provider():
 
     with pytest.raises(ValueError, match="observation must be one of"):
         make_parallel_env(1, provider=provider, observation="nope")
+
+    assert provider.requested_count is None
+    assert provider.closed is False
+
+
+def test_persona_options_are_rejected_before_adopting_a_provider():
+    provider = ScriptedProvider()
+
+    with pytest.raises(ValueError, match="provider"):
+        make_parallel_env(2, provider=provider, personas=[(None, None), (None, None)])
 
     assert provider.requested_count is None
     assert provider.closed is False

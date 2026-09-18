@@ -10,6 +10,7 @@ from importlib.resources import files
 import pytest
 
 from mudgym import make_env, make_parallel_env
+from mudgym.connections.persona import DEFAULT_PERSONA_POOL, Persona
 from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
 from mudgym.envs.factory import create_players
 
@@ -80,7 +81,7 @@ def test_default_civil_clock_starts_at_midnight_on_every_scalar_reset(wasm_runti
 
 
 def test_pending_peer_output_precedes_the_observation_command_echo(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
+    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male")))
     sender, observer = provider.create_connections(2)
     try:
         sender.reset()
@@ -110,7 +111,7 @@ def test_civil_anchor_controls_halloween_startup_and_seeded_replay(wasm_runtime)
         for seed in (123, 456, 123):
             world = wasm_runtime.create_world(max_players=1, seed=seed, civil_time_anchor=anchor)
             try:
-                session = world.add_session("Ada")
+                session = world.add_session(Persona("Ada", "f"))
                 initial = session.receive()
                 assert (halloween in initial) is seasonal
                 world.tick(7)
@@ -181,7 +182,8 @@ def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm
     try:
         initial, info = environment.reset(seed=123)
         assert environment.observation_space.contains(initial)
-        assert info["persona"] == "Aaron"
+        assert info["persona"] in {persona.name for persona in DEFAULT_PERSONA_POOL}
+        assert info["transport"]["persona"]["name"] == info["persona"]
         assert initial["points"] == 200
         result, reward, terminated, truncated, info = environment.step("look")
         assert environment.observation_space.contains(result)
@@ -293,7 +295,11 @@ def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runt
 
 
 def test_bytes_observation_retains_peer_output(wasm_runtime):
-    environment = make_parallel_env(2, observation="bytes", provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))
+    environment = make_parallel_env(
+        2,
+        observation="bytes",
+        provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
+    )
     try:
         environment.reset(seed=211)
         obs, _, terminates, truncates, infos = environment.step(

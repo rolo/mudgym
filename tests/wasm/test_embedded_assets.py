@@ -7,16 +7,16 @@ from itertools import batched
 import pytest
 from wasmtime import Config, Engine, Linker, Module, Store, WasiConfig
 
-from mudgym.connections.persona import PERSONA_NAMES
+from mudgym.connections.persona import DEFAULT_PERSONA_POOL, Persona
 from mudgym.connections.wasm.engine_contract import MAX_WORLD_SESSIONS
 
 
-@pytest.mark.parametrize("names", tuple(batched(PERSONA_NAMES, MAX_WORLD_SESSIONS)))
-def test_all_shared_persona_names_can_join_in_supported_world_batches(wasm_runtime, names):
-    world = wasm_runtime.create_world(max_players=len(names), seed=123)
+@pytest.mark.parametrize("personas", tuple(batched(DEFAULT_PERSONA_POOL, MAX_WORLD_SESSIONS)))
+def test_all_shared_personas_can_join_in_supported_world_batches(wasm_runtime, personas):
+    world = wasm_runtime.create_world(max_players=len(personas), seed=123)
     try:
-        players = [world.add_session(name) for name in names]
-        assert len({player.player_id for player in players}) == len(names)
+        players = [world.add_session(persona) for persona in personas]
+        assert len({player.player_id for player in players}) == len(personas)
         for player in players:
             assert b"Elizabethan tearoom" in player.send("look", timeout_ms=5000).output
     finally:
@@ -34,7 +34,7 @@ def test_distributed_engine_rejects_privileged_admission_through_the_raw_abi(was
         )
         assert result == -1
         assert world._call("mud2_shared_player_count") == 0
-        player = world.add_session("Ada")
+        player = world.add_session(Persona("Ada", "f"))
         assert b"Elizabethan tearoom" in player.send("look", timeout_ms=5000).output
     finally:
         world.shutdown()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
@@ -13,7 +13,13 @@ from typing import Any
 
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.errors import ConnectionClosedError
-from mudgym.connections.persona import PERSONA_NAMES
+from mudgym.connections.persona import (
+    DEFAULT_PERSONA_POOL,
+    Persona,
+    parse_persona,
+    resolve_personas,
+    validate_persona_pool,
+)
 from mudgym.connections.prompts import INVALID_COMMAND_PROMPTS
 from mudgym.connections.termination import has_game_over_prompt
 from mudgym.featurizers.strings import encode_command_bytes
@@ -203,6 +209,11 @@ class WasmtimeConnection(MudConnection):
                 "backend": "wasmtime",
                 "connection_index": self.connection_index,
                 "world_index": self.provider.world_for_connection(self.connection_index),
+                "world_seed": session.world.seed,
+                "persona": {
+                    "name": session.persona.name,
+                    "sex": session.persona.sex,
+                },
                 "bytes_length": len(raw_bytes),
                 "marker_arrived": not (terminated or incomplete),
                 "rejected": any(pattern.search(game_bytes) for pattern in INVALID_COMMAND_PROMPTS),
@@ -266,6 +277,8 @@ class WasmtimeProvider:
         seed: int = 0,
         civil_time_anchor: datetime = datetime(2026, 1, 1, tzinfo=UTC),
         timeout_ms: int = 5_000,
+        personas: Sequence[tuple[str] | tuple[str | None, str | None]] | None = None,
+        persona_pool: Sequence[tuple[str, str | None]] | None = None,
     ) -> None:
         # Resolve worlds=None when the factory supplies its connection count.
         # An explicit world count shares connections by modulo.
@@ -276,6 +289,12 @@ class WasmtimeProvider:
         validate_seed(seed, label="seed")
         if worlds is not None:
             validate_seed(seed + worlds - 1, label="seed plus the final world index")
+        self.personas = None if personas is None else tuple(parse_persona(entry) for entry in personas)
+        self.persona_pool = (
+            DEFAULT_PERSONA_POOL
+            if persona_pool is None
+            else validate_persona_pool(tuple(Persona(name, sex) for name, sex in persona_pool))
+        )
         self.runtime = WasmtimeRuntime() if runtime is None else runtime
         self.worlds = worlds
         self.seed = seed
@@ -311,6 +330,10 @@ class WasmtimeProvider:
                 raise ValueError(f"worlds cannot exceed connections: {resolved_worlds} > {count}")
             largest_world_session_count = -(-count // resolved_worlds)
             validate_session_count(largest_world_session_count)
+            if self.personas is not None and len(self.personas) != count:
+                raise ValueError(f"personas must contain one entry per connection: {len(self.personas)} != {count}")
+            if self.personas is None:
+                self.personas = (Persona(),) * count
             self.worlds = resolved_worlds
             self._world_seeds = tuple(self.seed + world_index for world_index in range(resolved_worlds))
             self._world_slots = [list(range(index, count, resolved_worlds)) for index in range(resolved_worlds)]
@@ -349,10 +372,13 @@ class WasmtimeProvider:
             world_seeds.append(self._world_seeds[world_index] if candidate is None else candidate)
         return tuple(world_seeds)
 
-    def _build_world_with_sessions(self, count: int, seed: int) -> tuple[WasmtimeWorld, list[WasmtimeSession]]:
-        world = self.runtime.create_world(max_players=count, seed=seed, civil_time_anchor=self.civil_time_anchor)
+    def _build_world_with_sessions(
+        self, slots: Sequence[int], seed: int
+    ) -> tuple[WasmtimeWorld, list[WasmtimeSession]]:
+        personas = resolve_personas([self.personas[index] for index in slots], pool=self.persona_pool, seed=seed)
+        world = self.runtime.create_world(max_players=len(slots), seed=seed, civil_time_anchor=self.civil_time_anchor)
         try:
-            sessions = [world.add_session(PERSONA_NAMES[local_index], self.timeout_ms) for local_index in range(count)]
+            sessions = [world.add_session(persona, self.timeout_ms) for persona in personas]
             return world, sessions
         except BaseException as error:
             if cleanup_errors := _shutdown_worlds([world]):
@@ -381,7 +407,7 @@ class WasmtimeProvider:
         previous_session = connection._require_session()
         if not previous_session.departed:
             world.remove_session(previous_session, connection.timeout_ms)
-        new_session = world.add_session(previous_session.persona_name, self.timeout_ms)
+        new_session = world.add_session(previous_session.persona, self.timeout_ms)
         connection._bind(new_session)
 
     def _replace_world(self, world_index: int, *, seed: int | None = None) -> None:
@@ -389,7 +415,7 @@ class WasmtimeProvider:
         self._require_world_connections_quiescent(world_index)
         slots = self._world_slots[world_index]
         seed = self._world_seeds[world_index] if seed is None else validate_seed(seed, label="world seed")
-        new_world, sessions = self._build_world_with_sessions(len(slots), seed)
+        new_world, sessions = self._build_world_with_sessions(slots, seed)
         old_world = self._ordered_worlds[world_index]
         for connection_index, session in zip(slots, sessions, strict=True):
             self._connections[connection_index]._bind(session)
@@ -413,7 +439,7 @@ class WasmtimeProvider:
             try:
                 built = ordered_future_results(
                     (
-                        self._executor.submit(self._build_world_with_sessions, len(slots), world_seeds[world_index])
+                        self._executor.submit(self._build_world_with_sessions, slots, world_seeds[world_index])
                         for world_index, slots in enumerate(self._world_slots)
                     ),
                     "WASI world reset failed",
@@ -523,9 +549,11 @@ class WasmtimeProvider:
                 raise BaseExceptionGroup("WASI provider close failed", errors)
 
 
-def create_connection(**provider_options: Any) -> WasmtimeConnection:
+def create_connection(
+    *, persona: str | None = None, sex: str | None = None, **provider_options: Any
+) -> WasmtimeConnection:
     """Create a standalone connection that owns and closes its entire provider."""
-    provider = WasmtimeProvider(**provider_options)
+    provider = WasmtimeProvider(personas=((persona, sex),), **provider_options)
     try:
         connection = provider.create_connections(1)[0]
         connection.owns_provider = True

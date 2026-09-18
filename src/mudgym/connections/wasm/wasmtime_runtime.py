@@ -11,6 +11,7 @@ from typing import Any
 
 from wasmtime import Config, Engine, Linker, Module, Store, WasiConfig
 
+from mudgym.connections.persona import Persona
 from mudgym.featurizers.strings import encode_command_bytes
 
 from .engine_contract import CommandTicketStatus, SessionResultCode, WorldStatus, validate_seed, validate_session_count
@@ -64,11 +65,11 @@ class WasmtimeTicket:
 class WasmtimeSession:
     """One generation-safe player handle within a :class:`WasmtimeWorld`."""
 
-    def __init__(self, world: WasmtimeWorld, player_id: int, generation: int, persona_name: str) -> None:
+    def __init__(self, world: WasmtimeWorld, player_id: int, generation: int, persona: Persona) -> None:
         self.world = world
         self.player_id = player_id
         self.generation = generation
-        self.persona_name = persona_name
+        self.persona = persona
         self.departed = False
 
     def send(self, command: str, timeout_ms: int) -> WasmtimeTicket:
@@ -143,6 +144,7 @@ class WasmtimeWorld:
     ) -> None:
         validate_session_count(max_players)
         validate_seed(seed, label="world seed")
+        self.seed = seed
         offset = civil_time_anchor.utcoffset()
         if offset is None:
             raise ValueError("civil_time_anchor must include a UTC offset")
@@ -208,22 +210,24 @@ class WasmtimeWorld:
             session.departed = True
             raise _engine_error("session-gone", result, f"session no longer exists during {operation}")
 
-    def add_session(self, persona_name: str, timeout_ms: int = 5_000) -> WasmtimeSession:
+    def add_session(self, persona: Persona, timeout_ms: int = 5_000) -> WasmtimeSession:
+        if persona.name is None or persona.sex is None:
+            raise ValueError("session admission requires a resolved persona name and sex")
         with self.lock:
             player_id = self._call_with_text(
                 "mud2_shared_add_session",
-                persona_name,
-                # The ABI requires these fields. Zero selects the engine's default mortal persona.
-                arguments_after_text=(0, 0, 0, 0, 0, 0, 0, 0, timeout_ms),
+                persona.name,
+                # Leave stats unspecified so the game generates them for the selected sex.
+                arguments_after_text=(0, int(persona.sex == "female"), 0, 0, 0, 0, 0, 0, timeout_ms),
             )
             if player_id == -2:
-                raise _engine_error("persona-collision", player_id, f"persona name is reserved: {persona_name}")
+                raise _engine_error("persona-collision", player_id, f"persona name is reserved: {persona.name}")
             if player_id < 0:
-                raise _engine_error("add-player-failed", player_id, f"could not add persona {persona_name}")
+                raise _engine_error("add-player-failed", player_id, f"could not add persona {persona.name}")
             generation = int(self._call("mud2_shared_last_session_generation"))
             if generation < 1:
-                raise _engine_error("add-player-failed", None, f"persona {persona_name} has no generation")
-            return WasmtimeSession(self, player_id, generation, persona_name)
+                raise _engine_error("add-player-failed", None, f"persona {persona.name} has no generation")
+            return WasmtimeSession(self, player_id, generation, persona)
 
     def remove_session(self, session: WasmtimeSession, timeout_ms: int) -> None:
         with self.lock:

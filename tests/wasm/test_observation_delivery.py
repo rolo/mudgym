@@ -18,7 +18,9 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
     def capture_path(index):
         return tmp_path / f"player{index}.jsonl"
 
-    provider = RecordingProvider(WasmtimeProvider(runtime=wasm_runtime, worlds=1), capture_path)
+    provider = RecordingProvider(
+        WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))), capture_path
+    )
     with closing(make_parallel_env(2, provider=provider, observation=preset, render_mode="ansi")) as environment:
         # With all players prepared first, seed 10 places Aaron and Abbie in the same room.
         obs, infos = environment.reset(seed=10)

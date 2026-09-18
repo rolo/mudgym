@@ -103,6 +103,7 @@ class RecordingConnection(MudConnection):
             rejected=bool(debug_info.get("rejected", False)),
             marker_arrived=bool(debug_info.get("marker_arrived", False)),
             sent_lines=debug_info["sent_lines"],
+            persona=debug_info.get("persona"),
         )
         return raw_bytes, terminated, incomplete, debug_info
 
@@ -163,6 +164,7 @@ class ReplayConnection(MudConnection):
                 "replayed": True,
                 "capture": str(self.path),
                 "sent_lines": call["sent_lines"],
+                "persona": call.get("persona"),
             },
         )
 

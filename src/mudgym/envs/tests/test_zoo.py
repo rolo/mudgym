@@ -50,7 +50,11 @@ def test_human_render_prints_labeled_child_output(wasm_runtime, capsys):
 @pytest.mark.parametrize("observation", ["text", "parsed"])
 def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, observation):
     with closing(
-        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=observation)
+        make_parallel_env(
+            2,
+            provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
+            observation=observation,
+        )
     ) as env:
         env.reset(seed=10)
 
@@ -135,7 +139,12 @@ def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
 
 
 def test_parallel_reset_observations_include_every_player(wasm_runtime):
-    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+    with closing(
+        make_parallel_env(
+            2,
+            provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
+        )
+    ) as env:
         obs, infos = env.reset(seed=10)
 
         assert obs["player_0"]["room_name"] == obs["player_1"]["room_name"]

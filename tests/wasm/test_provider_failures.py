@@ -120,9 +120,9 @@ def test_failed_admission_preserves_the_native_error_when_shutdown_also_fails():
     shutdown_error = RuntimeError("world shutdown failed")
 
     class OverfilledWorld(WasmtimeWorld):
-        def add_session(self, persona_name, *arguments, **options):
-            super().add_session(persona_name, *arguments, **options)
-            return super().add_session(persona_name, *arguments, **options)
+        def add_session(self, persona, *arguments, **options):
+            super().add_session(persona, *arguments, **options)
+            return super().add_session(persona, *arguments, **options)
 
         def shutdown(self):
             super().shutdown()
@@ -253,7 +253,7 @@ def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runt
         world = session.world
 
         player.close()
-        replacement = world.add_session(session.persona_name)
+        replacement = world.add_session(session.persona)
 
         assert replacement.player_id == session.player_id
         assert replacement.generation > session.generation

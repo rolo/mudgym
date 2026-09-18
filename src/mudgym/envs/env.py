@@ -196,18 +196,20 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         *,
         raw_bytes: bytes,
         render_bytes: bytes,
-        rejected: bool,
         field_refusals: dict[str, bytes],
+        transport: dict[str, Any],
     ) -> dict[str, Any]:
         info: dict[str, Any] = {
             "raw_bytes": raw_bytes,
             "render_bytes": render_bytes,
             "step": self.step_count,
             "persona": self.persona,
-            "action_rejected": rejected,
+            "action_rejected": bool(transport.get("rejected", False)),
         }
         if field_refusals:
             info["field_refusals"] = field_refusals
+        if persona := transport.get("persona"):
+            info["persona_sex"] = persona["sex"]
         return info
 
     def render(self) -> str | None:
@@ -283,8 +285,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         info = self.make_info(
             raw_bytes=raw_bytes,
             render_bytes=render_bytes,
-            rejected=transport["rejected"],
             field_refusals=field_refusals,
+            transport=transport,
         )
         info["transport"] = {**transport, "incomplete": incomplete}
         self.last_render_bytes = render_bytes
@@ -373,8 +375,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         info = self.make_info(
             raw_bytes=raw_bytes,
             render_bytes=render_bytes,
-            rejected=bool(debug_info.get("rejected", False)),
             field_refusals=field_refusals,
+            transport=debug_info,
         )
         info["transport"] = {**debug_info, "incomplete": incomplete}
 

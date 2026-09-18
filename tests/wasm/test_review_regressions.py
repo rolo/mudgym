@@ -27,7 +27,9 @@ def test_failed_reset_requires_a_clean_reset_before_normal_use(wasm_runtime):
 @pytest.mark.parametrize("phase", ["action", "observation"])
 @pytest.mark.parametrize("preset", ["parsed", "text", "bytes"])
 def test_pending_combat_death_survives_the_next_command_and_reset(wasm_runtime, phase, preset, tmp_path):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123)
+    provider = WasmtimeProvider(
+        runtime=wasm_runtime, worlds=1, seed=123, personas=(("Aaron", "male"), ("Abbie", "male"))
+    )
     victim, survivor = provider.create_connections(2)
     capture = tmp_path / "departure.jsonl"
     environment = make_env(connection=RecordingConnection(victim, capture), observation=preset)

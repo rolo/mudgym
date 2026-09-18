@@ -74,15 +74,26 @@ def make_env(
     connection_kwargs: Mapping[str, Any] | None = None,
     tearoom_commands: str | None = None,
     world_ticker: Callable[[], None] | None = None,
+    *,
+    persona: str | None = None,
+    sex: str | None = None,
+    persona_pool: Sequence[tuple[str, str | None]] | None = None,
 ) -> gym.Env:
-    """Build one Gymnasium environment.
+    """Build a Gymnasium environment.
 
-    ``world_ticker`` runs once after the action for a step and before its observation. When omitted, the connection's ``tick_for_step`` hook supplies the clock if present.
+    Reset and step expose ``info["persona"]`` and ``info["persona_sex"]``. Non-None persona options override ``connection_kwargs``. Configure existing connections on their provider. See ``make_parallel_env`` for per-player tuple shorthand.
+
+    ``world_ticker`` runs between the action and observation, defaulting to the connection's ``tick_for_step`` hook if present.
     """
     if actions not in {"text", "directions"}:
         raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
+    options = {"persona": persona, "sex": sex, "persona_pool": persona_pool}
+    connection_kwargs = {
+        **(connection_kwargs or {}),
+        **{key: value for key, value in options.items() if value is not None},
+    }
     if isinstance(connection, MudConnection) and connection_kwargs:
-        raise ValueError("connection_kwargs is not valid when passing an explicit connection instance.")
+        raise ValueError("Configure connection options on the provider when passing an explicit connection instance.")
     if field_parsers is None and observation not in OBSERVATION_PRESETS:
         raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})")
 
@@ -90,9 +101,7 @@ def make_env(
     if isinstance(connection_factory, str):
         connection_factory = registry.connections[connection_factory]
     resolved_connection = (
-        connection_factory
-        if isinstance(connection_factory, MudConnection)
-        else connection_factory(**dict(connection_kwargs or {}))
+        connection_factory if isinstance(connection_factory, MudConnection) else connection_factory(**connection_kwargs)
     )
     if world_ticker is None:
         world_ticker = getattr(resolved_connection, "tick_for_step", None)
@@ -171,24 +180,24 @@ def make_parallel_env(
     tearoom_commands: str | None = None,
     provider: ConnectionProvider | None = None,
     world_ticker: Callable[[], None] | None = None,
+    personas: Sequence[tuple[str] | tuple[str | None, str | None]] | None = None,
+    persona_pool: Sequence[tuple[str, str | None]] | None = None,
 ) -> ParallelEnv:
     """Create a PettingZoo environment whose players share one MUD world.
 
-    The registry supplies a one-world default. A provider that exposes ``world_for_connection`` must map every connection to that same world. Providers without that capability retain their existing topology behavior. The resulting environment owns that provider, and action wrappers sit around the joint environment rather than around each player.
-
-    ``world_ticker`` runs once after all actions for a step and before any observations. It belongs to the coordinator
-    alone. When omitted, the provider's ``tick_for_step`` hook supplies the clock if present.
+    ``world_ticker`` runs after all actions and before any observations, defaulting to the provider's ``tick_for_step`` hook if present.
     """
-    if agents < 1:
-        raise ValueError("agents must be at least 1.")
-    if actions not in {"text", "directions"}:
-        raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
     if field_parsers is None and observation not in OBSERVATION_PRESETS:
         raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})")
     child_render_mode = "ansi" if render_mode is not None else None
 
+    if provider is not None and (personas is not None or persona_pool is not None):
+        raise ValueError("Configure personas and persona_pool on the explicit provider.")
     if provider is None:
-        provider = registry.default_parallel_provider_factory()
+        options = {"personas": personas, "persona_pool": persona_pool}
+        provider = registry.default_parallel_provider_factory(
+            **{key: value for key, value in options.items() if value is not None}
+        )
     if world_ticker is None:
         world_ticker = getattr(provider, "tick_for_step", None)
     children = {

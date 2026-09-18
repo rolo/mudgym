@@ -12,7 +12,9 @@ from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
 
 @pytest.mark.parametrize("command", ["say café", "say €100"])
 def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runtime, command):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123)) as provider:
+    with closing(
+        WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123, personas=(("Aaron", "male"), ("Abbie", "male")))
+    ) as provider:
         player, peer = provider.create_connections(2)
         player.reset()
         peer.reset()
@@ -113,7 +115,9 @@ def test_recording_and_replay_retain_marker_free_presets(wasm_runtime, tmp_path)
     ids=["text", "bytes", "no-fields", "inventory-only"],
 )
 def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wasm_runtime, observation_options):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123)
+    provider = WasmtimeProvider(
+        runtime=wasm_runtime, worlds=1, seed=123, personas=(("Aaron", "male"), ("Abbie", "male"))
+    )
     player, opponent = provider.create_connections(2)
     environment = make_env(connection=player, **observation_options)
 

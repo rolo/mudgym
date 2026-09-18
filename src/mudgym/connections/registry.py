@@ -9,6 +9,6 @@ connections: dict[str, Callable[..., MudConnection]] = {"wasm": create_connectio
 default_connection = create_connection
 
 
-def default_parallel_provider_factory() -> WasmtimeProvider:
+def default_parallel_provider_factory(**options) -> WasmtimeProvider:
     """Create the default provider for players who share one world."""
-    return WasmtimeProvider(worlds=1)
+    return WasmtimeProvider(worlds=1, **options)
