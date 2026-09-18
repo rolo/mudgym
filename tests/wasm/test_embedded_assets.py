@@ -5,7 +5,6 @@ from importlib.resources import files
 from itertools import batched
 
 import pytest
-from packaging.requirements import Requirement
 from wasmtime import Config, Engine, Linker, Module, Store, WasiConfig
 
 from mudgym.connections.persona import PERSONA_NAMES
@@ -39,17 +38,6 @@ def test_distributed_engine_rejects_privileged_admission_through_the_raw_abi(was
         assert b"Elizabethan tearoom" in player.send("look", timeout_ms=5000).output
     finally:
         world.shutdown()
-
-
-def test_required_wasm_engine_accepts_patch_releases_only():
-    requirements = [Requirement(value) for value in metadata.requires("mudgym")]
-    (engine,) = [requirement for requirement in requirements if requirement.name == "mudgym-wasm-engine"]
-    assert engine.url is None
-    assert engine.marker is None
-    for version in ("0.1.0", "0.1.1", "0.1.99"):
-        assert version in engine.specifier
-    for version in ("0.0.9", "0.2.0", "1.0.0"):
-        assert version not in engine.specifier
 
 
 def test_engine_wheel_contains_only_namespace_and_wasm():

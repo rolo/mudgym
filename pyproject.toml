@@ -27,8 +27,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
     "ansi2html>=1.9.2",
@@ -37,7 +37,7 @@ dependencies = [
     "numpy>=2.3.4",
     "pettingzoo>=1.25.0",
     "wasmtime>=48.0.0,<49",
-    "mudgym-wasm-engine~=0.1.0",
+    "mudgym-wasm-engine~=0.1.4",
 ]
 
 [project.urls]
@@ -98,6 +98,6 @@ log_level = "DEBUG"
 log_cli_format = "%(asctime)s %(levelname)-7s %(message)s"
 log_cli_date_format = "%H:%M:%S"
 markers = [
-  "soak: long-running live-game soak tests; excluded by default, run with -m soak",
+  "soak: long-running live-game soak tests, excluded by default, run with -m soak",
 ]
 addopts = "-m 'not soak'"
