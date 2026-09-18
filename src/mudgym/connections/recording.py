@@ -93,8 +93,8 @@ class RecordingConnection(MudConnection):
             raise
         self.capture.write_call("send_line", line=line)
 
-    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(end_of_turn_marker)
+    def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
+        raw_bytes, terminated, incomplete, debug_info = self.connection.read_response()
         self.capture.write_call(
             "read_response",
             raw_text=raw_bytes.decode("latin-1"),
@@ -151,7 +151,7 @@ class ReplayConnection(MudConnection):
         if call.get("error") == "connection_closed":
             raise ConnectionClosedError(f"Recorded connection closed while sending {line!r}.")
 
-    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
+    def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
         call = self._take("read_response")
         return (
             call["raw_bytes"],

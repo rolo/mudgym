@@ -1,8 +1,6 @@
-import re
-
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.errors import ConnectionClosedError
-from mudgym.featurizers.quickscore import QUICKSCORE_COMMAND, QUICKSCORE_PATTERN, parse_quickscore
+from mudgym.featurizers.quickscore import QUICKSCORE_COMMAND, parse_quickscore
 
 
 class MudSession:
@@ -11,19 +9,9 @@ class MudSession:
     environments, specs or any of that jazz.
     """
 
-    def __init__(
-        self,
-        connection: MudConnection,
-        *,
-        observation_line: str,
-        end_of_turn_marker: re.Pattern | None,
-    ) -> None:
+    def __init__(self, connection: MudConnection, *, observation_line: str = "") -> None:
         self.connection = connection
-
-        if not observation_line and connection.requires_end_of_turn_marker:
-            raise ValueError("MudSession requires an observation command line.")
         self.observation_line = observation_line
-        self.end_of_turn_marker = end_of_turn_marker
 
         # A pending command has been sent to the game but its response hasn't been read yet.
         # This is for the two step act/observe pattern to ensure we have the latest game text to act on.
@@ -35,7 +23,7 @@ class MudSession:
         self.pending_command = None
 
         self.send(QUICKSCORE_COMMAND)
-        raw_bytes, terminated, incomplete, _ = self.read_pending_response(QUICKSCORE_PATTERN)
+        raw_bytes, terminated, incomplete, _ = self.read_pending_response()
         if terminated or incomplete:
             raise RuntimeError(
                 f"quickscore failed during reset (terminated={terminated}, incomplete={incomplete}): {raw_bytes!r}"
@@ -46,7 +34,7 @@ class MudSession:
         """Send one player's command without waiting for its response."""
         if self.pending_command is not None:
             raise RuntimeError(
-                f"Cannot send {command!r}; command {self.pending_command!r} is still waiting to be received."
+                f"Cannot send {command!r} while command {self.pending_command!r} is still waiting to be received."
             )
         self.connection.send_line(command)
         self.pending_command = command
@@ -66,15 +54,12 @@ class MudSession:
             # reading. With no pending action there is nothing to recover, so surface the failure.
             if command is None:
                 raise
-        return self.read_pending_response(self.end_of_turn_marker)
+        return self.read_pending_response()
 
-    def read_pending_response(self, end_of_turn_marker: re.Pattern | None) -> tuple[bytes, bool, bool, dict]:
-        """Read to the supplied boundary without sending observation commands.
-
-        Reset uses this for quickscore and for the tearoom-exit narration through its following prompt.
-        """
+    def read_pending_response(self) -> tuple[bytes, bool, bool, dict]:
+        """Read the completed response without sending observation commands."""
         try:
-            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response(end_of_turn_marker)
+            raw_bytes, terminated, incomplete, debug_info = self.connection.read_response()
         finally:
             self.pending_command = None
 

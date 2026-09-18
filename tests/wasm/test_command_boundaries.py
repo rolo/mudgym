@@ -17,18 +17,18 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
         player.reset()
         peer.reset()
         peer.send_line('tell "pending message" to Aaron')
-        peer.read_response(None)
+        peer.read_response()
 
         with pytest.raises(ValueError, match="outside ASCII"):
             player.send_line(command)
 
         player.send_line("look")
-        raw, terminated, incomplete, info = player.read_response(None)
+        raw, terminated, incomplete, info = player.read_response()
         assert b"pending message" in raw
         assert b"Elizabethan tearoom" in raw
         assert not terminated and not incomplete
         assert info["sent_lines"] == ["look"]
-        assert player.read_response(None)[0] == b""
+        assert player.read_response()[0] == b""
 
 
 @pytest.mark.parametrize("preset", ["text", "bytes"])
@@ -132,7 +132,7 @@ def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wa
         assert initial["points"] == 200
         opponent.reset()
         opponent.send_line("north")
-        opponent.read_response(None)
+        opponent.read_response()
         for command in ("west", "kill Abbie"):
             observation, reward, terminated, truncated, _ = step(command)
             assert observation["points"] == 200 and reward == 0

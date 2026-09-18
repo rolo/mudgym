@@ -87,9 +87,9 @@ def test_pending_peer_output_precedes_the_observation_command_echo(wasm_runtime)
         observer.reset()
         observer.send_line("look")
         sender.send_line('tell "queued before probe" to abbie')
-        sender.read_response(None)
+        sender.read_response()
         observer.send_line("fes")
-        raw_bytes, terminated, incomplete, info = observer.read_response(None)
+        raw_bytes, terminated, incomplete, info = observer.read_response()
         assert info["sent_lines"] == ["look", "fes"]
         assert not terminated and not incomplete
         assert raw_bytes.index(b"look\r\n") < raw_bytes.index(b"queued before probe")

@@ -1,4 +1,3 @@
-import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -31,9 +30,6 @@ class FEInventoryField(ObservationField):
     """
 
     command = "fei"
-
-    # the ======== divider
-    end_of_turn_marker = re.compile(rb"(?m)(?:^|\x1b\[[0-9;]*m)========\r?\n")
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {

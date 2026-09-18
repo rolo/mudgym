@@ -34,32 +34,20 @@ DRAGONFLY_WINDOW_BYTES = (
 DRAGONFLY_INTERLEAVED_BYTES = DRAGONFLY_WINDOW_BYTES + FEI_MARKER_CHUNK
 
 
-def framing(command: str, *, marker_arrived: bool) -> dict:
-    return {
-        "sent_lines": [command, "sql,fes,fex,fei"],
-        "marker_arrived": marker_arrived,
-    }
-
-
-def parse(env, raw_bytes: bytes, info: dict):
-    observation, _, _ = env.bytes_to_observation(
+def parse(env, raw_bytes: bytes, command: str, *, response_complete: bool = True):
+    obs, _, _ = env.bytes_to_observation(
         raw_bytes,
-        sent_lines=info["sent_lines"],
-        response_complete=info["marker_arrived"] and not info.get("incomplete", False),
+        sent_lines=[command, "sql,fes,fex,fei"],
+        response_complete=response_complete,
     )
-    return observation
+    return obs
 
 
 def test_interleaved_async_output_lands_in_text_and_fields_align(scripted_env_factory):
-    """An async line flushed at the head of the window must not shift field assignment.
-
-    The fei marker anchors the tail: the four field responses are the chunks it bounds,
-    and the flushed dragonfly line is narrative text the player really saw.
-    """
+    """An async line before the field responses stays in narrative text without shifting field assignment."""
     env = scripted_env_factory(observation="parsed")
-    info = framing("move jump", marker_arrived=True)
 
-    obs = parse(env, DRAGONFLY_INTERLEAVED_BYTES, info)
+    obs = parse(env, DRAGONFLY_INTERLEAVED_BYTES, "move jump")
 
     assert obs["room_name"] == "fast-flowing river"
     assert obs["available_exits"].sum() == 12
@@ -68,10 +56,7 @@ def test_interleaved_async_output_lands_in_text_and_fields_align(scripted_env_fa
     assert "========" not in obs["text"]
 
 
-# Condensed from a live arena capture (exports/diagnostics/mudgym-arena-dump.txt): during a fight
-# the game flushes combat rounds BETWEEN observation-command responses -- here between fex and fei --
-# each with a prompt reprint. The marker still bounds the window; matcher-scan assignment must
-# route the fight block to narrative text and keep every field aligned.
+# A live arena capture with combat rounds between fex and fei responses. Each round reprints the prompt, but the fight output must stay in narrative text.
 COMBAT_INTERLEAVED_BYTES = (
     b"You hear sounds of combat, as Matthew the necromancer attacks Stephen the necromancer.\r\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
@@ -99,9 +84,8 @@ COMBAT_INTERLEAVED_BYTES = (
 def test_combat_rounds_interleaved_between_responses_still_align(scripted_env_factory):
     """Fight output between two observation-command responses must not shift field assignment."""
     env = scripted_env_factory(observation="parsed")
-    info = framing("kill matthew", marker_arrived=True)
 
-    obs = parse(env, COMBAT_INTERLEAVED_BYTES, info)
+    obs = parse(env, COMBAT_INTERLEAVED_BYTES, "kill matthew")
 
     assert obs["room_name"] == "treacherous swamp"
     assert obs["available_exits"].sum() == 9
@@ -110,21 +94,21 @@ def test_combat_rounds_interleaved_between_responses_still_align(scripted_env_fa
     assert "========" not in obs["text"]
 
 
-def test_missing_marker_means_no_field_extraction(scripted_env_factory):
-    """Without the marker, chunk positions cannot be trusted: fields default, chunks stay text."""
+@pytest.mark.parametrize("raw_bytes", [DRAGONFLY_WINDOW_BYTES, DRAGONFLY_INTERLEAVED_BYTES])
+def test_incomplete_response_keeps_field_output_as_text(scripted_env_factory, raw_bytes):
+    """Incomplete responses leave fields empty even if the inventory divider arrived."""
     env = scripted_env_factory(observation="parsed")
-    info = framing("move jump", marker_arrived=False)
 
-    obs = parse(env, DRAGONFLY_WINDOW_BYTES, info)
+    obs = parse(env, raw_bytes, "move jump", response_complete=False)
 
     assert obs["room_name"] == ""
     assert 'The place known as "fast-flowing river"' in obs["text"]
 
 
-def test_step_batches_end_with_fei_and_marker_is_stripped(scripted_env_factory):
+def test_default_observation_batch_parses_fields_and_hides_inventory_divider(scripted_env_factory):
     env = scripted_env_factory(observation="parsed")
     env.reset()
-    obs, _, _, _, info = env.step("look")
+    obs = env.step("look")[0]
     connection = env.unwrapped.session.connection
 
     assert connection.sent_lines[-1] == ["look", "sql,fes,fex,fei"]
@@ -132,11 +116,10 @@ def test_step_batches_end_with_fei_and_marker_is_stripped(scripted_env_factory):
     assert "========" not in obs["text"]
 
 
-def test_text_mode_uses_fes_as_a_marker_and_keeps_tracked_points(scripted_env_factory):
-    """The text preset uses fes to end the batch while the env supplies points."""
+def test_text_mode_hides_probe_output_and_keeps_tracked_points(scripted_env_factory):
     env = scripted_env_factory(observation="text")
     env.reset()
-    obs, _, _, _, info = env.step("look")
+    obs = env.step("look")[0]
     connection = env.unwrapped.session.connection
 
     assert env.unwrapped.session.observation_line == "fes"
@@ -146,12 +129,11 @@ def test_text_mode_uses_fes_as_a_marker_and_keeps_tracked_points(scripted_env_fa
     assert "75 75" not in obs["text"]
 
 
-def test_bare_env_defaults_to_a_marker_only_text_field():
-    """A field-less MudEnv() uses fes as a marker and includes the common text and points observations."""
+def test_bare_env_defaults_to_text_and_points_with_a_score_probe():
     env = MudEnv(connection=ScriptedConnection())
     try:
         env.reset()
-        obs, _, _, _, info = env.step("look")
+        obs = env.step("look")[0]
         connection = env.session.connection
 
         assert env.session.observation_line == "fes"
@@ -183,11 +165,11 @@ def test_bare_env_defaults_to_a_marker_only_text_field():
 def test_tearoom_exit_uses_the_quickscore_points(field_parsers):
     env = make_scripted_env(field_parsers=field_parsers)
     try:
-        observation, _ = env.reset()
+        obs, _ = env.reset()
         connection = env.unwrapped.session.connection
 
         assert env.unwrapped.points == 200
-        assert "75 75 52 52" not in observation["text"]
+        assert "75 75 52 52" not in obs["text"]
         assert connection.sent_lines == [["qs"], ["move north"], [env.unwrapped.session.observation_line]]
 
         env.step("look")
@@ -196,15 +178,16 @@ def test_tearoom_exit_uses_the_quickscore_points(field_parsers):
         env.close()
 
 
-def test_final_observation_field_without_a_marker_raises():
-    with pytest.raises(ValueError, match="end_of_turn_marker"):
-        make_scripted_env(field_parsers=[FEScoreField, FEXitsField])
-
-
-def test_final_commanded_field_owns_framing_when_later_field_is_commandless():
-    env = make_scripted_env(field_parsers=[FEScoreField, RawBytesField])
+@pytest.mark.parametrize("field_parsers", [[FEScoreField, FEXitsField], [FEScoreField, FEXitsField, RawBytesField]])
+def test_observation_fields_do_not_require_a_final_marker(field_parsers):
+    env = make_scripted_env(field_parsers=field_parsers)
     try:
-        assert env.unwrapped.session.observation_line == "fes"
+        env.reset()
+        obs, _, terminated, truncated, _ = env.step("look")
+        assert env.session.observation_line == "fes,fex"
+        assert obs["available_exits"].sum() == 8
+        assert obs["vitals"].size == 8
+        assert not terminated and not truncated
     finally:
         env.close()
 
@@ -228,8 +211,7 @@ def test_field_order_drives_observation_command_order_and_claiming():
     assert obs["available_exits"].sum() == 8
 
 
-def test_fes_terminated_batch_extracts_against_the_live_game(live_env_factory):
-    """The fes wire marker must match the real game's SGR-interleaved status line."""
+def test_reordered_fields_extract_from_the_live_game(live_env_factory):
     env = live_env_factory(
         field_parsers=[
             SuperQuickLookField(
@@ -240,15 +222,14 @@ def test_fes_terminated_batch_extracts_against_the_live_game(live_env_factory):
             FEScoreField,
         ]
     )
-    obs, info = env.reset()
-    obs, _, _, truncated, info = env.step("look")
+    env.reset()
+    obs, _, _, truncated, _ = env.step("look")
 
     assert not truncated
     assert obs["vitals"].sum() > 0
 
 
-def test_fes_terminates_the_batch_when_listed_last():
-    """A marker-capable field's command listed last becomes the end-of-turn marker: no fei appended."""
+def test_fes_parses_correctly_when_listed_last():
     env = make_scripted_env(
         field_parsers=[
             SuperQuickLookField(
@@ -260,7 +241,7 @@ def test_fes_terminates_the_batch_when_listed_last():
         ]
     )
     env.reset()
-    obs, _, _, _, info = env.step("look")
+    obs = env.step("look")[0]
     connection = env.unwrapped.session.connection
 
     assert env.unwrapped.session.observation_line == "sql,fex,fei,fes"
@@ -271,53 +252,10 @@ def test_fes_terminates_the_batch_when_listed_last():
     assert "========" not in obs["text"]
 
 
-def test_incomplete_step_defaults_fields_even_when_the_divider_arrived(scripted_env_factory):
-    """A incomplete read window cannot be trusted, marker bytes or not.
-
-    TIMEOUT can cut the window between the divider and its trailing prompt; the transport
-    reports incomplete=True and the parse must not treat the tail as marker-bounded.
-    """
-    env = scripted_env_factory(observation="parsed")
-    info = {**framing("move jump", marker_arrived=True), "incomplete": True}
-
-    obs = parse(env, DRAGONFLY_INTERLEAVED_BYTES, info)
-
-    assert obs["room_name"] == ""
-    assert 'The place known as "fast-flowing river"' in obs["text"]
-
-
-def test_a_longer_equals_run_is_not_mistaken_for_the_marker(scripted_env_factory):
-    """Only fei's exact eight-equals divider closes the window; longer ==== rules are narrative."""
-    env = scripted_env_factory(observation="parsed")
-    info = framing("look", marker_arrived=False)
-    prompt = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
-    raw_bytes = b"look\r\nSome narrative.\r\n" + prompt + b"sql,fes,fex,fei\r\n==================\r\n" + prompt
-
-    obs = parse(env, raw_bytes, info)
-
-    assert obs["room_name"] == ""
-    assert "==================" in obs["text"]
-
-
-def test_a_mid_line_equals_run_is_not_mistaken_for_the_marker(scripted_env_factory):
-    """fei's divider only ever follows a line start or an ANSI SGR sequence; eight equals
-    embedded mid-line are narrative."""
-    env = scripted_env_factory(observation="parsed")
-    info = framing("look", marker_arrived=False)
-    prompt = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
-    raw_bytes = b"look\r\n" + prompt + b"sql,fes,fex,fei\r\nThe sign reads ========\r\n" + prompt
-
-    obs = parse(env, raw_bytes, info)
-
-    assert obs["room_name"] == ""
-    assert "The sign reads ========" in obs["text"]
-
-
-def test_mgcheats_terminates_the_batch_when_listed_last():
-    """The mgcheats closing tag serves as the marker when mgcheats ends the batch."""
+def test_mgcheats_parses_correctly_when_listed_last():
     env = make_scripted_env(field_parsers=[FEScoreField, FEXitsField, FEInventoryField, MGCheatsField])
     env.reset()
-    obs, _, _, _, info = env.step("look")
+    obs = env.step("look")[0]
     connection = env.unwrapped.session.connection
 
     assert env.unwrapped.session.observation_line == "fes,fex,fei,mgcheats"

@@ -3,8 +3,6 @@ import json
 import pytest
 
 from mudgym.connections.recording import RecordingConnection
-from mudgym.envs.fields.feinventory import FEInventoryField
-from mudgym.featurizers.quickscore import QUICKSCORE_PATTERN
 from mudgym.session import MudSession
 from tests.scripted import ScriptedConnection
 
@@ -15,7 +13,6 @@ def make_session(connection=None) -> MudSession:
     return MudSession(
         connection or ScriptedConnection(),
         observation_line=OBSERVATION_LINE,
-        end_of_turn_marker=FEInventoryField.end_of_turn_marker,
     )
 
 
@@ -44,12 +41,15 @@ def test_player_command_and_observation_commands_are_always_separate_wire_calls(
     assert session.pending_command is None
 
 
-def test_command_is_send_followed_by_receive():
-    session = make_session()
+@pytest.mark.parametrize(
+    ("observation_line", "sent_lines"),
+    [("", ["look"]), (OBSERVATION_LINE, ["look", OBSERVATION_LINE])],
+)
+def test_command_sends_the_action_and_only_configured_observation_commands(observation_line, sent_lines):
+    session = MudSession(ScriptedConnection(), observation_line=observation_line)
 
-    result = session.command("look")
-
-    assert result[3]["sent_lines"] == ["look", "sql,fes,fex,fei"]
+    assert session.command("look")[3]["sent_lines"] == sent_lines
+    assert session.pending_command is None
 
 
 def test_receive_without_a_pending_command_refreshes_observation_only(tmp_path):
@@ -87,7 +87,6 @@ def test_reset_reads_quickscore_without_requesting_an_observation(tmp_path):
     calls = recorded_calls(capture_path)
     assert [call["call"] for call in calls] == ["reset", "send_line", "read_response"]
     assert [call["line"] for call in calls if call["call"] == "send_line"] == ["qs"]
-    assert scripted_connection.read_markers == [QUICKSCORE_PATTERN]
 
 
 @pytest.mark.parametrize(("terminated", "incomplete"), [(True, False), (False, True)])

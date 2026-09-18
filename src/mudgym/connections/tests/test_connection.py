@@ -2,7 +2,6 @@ import pytest
 
 from mudgym.connections.registry import connections
 from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END
-from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.session import MudSession
 
 
@@ -10,17 +9,17 @@ def send_and_read(connection, lines):
     """Send separate lines to exercise completion across a split command batch."""
     for line in lines:
         connection.send_line(line)
-    return connection.read_response(FEInventoryField.end_of_turn_marker)
+    return connection.read_response()
 
 
 @pytest.mark.parametrize("connection_key", connections)
 def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
     connection = connections[connection_key]()
-    session = MudSession(connection, observation_line="fei", end_of_turn_marker=FEInventoryField.end_of_turn_marker)
+    session = MudSession(connection, observation_line="fei")
     try:
         session.reset()
         session.send("move north")
-        raw, terminated, incomplete, transport = session.read_pending_response(TEAROOM_EXIT_NARRATION_END)
+        raw, terminated, incomplete, transport = session.read_pending_response()
         assert not terminated and not incomplete
         assert transport["marker_arrived"]
         assert transport["sent_lines"] == ["move north"]

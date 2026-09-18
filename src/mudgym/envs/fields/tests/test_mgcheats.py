@@ -63,17 +63,6 @@ def test_empty_returns_valid_defaults_cheats():
     assert "room_id" in defaults
 
 
-def test_end_of_turn_marker_matches_the_closing_tag():
-    """The [/mgcheats] closing tag can terminate a batch when mgcheats is the final command."""
-    response = (
-        b"[mgcheats]room_id=groad3; room_name=dally lane; fighting=0; dark=0; glowing=0; "
-        b"asleep=0; gifted=0; here=[necklace0, weather, road]; ticks=125; inventory=[][/mgcheats]\r\n"
-    )
-
-    assert MGCheatsField.end_of_turn_marker.search(response)
-    assert not MGCheatsField.end_of_turn_marker.search(b"You attack Matthew the necromancer.\r\n")
-
-
 @pytest.mark.parametrize("value", [b"01", b"+1", b"1_0", b"007", b"x", b"200", b"true", b""])
 def test_a_flag_that_is_not_exactly_0_or_1_fails_loudly(value):
     # the game prints a flag as the literal 0 or 1, so anything else is a parse fault, not a number to coerce

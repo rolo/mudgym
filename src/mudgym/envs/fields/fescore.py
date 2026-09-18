@@ -5,7 +5,6 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from mudgym.connections.prompts import SGR
 from mudgym.db.index import indexed_discrete_size, weather_count, weather_to_index
 from mudgym.db.weather import WEATHER_CODE_TO_NAME
 from mudgym.envs.specs import BIT_DTYPE, INDEX_DTYPE, INT_DTYPE, SINGLE_LINE_CHARSET
@@ -46,26 +45,6 @@ class FEScoreField(ObservationField):
         (?P<weather>[SBRTCOF])\s*
         $""",
         re.VERBOSE | re.ASCII,
-    )
-
-    # The status line in wire form, mirroring REGEX above and tolerating the SGR codes the live
-    # game interleaves around the coloured vitals. Runs of spaces separate tokens (like REGEX's
-    # \s+, minus line breaks: a marker is one line); closes the read window when fes ends the batch.
-    end_of_turn_marker = re.compile(
-        rb"(?m)(?:^|\x1b\[[0-9;]*m)"
-        + (rb"\d+" + SGR + rb" +" + SGR) * 8
-        + rb"\d{2,}"
-        + SGR
-        + rb" +"
-        + SGR
-        + (rb"[YN]" + SGR + rb" +" + SGR) * 4
-        + rb"\d+"
-        + SGR
-        + rb" +"
-        + SGR
-        + rb"[SBRTCOF]"
-        + SGR
-        + rb" ?\r?\n"
     )
 
     def full_space(self) -> dict[str, spaces.Space]:

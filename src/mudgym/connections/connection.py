@@ -1,4 +1,3 @@
-import re
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -20,10 +19,7 @@ class MudConnection(ABC):
         """Send a line without collecting its response."""
 
     @abstractmethod
-    def read_response(
-        self,
-        end_of_turn_marker: re.Pattern | None,
-    ) -> tuple[bytes, bool, bool, dict[str, Any]]:
+    def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
         """Collect pending output, game-over and incomplete flags, and transport details."""
 
     @abstractmethod

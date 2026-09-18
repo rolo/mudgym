@@ -3,7 +3,6 @@ import pytest
 
 from mudgym.envs.fields.fescore import FEScoreField
 from mudgym.envs.specs import INT_DTYPE
-from mudgym.featurizers.ansi import strip_ansi
 
 
 def test_matches_valid_line():
@@ -95,21 +94,6 @@ def test_extracts_fes_from_real_captures(bytes_case):
     np.testing.assert_array_equal(obs["flags"], expected["flags"])
     assert obs["reset_minutes"] == expected["reset_minutes"]
     assert obs["weather"] == expected["weather"]
-
-
-def test_end_of_turn_marker_matches_the_status_line_on_the_wire_and_stripped():
-    """The fes status line can terminate a batch, so its marker must match the raw wire form
-    (SGR codes interleaved around the vitals, verbatim from a live capture) and the stripped form."""
-
-    wire_line = b"\x1b[1;32;40m64\x1b[0;37;40m \x1b[1;32;40m64\x1b[0;37;40m 59 59 57 57 0 64 0200 N N N N 52 F\r\n"
-
-    assert FEScoreField.end_of_turn_marker.search(wire_line)
-    assert FEScoreField.end_of_turn_marker.search(strip_ansi(wire_line))
-    assert not FEScoreField.end_of_turn_marker.search(b"You attack Matthew the necromancer.\r\n")
-    assert not FEScoreField.end_of_turn_marker.search(b"12 3 bottles of beer on the wall\r\n")
-
-    # multiple spaces between tokens still parse (REGEX uses \s+), so the marker accepts them too
-    assert FEScoreField.end_of_turn_marker.search(b"64 64  59 59 57 57 0 64 0200 N N N N 52 F\r\n")
 
 
 def test_include_keys_must_be_space_keys():

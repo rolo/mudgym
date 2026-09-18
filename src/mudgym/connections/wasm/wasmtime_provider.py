@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 import threading
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -176,7 +175,7 @@ class WasmtimeConnection(MudConnection):
                 raise ConnectionClosedError("Wasmtime connection closed after the previous command line")
         self._pending_responses.append(self._execute_line(line))
 
-    def read_response(self, end_of_turn_marker: re.Pattern | None) -> tuple[bytes, bool, bool, dict[str, Any]]:
+    def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
         if self._closed or not self._started:
             raise ConnectionClosedError("Wasmtime connection is not open. Call reset() before receiving.")
         responses = self._pending_responses

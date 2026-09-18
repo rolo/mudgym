@@ -39,7 +39,7 @@ def test_provider_allows_one_valid_batch_after_rejecting_an_invalid_topology(was
         for connection in (first, independent, peer):
             connection.reset()
             connection.send_line("look")
-            raw, terminated, incomplete, _ = connection.read_response(None)
+            raw, terminated, incomplete, _ = connection.read_response()
             assert b"Elizabethan tearoom" in raw
             assert not terminated and not incomplete
         assert first.advance_world_ticks(1) == 1
@@ -109,7 +109,7 @@ def test_failed_reset_cleans_every_new_world_and_keeps_the_build_failure():
         for connection in connections:
             connection.reset()
             connection.send_line("look")
-            assert b"Elizabethan" in connection.read_response(None)[0]
+            assert b"Elizabethan" in connection.read_response()[0]
     finally:
         provider.close()
         for world in runtime.created_worlds:
@@ -259,7 +259,7 @@ def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runt
         assert replacement.generation > session.generation
         assert b"Elizabethan tearoom" in replacement.send("look", 5000).output
         peer.send_line("look")
-        raw, terminated, incomplete, _ = peer.read_response(None)
+        raw, terminated, incomplete, _ = peer.read_response()
         assert b"Elizabethan tearoom" in raw
         assert not terminated and not incomplete
 

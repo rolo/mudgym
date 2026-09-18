@@ -125,10 +125,10 @@ def test_explicit_fields_ignores_preset(scripted_env_factory):
     assert observation_keys(env) == EXPLICIT_RAW_BYTES_KEYS
 
 
-def test_explicit_fields_without_a_marker_field_raise(scripted_env_factory):
-    """Every env needs a batch ender: a configured field declaring an end_of_turn_marker."""
-    with pytest.raises(ValueError, match="declare a command"):
-        scripted_env_factory(field_parsers=[RawBytesField])
+def test_explicit_commandless_fields_need_no_observation_probe(scripted_env_factory):
+    env = scripted_env_factory(field_parsers=[RawBytesField])
+    assert env.session.observation_line == ""
+    assert observation_keys(env) == PRESET_KEYS["bytes"]
 
 
 def test_fields_providing_the_same_key_raise(scripted_env_factory):

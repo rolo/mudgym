@@ -130,7 +130,6 @@ class ScriptedConnection(MudConnection):
         self.send_errors = dict(send_errors or {})
         self.sent_lines: list[list[str]] = []
         self.pending_lines: list[str] = []
-        self.read_markers = []
         self.entered_land = False
         self.invalidated = False
         self.closed = False
@@ -146,8 +145,7 @@ class ScriptedConnection(MudConnection):
             raise error
         self.pending_lines.append(line)
 
-    def read_response(self, end_of_turn_marker) -> tuple[bytes, bool, bool, dict[str, Any]]:
-        self.read_markers.append(end_of_turn_marker)
+    def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
         lines = list(self.pending_lines)
         self.pending_lines.clear()
         raw_bytes, terminated, incomplete, debug_info = self.complete_command(lines)

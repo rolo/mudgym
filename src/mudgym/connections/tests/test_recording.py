@@ -1,5 +1,4 @@
 import json
-import re
 
 import numpy as np
 import pytest
@@ -16,18 +15,16 @@ from mudgym.connections.recording import (
     ReplayProvider,
 )
 from mudgym.envs.factory import make_env
-from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.session import MudSession
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
-END_OF_TURN_MARKER = FEInventoryField.end_of_turn_marker
 OBSERVATION_LINE = "sql,fes,fex,fei"
 
 
 def send_and_read(connection, lines):
     for line in lines:
         connection.send_line(line)
-    return connection.read_response(END_OF_TURN_MARKER)
+    return connection.read_response()
 
 
 def drive_conversation(connection):
@@ -153,7 +150,7 @@ def test_replay_rejects_read_response_before_recorded_send_lines(tmp_path):
     replay = ReplayConnection(path)
     replay.reset()
     with pytest.raises(ReplayMismatchError, match="expected 'read_response'.*has 'send_line'"):
-        replay.read_response(END_OF_TURN_MARKER)
+        replay.read_response()
 
 
 def test_replay_rejects_exhausted_use_and_unconsumed_calls(tmp_path):
@@ -178,7 +175,6 @@ def make_session(connection) -> MudSession:
     return MudSession(
         connection,
         observation_line=OBSERVATION_LINE,
-        end_of_turn_marker=END_OF_TURN_MARKER,
     )
 
 
@@ -227,17 +223,6 @@ def test_replay_requires_recorded_invalidation(tmp_path):
         replay.assert_exhausted()
     replay.invalidate()
     replay.assert_exhausted()
-
-
-def test_end_of_turn_marker_reaches_wrapped_connection(tmp_path):
-    inner = ScriptedConnection()
-    recording = RecordingConnection(inner, tmp_path / "capture.jsonl")
-    marker = re.compile(rb"custom-marker")
-    recording.reset()
-    recording.send_line("look")
-    recording.read_response(marker)
-    assert inner.read_markers == [marker]
-    recording.close()
 
 
 def test_env_over_replay_reproduces_the_recorded_episode(tmp_path):

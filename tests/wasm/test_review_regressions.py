@@ -35,11 +35,11 @@ def test_pending_combat_death_survives_the_next_command_and_reset(wasm_runtime, 
         environment.reset()
         survivor.reset()
         survivor.send_line("north")
-        survivor.read_response(None)
+        survivor.read_response()
         victim.send_line("west")
-        assert b"Beaten track near cliff" in victim.read_response(None)[0]
+        assert b"Beaten track near cliff" in victim.read_response()[0]
         victim.send_line("kill Abbie")
-        assert b"You attack Abbie" in victim.read_response(None)[0]
+        assert b"You attack Abbie" in victim.read_response()[0]
         if phase == "observation":
             environment.unwrapped.act("look")
 

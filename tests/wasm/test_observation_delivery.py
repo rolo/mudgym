@@ -61,10 +61,10 @@ def test_real_peer_output_after_a_field_response_survives_parsing(wasm_runtime):
     try:
         environment.reset()
         peer.reset()
-        connection.read_response(None)
+        connection.read_response()
         connection.send_line("sql")
         peer.step("shout trailing observation")
-        raw, terminated, incomplete, info = connection.read_response(None)
+        raw, terminated, incomplete, info = connection.read_response()
         assert not terminated and not incomplete
         assert b"trailing observation" in raw
         observation, rendered, _ = environment.bytes_to_observation(
@@ -73,7 +73,7 @@ def test_real_peer_output_after_a_field_response_survives_parsing(wasm_runtime):
         assert observation["room_name"]
         assert "trailing observation" in observation["text"]
         assert b"trailing observation" in rendered
-        assert connection.read_response(None)[0] == b""
+        assert connection.read_response()[0] == b""
     finally:
         environment.close()
         peer.close()

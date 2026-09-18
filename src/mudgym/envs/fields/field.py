@@ -28,11 +28,6 @@ class ObservationField(ABC):
 
     command: str | None = None
 
-    # When this is the final observation field, this pattern identifies its response bytes as the step's
-    # end of step marker.
-    # None (the default) means the response is not distinctive enough to trust for end of step marking duty.
-    end_of_turn_marker: re.Pattern[bytes] | None = None
-
     # When True (the default), the chunk this field claims is considered consumed and not included in the observation
     # `text` key.
     remove_on_match: bool = True
@@ -49,7 +44,7 @@ class ObservationField(ABC):
         """
         Args:
             include_keys: restrict this field's observation contribution to the given space() keys.
-                None (default) keeps every key. An empty sequence keeps none, useful for using as an end of step marker.
+                None (default) keeps every key. An empty sequence contributes no keys.
         """
         if include_keys is None:
             self.include_keys: tuple[str, ...] | None = None

@@ -4,6 +4,7 @@ import pytest
 
 from mudgym.connections.connection import MudConnection
 from mudgym.envs.factory import make_env, make_parallel_env
+from mudgym.envs.fields import RawBytesField
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
 
@@ -64,8 +65,8 @@ def test_provider_teardown_does_not_mask_batch_creation_error():
 def test_make_env_constructor_failure_closes_connection():
     connection = ScriptedConnection()
 
-    with pytest.raises(ValueError, match="declare a command"):
-        make_env(connection=connection, field_parsers=[])
+    with pytest.raises(ValueError, match="Duplicate observation keys"):
+        make_env(connection=connection, field_parsers=[RawBytesField, RawBytesField])
 
     assert connection.closed is True
 
@@ -73,8 +74,8 @@ def test_make_env_constructor_failure_closes_connection():
 def test_child_constructor_failure_closes_entire_batch_and_provider():
     provider = ScriptedProvider()
 
-    with pytest.raises(ValueError, match="declare a command"):
-        make_parallel_env(3, provider=provider, field_parsers=[])
+    with pytest.raises(ValueError, match="Duplicate observation keys"):
+        make_parallel_env(3, provider=provider, field_parsers=[RawBytesField, RawBytesField])
 
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True

@@ -86,14 +86,6 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         command_fields = tuple(field for field in self.fields if field.command is not None)
         commands = tuple(field.command for field in command_fields)
-        if not command_fields and connection.requires_end_of_turn_marker:
-            raise ValueError("At least one observation field must declare a command.")
-
-        end_of_turn_marker = command_fields[-1].end_of_turn_marker if command_fields else None
-        if end_of_turn_marker is None and connection.requires_end_of_turn_marker:
-            raise ValueError(
-                "The final commanded observation field must declare an end_of_turn_marker (fei, fes, mgcheats, ...)."
-            )
 
         self.observation_command_fields: tuple[ObservationField, ...] = command_fields
         observation_line = ",".join(commands)
@@ -110,7 +102,6 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.session = MudSession(
             connection=connection,
             observation_line=observation_line,
-            end_of_turn_marker=end_of_turn_marker,
         )
 
     def bytes_to_observation(
@@ -159,7 +150,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                     payload_text_chunks.append(chunk)
             if pending_fields:
                 raise RuntimeError(
-                    f"end of step marker arrived but fields {[f.__class__.__name__ for f in pending_fields]} "
+                    f"response completed but fields {[f.__class__.__name__ for f in pending_fields]} "
                     f"found no matching response among {len(chunks)} window chunks"
                 )
 
@@ -250,7 +241,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     def _enter_world(self) -> tuple[bytes, bool]:
         """Complete entry and return retained room bytes and the entry's rejection flag."""
         self.session.send("move north")
-        raw_bytes, terminated, incomplete, transport = self.session.read_pending_response(TEAROOM_EXIT_NARRATION_END)
+        raw_bytes, terminated, incomplete, transport = self.session.read_pending_response()
         self.update_points(raw_bytes, terminated=terminated)
         if terminated or incomplete or self.points == WIZARD_POINTS:
             raise RuntimeError(
