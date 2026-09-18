@@ -1,10 +1,12 @@
 """Recording must preserve real WASM reset, clock and response semantics."""
 
+from contextlib import closing
+
 import numpy as np
 import pytest
 
 from mudgym import make_env, make_parallel_env
-from mudgym.connections.recording import RecordingConnection, RecordingProvider
+from mudgym.connections.recording import RecordingConnection, RecordingProvider, ReplayConnection
 from mudgym.connections.wasm import WasmtimeProvider
 from mudgym.connections.wasm.wasmtime_provider import create_connection
 
@@ -45,3 +47,29 @@ def test_recording_preserves_seeded_observations_rewards_and_world_ticks(wasm_ru
     finally:
         recorded.close()
         direct.close()
+
+
+@pytest.mark.parametrize("preset", ["parsed", "bytes"])
+def test_replay_preserves_persona_and_response_metadata(wasm_runtime, tmp_path, preset):
+    path = tmp_path / "persona.jsonl"
+    expected_persona = {"name": "Zavren", "sex": "female"}
+    connection = create_connection(runtime=wasm_runtime, persona="Zavren", sex="f")
+    with closing(make_env(connection=RecordingConnection(connection, path), observation=preset)) as env:
+        expected = [env.reset(seed=123), env.step("look")]
+        assert expected[1][-1]["transport"]["sent_lines"] == (
+            ["look", "sql,fes,fex,fei"] if preset == "parsed" else ["look"]
+        )
+    replay = ReplayConnection(path)
+    with closing(make_env(connection=replay, observation=preset)) as env:
+        actual = [env.reset(seed=123), env.step("look")]
+        replay.assert_exhausted()
+    for original, replayed in zip(expected, actual, strict=True):
+        np.testing.assert_equal(replayed[:-1], original[:-1])
+        original_info, replayed_info = original[-1], replayed[-1]
+        assert original_info["persona"] == replayed_info["persona"] == "Zavren"
+        assert original_info["persona_sex"] == replayed_info["persona_sex"] == "female"
+        assert original_info["transport"]["persona"] == replayed_info["transport"]["persona"] == expected_persona
+        assert original_info["transport"]["world_seed"] == replayed_info["transport"]["world_seed"] == 123
+        for key in ("raw_bytes", "render_bytes"):
+            assert replayed_info[key] == original_info[key]
+        assert replayed_info["transport"]["sent_lines"] == original_info["transport"]["sent_lines"]

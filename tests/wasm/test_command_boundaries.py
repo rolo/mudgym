@@ -5,7 +5,6 @@ from contextlib import closing
 import pytest
 
 from mudgym import make_env, make_parallel_env
-from mudgym.connections.recording import RecordingConnection, ReplayConnection
 from mudgym.connections.wasm import WasmtimeProvider
 from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
 
@@ -73,33 +72,6 @@ def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
         assert not terminated and not truncated
         assert observation["room_name"] == initial["room_name"]
         assert info["transport"]["sent_lines"] == ["look", "sql"]
-    finally:
-        environment.close()
-
-
-def test_recording_and_replay_retain_marker_free_presets(wasm_runtime, tmp_path):
-    provider = WasmtimeProvider(runtime=wasm_runtime, seed=123)
-    connection = provider.create_connections(1)[0]
-    capture = tmp_path / "wasm.jsonl"
-    recording = RecordingConnection(connection, capture)
-    environment = make_env(connection=recording, observation="bytes", world_ticker=provider.tick_for_step)
-    try:
-        initial, _ = environment.reset()
-        result, reward, terminated, truncated, info = environment.step("look")
-        assert info["transport"]["sent_lines"] == ["look"]
-    finally:
-        environment.close()
-        provider.close()
-    replay = ReplayConnection(capture)
-    environment = make_env(connection=replay, observation="bytes")
-    try:
-        replay_initial, _ = environment.reset()
-        replay_result, replay_reward, replay_terminated, replay_truncated, replay_info = environment.step("look")
-        assert replay_initial["text"] == initial["text"]
-        assert replay_result["text"] == result["text"]
-        assert (replay_reward, replay_terminated, replay_truncated) == (reward, terminated, truncated)
-        assert replay_info["raw_bytes"] == info["raw_bytes"]
-        replay.assert_exhausted()
     finally:
         environment.close()
 
