@@ -104,12 +104,13 @@ def test_completed_window_with_refused_fes_retains_the_tracked_score(scripted_en
         + PROMPT
     )
     env = scripted_env_factory(observation="parsed", responses={"wait": raw_bytes})
-    initial_observation, _ = env.reset()
+    obs, _ = env.reset()
+    start_points = int(obs["points"])
+    assert start_points == 200
 
-    observation, reward, terminated, truncated, info = env.step("wait")
+    obs, reward, terminated, truncated, info = env.step("wait")
 
-    assert initial_observation["points"] == 200
-    assert observation["points"] == initial_observation["points"]
+    assert obs["points"] == start_points
     assert reward == 0.0
     assert terminated is False
     assert truncated is False

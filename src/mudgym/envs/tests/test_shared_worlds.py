@@ -33,9 +33,9 @@ def test_players_only_hear_shouts_from_their_own_world(wasm_runtime, worlds):
         first.act("shout mudgymisolation")
         second.act("look")
         provider.tick_for_step()
-        first_observation, _, first_terminated, first_truncated, _ = first.observe()
-        second_observation, _, second_terminated, second_truncated, _ = second.observe()
+        first_obs, _, first_terminated, first_truncated, _ = first.observe()
+        second_obs, _, second_terminated, second_truncated, _ = second.observe()
 
         assert not any((first_terminated, first_truncated, second_terminated, second_truncated))
-        assert "mudgymisolation" in first_observation["text"].lower()
-        assert ("mudgymisolation" in second_observation["text"].lower()) is (worlds == 1)
+        assert "mudgymisolation" in first_obs["text"].lower()
+        assert ("mudgymisolation" in second_obs["text"].lower()) is (worlds == 1)

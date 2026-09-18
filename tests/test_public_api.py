@@ -32,7 +32,7 @@ def test_every_api_page_target_still_exists(target):
     assert hasattr(module, name), f"{target} is documented but no longer exists"
 
 
-def test_environment_factories_are_available_from_the_public_package():
+def test_env_factories_are_available_from_the_public_package():
     assert make_env is factory_make_env
     assert make_parallel_env is factory_make_parallel_env
 

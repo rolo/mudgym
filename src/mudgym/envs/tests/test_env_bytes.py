@@ -53,16 +53,16 @@ def test_live_bytes_reset_step_and_reset(live_env_factory):
     env = live_env_factory(observation="bytes")
 
     for _ in range(2):
-        observation, _ = env.reset()
-        assert env.observation_space.contains(observation)
+        obs, _ = env.reset()
+        assert env.observation_space.contains(obs)
 
-        observation, _, terminated, truncated, info = env.step("look")
+        obs, _, terminated, truncated, info = env.step("look")
 
         assert (terminated, truncated) == (False, False)
-        assert set(observation) == {"text", "raw_bytes", "points"}
-        assert env.observation_space.contains(observation)
-        assert observation["raw_bytes"].shape == (DEFAULT_MAX_BYTES,)
+        assert set(obs) == {"text", "raw_bytes", "points"}
+        assert env.observation_space.contains(obs)
+        assert obs["raw_bytes"].shape == (DEFAULT_MAX_BYTES,)
         raw_bytes = info["raw_bytes"]
-        assert observation["raw_bytes"][: len(raw_bytes)].tobytes() == raw_bytes
-        assert not observation["raw_bytes"][len(raw_bytes) :].any()
+        assert obs["raw_bytes"][: len(raw_bytes)].tobytes() == raw_bytes
+        assert not obs["raw_bytes"][len(raw_bytes) :].any()
         assert info["transport"]["sent_lines"] == ["look"]

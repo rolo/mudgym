@@ -44,15 +44,15 @@ def test_orangery_colours_are_removed_without_losing_content_classification():
         b"and \x1b[32mrain\x1b[37m.\nYou are carrying the following:\n        nothing.\n"
     )
     field = SuperQuickLookField()
-    observation = field.extract([raw], persona="Abbie")
+    obs = field.extract([raw], persona="Abbie")
 
-    assert observation["room_name"] == "orangery"
-    assert observation["room_name_index"] == room_name_to_index("orangery") > 0
-    assert observation["here"] == ("Abbie the protector", "rain")
-    assert observation["features"] == ("rain",)
-    assert observation["players"] == ()
-    assert observation["inventory"] == ()
-    assert field.full_space()["room_name"].contains(observation["room_name"])
+    assert obs["room_name"] == "orangery"
+    assert obs["room_name_index"] == room_name_to_index("orangery") > 0
+    assert obs["here"] == ("Abbie the protector", "rain")
+    assert obs["features"] == ("rain",)
+    assert obs["players"] == ()
+    assert obs["inventory"] == ()
+    assert field.full_space()["room_name"].contains(obs["room_name"])
 
 
 TWO_MORTALS_CHUNK = (

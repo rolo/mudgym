@@ -41,10 +41,10 @@ def test_incomplete_window_carries_the_current_score(scripted_env_factory):
     env = scripted_env_factory(observation="parsed", responses={"xyzzy": rejected})
     env.reset()
 
-    observation, _, _, truncated, info = env.step("xyzzy")
+    obs, _, _, truncated, info = env.step("xyzzy")
 
     assert truncated is True
     assert info["action_rejected"] is True
     # the other fields have nothing to report, but the score is still known
-    assert observation["room_name"] == ""
-    assert observation["points"] == 200
+    assert obs["room_name"] == ""
+    assert obs["points"] == 200

@@ -75,11 +75,11 @@ def test_step_matches_act_followed_by_observe(scripted_env_factory):
     split_env.act("look")
     split_transition = split_env.observe()
 
-    stepped_observation, *stepped_rest = stepped_transition
-    split_observation, *split_rest = split_transition
-    assert set(stepped_observation) == set(split_observation)
-    for key, expected_value in stepped_observation.items():
-        actual_value = split_observation[key]
+    stepped_obs, *stepped_rest = stepped_transition
+    split_obs, *split_rest = split_transition
+    assert set(stepped_obs) == set(split_obs)
+    for key, expected_value in stepped_obs.items():
+        actual_value = split_obs[key]
         if isinstance(expected_value, np.ndarray):
             assert np.array_equal(actual_value, expected_value), key
         else:

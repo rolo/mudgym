@@ -1,4 +1,4 @@
-"""Exercise the installed WASM engine through the public environment API."""
+"""Exercise the installed WASM engine through the public env API."""
 
 import importlib.util
 import shutil
@@ -57,31 +57,35 @@ def test_create_players_allows_independent_wasm_worlds(wasm_runtime):
     ],
 )
 def test_installed_engine_serves_runtime_help_and_faq_content(wasm_runtime, command, content):
-    environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
     try:
-        environment.reset(seed=123)
-        _, _, terminated, truncated, info = environment.step(command)
+        env.reset(seed=123)
+        _, _, terminated, truncated, info = env.step(command)
         assert not terminated and not truncated
         for expected in content:
             assert expected in info["raw_bytes"]
     finally:
-        environment.close()
+        env.close()
 
 
 def test_default_civil_clock_starts_at_midnight_on_every_scalar_reset(wasm_runtime):
-    environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
     try:
         for seed in (123, 456, 123):
-            environment.reset(seed=seed)
-            _, _, terminated, truncated, info = environment.step("time")
+            env.reset(seed=seed)
+            _, _, terminated, truncated, info = env.step("time")
             assert not terminated and not truncated
             assert b"It feels about twelve o'clock." in info["raw_bytes"]
     finally:
-        environment.close()
+        env.close()
 
 
 def test_pending_peer_output_precedes_the_observation_command_echo(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male")))
+    provider = WasmtimeProvider(
+        runtime=wasm_runtime,
+        worlds=1,
+        personas=(("Aaron", "male"), ("Abbie", "male")),
+    )
     sender, observer = provider.create_connections(2)
     try:
         sender.reset()
@@ -126,23 +130,23 @@ def test_civil_anchor_controls_halloween_startup_and_seeded_replay(wasm_runtime)
 def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, mode):
     anchor = datetime(2026, 1, 15, 1, 1, 58, tzinfo=timezone(timedelta(hours=5, minutes=30)))
     if mode == "scalar":
-        environment = make_env(
+        env = make_env(
             connection="wasm", connection_kwargs={"runtime": wasm_runtime, "civil_time_anchor": anchor}
         )
         action = "time"
     else:
-        environment = make_parallel_env(
+        env = make_parallel_env(
             1, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor)
         )
         action = {"player_0": "time"}
     try:
         runs = []
         for seed in (123, 456, 123):
-            environment.reset(seed=seed)
-            result = environment.step(action)
+            env.reset(seed=seed)
+            result = env.step(action)
             info = result[-1] if mode == "scalar" else result[-1]["player_0"]
             first = info["raw_bytes"]
-            result = environment.step(action)
+            result = env.step(action)
             info = result[-1] if mode == "scalar" else result[-1]["player_0"]
             second = info["raw_bytes"]
             assert b"It feels about one o'clock." in first
@@ -151,7 +155,7 @@ def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, 
         assert runs[0] == runs[2]
         assert runs[0] != runs[1]
     finally:
-        environment.close()
+        env.close()
 
 
 @pytest.mark.parametrize(
@@ -176,24 +180,24 @@ def test_installation_contains_only_the_binary_engine_and_no_native_binding():
     assert not distribution.requires
 
 
-@pytest.mark.parametrize("observation", ["text", "bytes", "parsed", "cheats"])
-def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm_runtime, observation):
-    environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=observation)
+@pytest.mark.parametrize("preset", ["text", "bytes", "parsed", "cheats"])
+def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm_runtime, preset):
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
     try:
-        initial, info = environment.reset(seed=123)
-        assert environment.observation_space.contains(initial)
+        obs, info = env.reset(seed=123)
+        assert env.observation_space.contains(obs)
         assert info["persona"] in {persona.name for persona in DEFAULT_PERSONA_POOL}
         assert info["transport"]["persona"]["name"] == info["persona"]
-        assert initial["points"] == 200
-        result, reward, terminated, truncated, info = environment.step("look")
-        assert environment.observation_space.contains(result)
-        assert result["text"]
+        assert obs["points"] == 200
+        obs, reward, terminated, truncated, info = env.step("look")
+        assert env.observation_space.contains(obs)
+        assert obs["text"]
         assert reward == 0 and not terminated and not truncated
         assert b"look\r\n" in info["raw_bytes"]
-        if observation == "bytes":
-            assert result["raw_bytes"].tobytes()[: len(info["raw_bytes"])] == info["raw_bytes"]
+        if preset == "bytes":
+            assert obs["raw_bytes"].tobytes()[: len(info["raw_bytes"])] == info["raw_bytes"]
     finally:
-        environment.close()
+        env.close()
 
 
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
@@ -204,17 +208,17 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
         provider.advance_worlds(3)
 
     if mode == "scalar":
-        environment = make_env(connection=provider.create_connections(1)[0], world_ticker=ticker)
+        env = make_env(connection=provider.create_connections(1)[0], world_ticker=ticker)
         action = "look"
     else:
-        environment = make_parallel_env(2, provider=provider, world_ticker=ticker)
+        env = make_parallel_env(2, provider=provider, world_ticker=ticker)
         action = {"player_0": "look", "player_1": "look"}
     try:
-        environment.reset(seed=123)
-        environment.step(action)
+        env.reset(seed=123)
+        env.step(action)
         assert provider.advance_worlds(0) == {0: 3}
     finally:
-        environment.close()
+        env.close()
         provider.close()
 
 
@@ -228,27 +232,27 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     ],
 )
 def test_command_rejection_comes_from_game_output(wasm_runtime, command, rejected):
-    environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})
     try:
-        environment.reset(seed=123)
-        _, _, terminated, truncated, info = environment.step(command)
+        env.reset(seed=123)
+        _, _, terminated, truncated, info = env.step(command)
         assert not terminated and not truncated
         assert info["action_rejected"] is rejected
     finally:
-        environment.close()
+        env.close()
 
 
-def test_closing_the_wasm_environments_releases_their_workers(wasm_runtime):
+def test_closing_the_wasm_envs_releases_their_workers(wasm_runtime):
     before = set(threading.enumerate())
-    for environment in (
+    for env in (
         make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}),
         make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1)),
     ):
         try:
-            environment.reset(seed=211)
+            env.reset(seed=211)
         finally:
-            environment.close()
-            environment.close()
+            env.close()
+            env.close()
     assert not [
         thread for thread in threading.enumerate() if thread not in before and thread.name.startswith("wasmtime-world")
     ]
@@ -259,15 +263,15 @@ def test_a_copied_module_needs_no_neighbouring_game_data(tmp_path):
     shutil.copyfile(str(files("mudgym_wasm_engine").joinpath("wasi/mud2-wasi.wasm")), module)
     runtime = WasmtimeRuntime(wasm_path=module)
     provider = WasmtimeProvider(runtime=runtime, worlds=1)
-    environment = make_parallel_env(1, provider=provider)
+    env = make_parallel_env(1, provider=provider)
     try:
-        environment.reset(seed=123)
-        _, _, terminates, truncates, infos = environment.step({"player_0": "faq 1"})
+        env.reset(seed=123)
+        _, _, terminates, truncates, infos = env.step({"player_0": "faq 1"})
         assert not any(terminates.values()) and not any(truncates.values())
         assert b"Elizabethan Tearoom" in infos["player_0"]["raw_bytes"]
         assert list(tmp_path.iterdir()) == [module]
     finally:
-        environment.close()
+        env.close()
 
 
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
@@ -275,63 +279,64 @@ def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runt
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
     if mode == "scalar":
         connection = provider.create_connections(1)[0]
-        environment = make_env(connection=connection)
+        env = make_env(connection=connection)
         action = "look"
         initial_ticks = {0: 0}
         next_ticks = {0: 1}
     else:
-        environment = make_parallel_env(2, provider=provider)
+        env = make_parallel_env(2, provider=provider)
         action = {"player_0": "look", "player_1": "look"}
         initial_ticks = {0: 0}
         next_ticks = {0: 1}
     try:
-        environment.reset(seed=123)
+        env.reset(seed=123)
         assert provider.advance_worlds(0) == initial_ticks
-        environment.step(action)
+        env.step(action)
         assert provider.advance_worlds(0) == next_ticks
     finally:
-        environment.close()
+        env.close()
         provider.close()
 
 
 def test_bytes_observation_retains_peer_output(wasm_runtime):
-    environment = make_parallel_env(
-        2,
-        observation="bytes",
-        provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
+    provider = WasmtimeProvider(
+        runtime=wasm_runtime,
+        worlds=1,
+        personas=(("Aaron", "male"), ("Abbie", "male")),
     )
+    env = make_parallel_env(2, observation="bytes", provider=provider)
     try:
-        environment.reset(seed=211)
-        obs, _, terminates, truncates, infos = environment.step(
+        env.reset(seed=211)
+        obs, _, terminates, truncates, infos = env.step(
             {"player_0": 'tell "packaging trial" to abbie', "player_1": "look"}
         )
         assert not any(terminates.values()) and not any(truncates.values())
         assert b"packaging trial" in infos["player_1"]["raw_bytes"]
-        for agent, observation in obs.items():
+        for agent, player_obs in obs.items():
             raw = infos[agent]["raw_bytes"]
-            assert observation["raw_bytes"].tobytes()[: len(raw)] == raw
+            assert player_obs["raw_bytes"].tobytes()[: len(raw)] == raw
             assert infos[agent]["transport"]["sent_lines"] == (
                 ['tell "packaging trial" to abbie'] if agent == "player_0" else ["look"]
             )
     finally:
-        environment.close()
+        env.close()
 
 
 @pytest.mark.parametrize("observation", ["parsed", "bytes"])
 def test_natural_world_reset_returns_final_transition_and_can_restart(wasm_runtime, observation):
-    environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=observation)
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=observation)
     try:
-        environment.reset(seed=51)
-        assert environment.session.connection.advance_world_ticks(3208) == 3208
-        _, reward, terminated, truncated, info = environment.step("look")
+        env.reset(seed=51)
+        assert env.session.connection.advance_world_ticks(3208) == 3208
+        _, reward, terminated, truncated, info = env.step("look")
         assert terminated
         assert not truncated
         # The seeded journey earns survival bonuses during the explicitly advanced interval.
         assert reward == 300
         assert b"Auto-reset initiated" in info["raw_bytes"]
-        environment.reset(seed=51)
-        assert environment.session.connection.advance_world_ticks(0) == 0
-        _, _, terminated, truncated, _ = environment.step("look")
+        env.reset(seed=51)
+        assert env.session.connection.advance_world_ticks(0) == 0
+        _, _, terminated, truncated, _ = env.step("look")
         assert not terminated and not truncated
     finally:
-        environment.close()
+        env.close()

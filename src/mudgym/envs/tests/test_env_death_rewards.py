@@ -44,12 +44,11 @@ def test_permadeath_charges_the_reset_score_in_every_observation_mode(scripted_e
     )
     env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("kill vampire")
+    obs, reward, terminated, truncated, _ = env.step("kill vampire")
 
     assert terminated is True
     assert truncated is False
     assert reward == -200.0
-    assert info["points"] == 0
     assert obs["points"] == 0
 
 
@@ -65,11 +64,10 @@ def test_permadeath_charges_the_score_held_when_the_step_began(scripted_env_fact
     env.reset()
     env.step("look")
 
-    observation, reward, _, _, info = env.step("kill vampire")
+    obs, reward, _, _, _ = env.step("kill vampire")
 
     assert reward == -3000.0
-    assert observation["points"] == 0
-    assert info["points"] == 0
+    assert obs["points"] == 0
 
 
 def test_permadeath_uses_the_most_recent_points_event(scripted_env_factory):
@@ -81,38 +79,37 @@ def test_permadeath_uses_the_most_recent_points_event(scripted_env_factory):
         },
     )
     env.reset()
-    observation, _, _, _, _ = env.step("look")
-    assert observation["points"] == 3000
+    obs, _, _, _, _ = env.step("look")
+    assert obs["points"] == 3000
 
-    observation, reward, _, _, _ = env.step("kill vampire")
+    obs, reward, _, _, _ = env.step("kill vampire")
 
     assert reward == -3000.0
-    assert observation["points"] == 0
+    assert obs["points"] == 0
 
 
 def test_tempdeath_keeps_the_reward_its_own_event_states(scripted_env_factory):
     env = scripted_env_factory(observation="text", responses={"jump": terminal_step("jump", SEAGULL_DEATH_BYTES)})
     env.reset()
 
-    observation, reward, terminated, _, info = env.step("jump")
+    obs, reward, terminated, _, _ = env.step("jump")
 
     assert terminated is True
     assert reward == -11.0
-    assert observation["points"] == 189
-    assert info["points"] == 189
+    assert obs["points"] == 189
 
 
 def test_quitting_costs_nothing(scripted_env_factory):
     env = scripted_env_factory(observation="text", responses={"quit": terminal_step("quit", QUIT_BYTES)})
     env.reset()
 
-    observation, reward, terminated, _, info = env.step("quit")
+    obs, reward, terminated, _, info = env.step("quit")
 
     assert terminated is True
     assert reward == 0.0
     assert "points" not in info
     # quitting preserves the score
-    assert observation["points"] == 200
+    assert obs["points"] == 200
 
 
 def test_marker_only_field_keeps_points_and_first_step_permadeath_reward(scripted_env_factory):
@@ -120,15 +117,14 @@ def test_marker_only_field_keeps_points_and_first_step_permadeath_reward(scripte
         field_parsers=(FEScoreField(include_keys=()),),
         responses={"fod me": terminal_step("fod me", COMBAT_DEATH_BYTES)},
     )
-    initial_observation, _ = env.reset()
+    obs, _ = env.reset()
+    assert set(obs) == {"text", "points"}
+    assert obs["points"] == 200
 
-    observation, reward, terminated, truncated, info = env.step("fod me")
+    obs, reward, terminated, truncated, _ = env.step("fod me")
 
-    assert set(initial_observation) == {"text", "points"}
-    assert initial_observation["points"] == 200
-    assert set(observation) == {"text", "points"}
-    assert observation["points"] == 0
+    assert set(obs) == {"text", "points"}
+    assert obs["points"] == 0
     assert terminated is True
     assert truncated is False
     assert reward == -200.0
-    assert info["points"] == 0

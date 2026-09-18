@@ -1,7 +1,7 @@
 import gymnasium as gym
 from gymnasium.envs.registration import registry
 
-import mudgym  # noqa: F401 - importing the package registers its Gymnasium environments
+import mudgym  # noqa: F401 - importing the package registers its Gymnasium envs
 from mudgym.envs.registration import default_env_id, env_configs, register_envs
 
 

@@ -231,26 +231,26 @@ def test_env_over_replay_reproduces_the_recorded_episode(tmp_path):
     path = tmp_path / "episode.jsonl"
 
     env = make_env(observation="parsed", connection=RecordingConnection(ScriptedConnection(), path))
-    observation, info = env.reset()
-    observation, reward, terminated, truncated, info = env.step("look")
+    env.reset()
+    obs, reward, terminated, truncated, _ = env.step("look")
     env.close()
 
     replay = ReplayConnection(path)
     replay_env = make_env(observation="parsed", connection=replay)
-    replay_observation, replay_info = replay_env.reset()
-    replay_observation, replay_reward, replay_terminated, replay_truncated, replay_info = replay_env.step("look")
+    replay_env.reset()
+    replay_obs, replay_reward, replay_terminated, replay_truncated, _ = replay_env.step("look")
     replay_env.close()
     replay.assert_exhausted()
 
     assert replay_reward == reward
     assert replay_terminated == terminated
     assert replay_truncated == truncated
-    assert set(replay_observation) == set(observation)
-    for key, value in observation.items():
+    assert set(replay_obs) == set(obs)
+    for key, value in obs.items():
         if isinstance(value, np.ndarray):
-            assert np.array_equal(replay_observation[key], value), key
+            assert np.array_equal(replay_obs[key], value), key
         else:
-            assert replay_observation[key] == value, key
+            assert replay_obs[key] == value, key
 
 
 def test_providers_record_and_replay_per_index(tmp_path):

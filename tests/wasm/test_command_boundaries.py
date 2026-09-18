@@ -12,7 +12,12 @@ from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
 @pytest.mark.parametrize("command", ["say café", "say €100"])
 def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runtime, command):
     with closing(
-        WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123, personas=(("Aaron", "male"), ("Abbie", "male")))
+        WasmtimeProvider(
+            runtime=wasm_runtime,
+            worlds=1,
+            seed=123,
+            personas=(("Aaron", "male"), ("Abbie", "male")),
+        )
     ) as provider:
         player, peer = provider.create_connections(2)
         player.reset()
@@ -36,44 +41,45 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, preset):
     if mode == "scalar":
-        environment = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
+        env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
         action = "look"
     else:
-        environment = make_parallel_env(
+        env = make_parallel_env(
             2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=preset
         )
         action = {"player_0": "look", "player_1": "look"}
     try:
-        environment.reset(seed=123)
-        result = environment.step(action)
+        env.reset(seed=123)
+        result = env.step(action)
         if mode == "scalar":
-            observation, _, terminated, truncated, info = result
-            pairs = [(observation, info)]
+            obs, _, terminated, truncated, info = result
+            pairs = [(obs, info)]
             assert not terminated and not truncated
         else:
             obs, _, terminates, truncates, infos = result
             pairs = [(obs[key], infos[key]) for key in obs]
             assert not any(terminates.values()) and not any(truncates.values())
-        for observation, details in pairs:
-            assert observation["text"] and observation["points"] == 200
+        for player_obs, details in pairs:
+            assert player_obs["text"] and player_obs["points"] == 200
             assert details["transport"]["sent_lines"] == ["look"]
             assert b"fes\r\n" not in details["raw_bytes"]
     finally:
-        environment.close()
+        env.close()
 
 
 def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
-    environment = make_env(
+    env = make_env(
         connection="wasm", connection_kwargs={"runtime": wasm_runtime}, field_parsers=[SuperQuickLookField]
     )
     try:
-        initial, _ = environment.reset(seed=123)
-        observation, _, terminated, truncated, info = environment.step("look")
+        obs, _ = env.reset(seed=123)
+        room_name = obs["room_name"]
+        obs, _, terminated, truncated, info = env.step("look")
         assert not terminated and not truncated
-        assert observation["room_name"] == initial["room_name"]
+        assert obs["room_name"] == room_name
         assert info["transport"]["sent_lines"] == ["look", "sql"]
     finally:
-        environment.close()
+        env.close()
 
 
 @pytest.mark.parametrize(
@@ -88,62 +94,66 @@ def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
 )
 def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wasm_runtime, observation_options):
     provider = WasmtimeProvider(
-        runtime=wasm_runtime, worlds=1, seed=123, personas=(("Aaron", "male"), ("Abbie", "male"))
+        runtime=wasm_runtime,
+        worlds=1,
+        seed=123,
+        personas=(("Aaron", "male"), ("Abbie", "male")),
     )
     player, opponent = provider.create_connections(2)
-    environment = make_env(connection=player, **observation_options)
+    env = make_env(connection=player, **observation_options)
 
     def step(command):
-        result = environment.step(command)
-        assert environment.observation_space.contains(result[0])
+        result = env.step(command)
+        assert env.observation_space.contains(result[0])
         expected_lines = [command]
-        if not result[2] and environment.session.observation_line:
-            expected_lines.append(environment.session.observation_line)
+        if not result[2] and env.session.observation_line:
+            expected_lines.append(env.session.observation_line)
         assert result[4]["transport"]["sent_lines"] == expected_lines
         assert b"fes\r\n" not in result[4]["raw_bytes"]
         return result
 
     try:
-        initial, _ = environment.reset()
-        assert initial["points"] == 200
+        obs, _ = env.reset()
+        start_points = int(obs["points"])
+        assert start_points == 200
         opponent.reset()
         opponent.send_line("north")
         opponent.read_response()
         for command in ("west", "kill Abbie"):
-            observation, reward, terminated, truncated, _ = step(command)
-            assert observation["points"] == 200 and reward == 0
+            obs, reward, terminated, truncated, _ = step(command)
+            assert obs["points"] == 200 and reward == 0
             assert not terminated and not truncated
 
-        observation, reward, terminated, truncated, info = step("flee east")
+        obs, reward, terminated, truncated, info = step("flee east")
         assert b"Persona saved on -51 = \x1b[0;31;40m149" in info["raw_bytes"]
-        assert observation["points"] == info["points"] == 149 and reward == -51
+        assert obs["points"] == 149 and reward == -51
         assert not terminated and not truncated
 
         for command in ("west", "kill Abbie"):
-            observation, reward, terminated, truncated, _ = step(command)
-            assert observation["points"] == 149 and reward == 0
+            obs, reward, terminated, truncated, _ = step(command)
+            assert obs["points"] == 149 and reward == 0
             assert not terminated and not truncated
         for _ in range(40):
-            observation, reward, terminated, truncated, info = step("look")
+            obs, reward, terminated, truncated, info = step("look")
             assert not terminated and not truncated
             if b"You have killed Abbie" in info["raw_bytes"]:
                 break
-            assert observation["points"] == 149 and reward == 0
+            assert obs["points"] == 149 and reward == 0
         else:
             pytest.fail("Seeded combat did not produce Abbie's defeat within 40 steps")
         assert b"Persona saved on +120 = \x1b[0;32;40m269" in info["raw_bytes"]
-        assert observation["points"] == info["points"] == 269 and reward == 120
+        assert obs["points"] == 269 and reward == 120
 
-        observation, reward, terminated, truncated, info = step("jump")
+        obs, reward, terminated, truncated, info = step("jump")
         assert b"Persona saved on -12 = \x1b[0;31;40m257" in info["raw_bytes"]
         assert b"Overall, you scored 257 points this game." in info["raw_bytes"]
-        assert observation["points"] == info["points"] == 257 and reward == -12
+        assert obs["points"] == 257 and reward == -12
         assert terminated and not truncated
 
         provider.reset(seed=123)
-        observation, _ = environment.reset()
-        assert observation["points"] == initial["points"]
-        assert environment.observation_space.contains(observation)
+        obs, _ = env.reset()
+        assert obs["points"] == start_points
+        assert env.observation_space.contains(obs)
     finally:
-        environment.close()
+        env.close()
         provider.close()

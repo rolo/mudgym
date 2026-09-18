@@ -12,16 +12,16 @@ def test_live_reset_and_step_keep_complete_command_echoes(live_env_factory, tmp_
     env = live_env_factory(connection=recording, field_parsers=[FEInventoryField])
 
     for _ in range(3):
-        observation, _ = env.reset()
-        assert env.observation_space.contains(observation)
-        assert "fei" not in observation["portables"]
-        assert "fei" not in observation["inventory"]
+        obs, _ = env.reset()
+        assert env.observation_space.contains(obs)
+        assert "fei" not in obs["portables"]
+        assert "fei" not in obs["inventory"]
 
-        observation, _, terminated, truncated, _ = env.step("look")
+        obs, _, terminated, truncated, _ = env.step("look")
         assert not terminated and not truncated
-        assert env.observation_space.contains(observation)
-        assert "fei" not in observation["portables"]
-        assert "fei" not in observation["inventory"]
+        assert env.observation_space.contains(obs)
+        assert "fei" not in obs["portables"]
+        assert "fei" not in obs["inventory"]
 
     # Count echoes in received bytes, independently of the send log. Separate lines may be
     # echoed on either side of the action response, but each must arrive intact exactly once.

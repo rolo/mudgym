@@ -47,13 +47,17 @@ def test_human_render_prints_labeled_child_output(wasm_runtime, capsys):
         assert captured.out.count("Badly-paved road") == 2
 
 
-@pytest.mark.parametrize("observation", ["text", "parsed"])
-def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, observation):
+@pytest.mark.parametrize("preset", ["text", "parsed"])
+def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, preset):
     with closing(
         make_parallel_env(
             2,
-            provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
-            observation=observation,
+            provider=WasmtimeProvider(
+                runtime=wasm_runtime,
+                worlds=1,
+                personas=(("Aaron", "male"), ("Abbie", "male")),
+            ),
+            observation=preset,
         )
     ) as env:
         env.reset(seed=10)
@@ -132,26 +136,26 @@ def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
         obs, infos = env.reset(seed=17)
 
         assert provider.advance_worlds(0) == {0: 0}
-        assert {agent: observation["text"] for agent, observation in obs.items()} == {
-            agent: observation["text"] for agent, observation in initial_obs.items()
+        assert {agent: player_obs["text"] for agent, player_obs in obs.items()} == {
+            agent: player_obs["text"] for agent, player_obs in initial_obs.items()
         }
         assert all(info["step"] == 0 for info in infos.values())
 
 
 def test_parallel_reset_observations_include_every_player(wasm_runtime):
-    with closing(
-        make_parallel_env(
-            2,
-            provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=(("Aaron", "male"), ("Abbie", "male"))),
-        )
-    ) as env:
+    provider = WasmtimeProvider(
+        runtime=wasm_runtime,
+        worlds=1,
+        personas=(("Aaron", "male"), ("Abbie", "male")),
+    )
+    with closing(make_parallel_env(2, provider=provider)) as env:
         obs, infos = env.reset(seed=10)
 
         assert obs["player_0"]["room_name"] == obs["player_1"]["room_name"]
         assert obs["player_0"]["players"] == ("Abbie the protector",)
         assert obs["player_1"]["players"] == ("Aaron the protector",)
-        for agent, observation in obs.items():
-            assert observation["text"].count("Badly-paved road") == 1
+        for agent, player_obs in obs.items():
+            assert player_obs["text"].count("Badly-paved road") == 1
             assert infos[agent]["render_bytes"].count(b"Badly-paved road") == 1
         assert all(info["step"] == 0 for info in infos.values())
 

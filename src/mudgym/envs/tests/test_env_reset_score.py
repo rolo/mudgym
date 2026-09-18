@@ -9,10 +9,10 @@ def test_reset_reports_the_quickscore_points_like_every_later_observation(script
     fields = scripted_response(["sql,fes,fex,fei"]).replace(FES_RESPONSE, FES_RESPONSE.replace(b"0200", b"0250"))
     env = scripted_env_factory(observation="parsed", responses={"move north": reset_bytes, "sql,fes,fex,fei": fields})
 
-    observation, _ = env.reset()
+    obs, _ = env.reset()
 
     assert env.unwrapped.points == 200
-    assert observation["points"] == 200
+    assert obs["points"] == 200
 
 
 @pytest.mark.parametrize("before_narration", [True, False])
@@ -26,11 +26,11 @@ def test_exit_points_events_establish_the_reset_score(scripted_env_factory, befo
     )
     env = scripted_env_factory(responses={"move north": reset_bytes, "look": step_bytes})
 
-    observation, _ = env.reset()
-    assert observation["points"] == 250
+    obs, _ = env.reset()
+    assert obs["points"] == 250
 
-    observation, reward, _, _, _ = env.step("look")
-    assert observation["points"] == 260
+    obs, reward, _, _, _ = env.step("look")
+    assert obs["points"] == 260
     assert reward == 10
 
 
@@ -44,8 +44,8 @@ def test_final_reset_points_and_rejections_are_in_the_initial_baseline(scripted_
         }
     )
 
-    observation, info = env.reset()
-    assert observation["points"] == 250
+    obs, info = env.reset()
+    assert obs["points"] == 250
     assert info["step"] == 0
     assert info["action_rejected"] and info["transport"]["rejected"]
     assert info["transport"]["bytes_length"] == len(info["raw_bytes"])
@@ -84,22 +84,22 @@ def test_reset_failure_requires_a_new_reset_without_printing(
         env.observe()
 
     env.session.connection.responses.clear()
-    observation, _ = env.reset()
-    assert observation["points"] == 200
+    obs, _ = env.reset()
+    assert obs["points"] == 200
     assert capsys.readouterr().out.count("Dally Lane") == 1
 
 
 def test_reset_sends_exit_separately_and_only_keeps_final_echoes(scripted_env_factory):
     env = scripted_env_factory(field_parsers=[FEInventoryField])
 
-    observation, info = env.reset()
+    obs, info = env.reset()
 
-    assert observation["portables"] == ("necklace0",)
-    assert env.observation_space.contains(observation)
+    assert obs["portables"] == ("necklace0",)
+    assert env.observation_space.contains(obs)
     assert env.session.connection.sent_lines == [["qs"], ["move north"], ["fei"]]
     assert info["transport"]["sent_lines"] == ["fei"]
     assert b"move north" not in info["raw_bytes"]
-    assert observation["text"].count("Dally Lane") == 1
+    assert obs["text"].count("Dally Lane") == 1
 
 
 def test_tearoom_exit_ignores_an_earlier_ellipsis_line(scripted_env_factory):
@@ -151,8 +151,8 @@ def test_separate_entry_and_fields_preserve_a_live_capture(scripted_env_factory)
         field_parsers=[FEInventoryField], responses={"move north": entry_bytes, "fei": b"fei\r\n" + fields}
     )
 
-    observation, _ = env.reset()
+    obs, _ = env.reset()
 
-    assert observation["portables"] == ()
-    assert observation["inventory"] == ()
-    assert env.observation_space.contains(observation)
+    assert obs["portables"] == ()
+    assert obs["inventory"] == ()
+    assert env.observation_space.contains(obs)

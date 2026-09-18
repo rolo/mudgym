@@ -44,14 +44,14 @@ def test_rejected_action_keeps_structured_observation(scripted_env_factory):
     )
     env.reset()
 
-    observation, reward, terminated, truncated, info = env.step(ACTION)
+    obs, reward, terminated, truncated, info = env.step(ACTION)
 
     assert connection.sent_lines[-1] == [ACTION, OBSERVATION_COMMAND_LINE]
     assert info["action_rejected"] is True
-    assert "don't know the word" in observation["text"].lower()
-    assert observation["room_name"] == "dally lane"
-    assert observation["points"] == 200
-    assert observation["available_exits"].sum() == 8
+    assert "don't know the word" in obs["text"].lower()
+    assert obs["room_name"] == "dally lane"
+    assert obs["points"] == 200
+    assert obs["available_exits"].sum() == 8
     assert reward == 0
     assert terminated is False
     assert truncated is False
@@ -65,17 +65,17 @@ def test_output_before_a_compound_player_command_rejection_survives_observation(
     env = scripted_env_factory(observation="parsed", connection=connection)
     env.reset()
 
-    observation, _, terminated, truncated, info = env.step(action)
+    obs, _, terminated, truncated, info = env.step(action)
 
-    assert "dances" in observation["text"]
-    assert "don't know the word" in observation["text"].lower()
-    assert observation["room_name"] == "dally lane"
+    assert "dances" in obs["text"]
+    assert "don't know the word" in obs["text"].lower()
+    assert obs["room_name"] == "dally lane"
     assert info["action_rejected"] is True
     assert terminated is False
     assert truncated is False
 
 
-def test_rejected_environment_step_records_and_replays_identically(tmp_path):
+def test_rejected_env_step_records_and_replays_identically(tmp_path):
     capture_path = tmp_path / "rejected-step.jsonl"
     live_connection = ScriptedConnection(responses={ACTION: rejected_response()})
     env = make_env(

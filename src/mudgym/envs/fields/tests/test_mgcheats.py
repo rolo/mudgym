@@ -118,9 +118,9 @@ def test_orangery_colours_are_removed_before_room_name_lookup():
         b"dark=0; glowing=0; asleep=0; gifted=0; here=[rain]; inventory=[][/mgcheats]\n"
     )
     field = MGCheatsField()
-    observation = field.extract([raw])
+    obs = field.extract([raw])
 
-    assert observation["room_name"] == "orangery"
-    assert observation["room_name_index"] == room_name_to_index("orangery") > 0
-    assert observation["here"] == ("rain",)
-    assert field.full_space()["room_name"].contains(observation["room_name"])
+    assert obs["room_name"] == "orangery"
+    assert obs["room_name_index"] == room_name_to_index("orangery") > 0
+    assert obs["here"] == ("rain",)
+    assert field.full_space()["room_name"].contains(obs["room_name"])
