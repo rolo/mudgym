@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tomllib
 from contextlib import nullcontext
-from datetime import date
+from datetime import UTC, date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
@@ -126,7 +126,9 @@ def test_retry_without_version_still_requires_an_explicit_version(release_script
 
 
 def test_write_version_updates_package_lock_and_citation(release_repository):
+    started = datetime.now(UTC).date()
     release_repository.write_version("0.4.7rc1")
+    finished = datetime.now(UTC).date()
 
     root = release_repository.REPOSITORY_ROOT
     project = tomllib.loads((root / "pyproject.toml").read_text())
@@ -135,7 +137,7 @@ def test_write_version_updates_package_lock_and_citation(release_repository):
     assert lock["package"][0]["version"] == "0.4.7rc1"
     citation = (root / "CITATION.cff").read_text()
     assert '\nversion: "0.4.7rc1"\n' in citation
-    assert f'\ndate-released: "{date.today().isoformat()}"\n' in citation
+    assert any(f'\ndate-released: "{day.isoformat()}"\n' in citation for day in (started, finished))
 
 
 def test_write_version_rejects_invalid_citation(release_repository):

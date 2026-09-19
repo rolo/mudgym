@@ -175,7 +175,7 @@ def interrupted_tick():
 
 
 def test_sigint_settles_the_started_tick_before_escaping():
-    result = subprocess.run([sys.executable, "-I", __file__], capture_output=True, text=True, timeout=30)
+    result = subprocess.run([sys.executable, "-I", __file__], capture_output=True, text=True, timeout=30, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -289,7 +289,7 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
         second.act("look")
         provider.tick_for_step()
         results = [first.observe(), second.observe()]
-        obs, rewards, terminates, truncates, infos = zip(*results, strict=True)
+        _obs, rewards, terminates, truncates, infos = zip(*results, strict=True)
         assert terminates == (True, False)
         assert not any(truncates)
         assert rewards == (300, 0)

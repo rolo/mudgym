@@ -11,7 +11,7 @@ from mudgym.envs.lifecycle import close_players, reset_players, reset_worlds, st
 class MudParallelEnv(ParallelEnv[str, dict[str, Any], str]):
     """Coordinates several named players acting together in one shared MUD world."""
 
-    metadata = {
+    metadata: dict[str, Any] = {  # noqa: RUF012 - PettingZoo permits instance metadata overrides
         "render_modes": ["ansi", "human"],
         "name": "mud2_v0",
     }

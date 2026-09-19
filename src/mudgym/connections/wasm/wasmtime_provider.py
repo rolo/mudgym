@@ -46,7 +46,7 @@ def _shutdown_worlds(worlds: Iterable[WasmtimeWorld]) -> list[BaseException]:
     for world in worlds:
         try:
             world.shutdown()
-        except BaseException as error:
+        except BaseException as error:  # noqa: BLE001 - finish cleanup and return every failure to the caller
             errors.append(error)
     return errors
 

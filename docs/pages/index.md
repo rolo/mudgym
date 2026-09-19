@@ -24,9 +24,11 @@ Install the `mudgym` package with your Python package manager of choice.
 
 ### Single Agent
 
+<!-- fmt: off -->
 ```python
 --8<-- "docs/code/index_single.py:index-single"
 ```
+<!-- fmt: on -->
 
 ```python exec="true" html="true"
 from pathlib import Path
@@ -40,9 +42,11 @@ print(show_ansi(Path("docs/recordings/index-single.ansi").read_bytes()).data)
 
 Two agents in the same world.
 
+<!-- fmt: off -->
 ```python
 --8<-- "docs/code/index_multiagent.py:index-multiagent"
 ```
+<!-- fmt: on -->
 
 --8<-- "docs/recordings/index-multiagent.md"
 

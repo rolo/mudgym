@@ -41,7 +41,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     A Gymnasium environment for MUD2.
     """
 
-    metadata = {
+    metadata: dict[str, Any] = {  # noqa: RUF012 - Gymnasium permits instance metadata overrides
         "render_modes": ["human", "ansi"],
     }
 
@@ -293,12 +293,12 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         return observation, info
 
     def _invalidate_reset(self, error: BaseException) -> None:
-        """Abandon reset work without replacing the original failure."""
+        """Preserve the original reset failure, recording cleanup interruptions as notes."""
         self.points = None
         self.last_render_bytes = b""
         try:
             self.session.connection.invalidate()
-        except BaseException as cleanup_error:
+        except BaseException as cleanup_error:  # noqa: BLE001 - attach cleanup failures to the original reset error
             error.add_note(f"reset invalidation failed for persona {self.persona!r}: {cleanup_error!r}")
 
     def reset(

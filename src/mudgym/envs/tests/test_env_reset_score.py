@@ -1,7 +1,7 @@
 import pytest
 
 from mudgym.envs.fields import FEInventoryField
-from tests.scripted import FES_RESPONSE, TEAROOM_EXIT_TEXT, scripted_response
+from tests.scripted import FES_RESPONSE, TEAROOM_EXIT_TEXT, ScriptedConnection, scripted_response
 
 
 def test_reset_reports_the_quickscore_points_like_every_later_observation(scripted_env_factory):
@@ -87,6 +87,36 @@ def test_reset_failure_requires_a_new_reset_without_printing(
     obs, _ = env.reset()
     assert obs["points"] == 200
     assert capsys.readouterr().out.count("Dally Lane") == 1
+
+
+@pytest.mark.parametrize("failure_type", [OSError, KeyboardInterrupt])
+@pytest.mark.parametrize("cleanup_failure_type", [OSError, KeyboardInterrupt])
+def test_reset_preserves_original_failure_when_invalidation_fails(
+    scripted_env_factory, failure_type, cleanup_failure_type
+):
+    failure = failure_type("reset failed")
+    cleanup_failure = cleanup_failure_type("invalidation failed")
+
+    class FailingInvalidationConnection(ScriptedConnection):
+        def invalidate(self):
+            super().invalidate()
+            raise cleanup_failure
+
+    connection = FailingInvalidationConnection()
+    env = scripted_env_factory(connection=connection)
+    env.reset()
+    connection.send_errors["move north"] = failure
+
+    with pytest.raises(failure_type) as raised:
+        env.reset()
+
+    assert raised.value is failure
+    assert any(repr(cleanup_failure) in note for note in failure.__notes__)
+    assert connection.invalidated and not connection.pending_lines
+    assert env.unwrapped.points is None
+    assert env.unwrapped.last_render_bytes == b""
+    with pytest.raises(RuntimeError, match="reset"):
+        env.step("look")
 
 
 def test_reset_sends_exit_separately_and_only_keeps_final_echoes(scripted_env_factory):

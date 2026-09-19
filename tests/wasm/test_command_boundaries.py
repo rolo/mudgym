@@ -44,9 +44,7 @@ def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, 
         env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
         action = "look"
     else:
-        env = make_parallel_env(
-            2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=preset
-        )
+        env = make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=preset)
         action = {"player_0": "look", "player_1": "look"}
     try:
         env.reset(seed=123)
@@ -68,9 +66,7 @@ def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, 
 
 
 def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
-    env = make_env(
-        connection="wasm", connection_kwargs={"runtime": wasm_runtime}, field_parsers=[SuperQuickLookField]
-    )
+    env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, field_parsers=[SuperQuickLookField])
     try:
         obs, _ = env.reset(seed=123)
         room_name = obs["room_name"]

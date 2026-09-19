@@ -39,7 +39,7 @@ def test_provider_offsets_each_world_from_its_resolved_seed(wasm_runtime, seed):
         for index, connection in enumerate(connections):
             connection.reset()
             connection.send_line("score")
-            raw_bytes, terminated, incomplete, info = connection.read_response()
+            _raw_bytes, terminated, incomplete, info = connection.read_response()
             assert not terminated and not incomplete
             assert info["world_seed"] == provider.seed + index
             assert info["world_seed"] <= MAX_SAFE_INTEGER

@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 import tomllib
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -31,7 +31,7 @@ def read(command: list[str]) -> str:
     Its output is captured, so a failure has to hand the tool's own message back rather than
     die with a traceback that hides the one line explaining what went wrong.
     """
-    completed = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True)
+    completed = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True, check=False)
     if completed.returncode:
         raise SystemExit(f"`{' '.join(command)}` failed:\n{completed.stderr.strip()}")
     return completed.stdout.strip()
@@ -39,7 +39,7 @@ def read(command: list[str]) -> str:
 
 def succeeds(command: list[str]) -> bool:
     """Report whether a command exited zero, discarding its output."""
-    completed = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True)
+    completed = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, check=False)
     return completed.returncode == 0
 
 
@@ -106,7 +106,8 @@ def write_version(version: str) -> None:
     if written_version != version:
         raise SystemExit(f"uv wrote package version {written_version} instead of {version}.")
 
-    write_citation_version(REPOSITORY_ROOT / "CITATION.cff", version, date.today())
+    # Use the UTC calendar so release dates do not depend on the machine's timezone.
+    write_citation_version(REPOSITORY_ROOT / "CITATION.cff", version, datetime.now(UTC).date())
     run(["uvx", "cffconvert", "--validate"])
 
     changed_files = read(["git", "diff", "--name-only"]).split()
@@ -128,7 +129,7 @@ def push_atomically(tag: str) -> None:
     GitHub supports atomic pushes: neither main nor the tag is updated if one ref is rejected.
     CI publishes only after receiving the tag and passing its own gates.
     """
-    push = subprocess.run(["git", "push", "--atomic", "origin", RELEASE_BRANCH, tag], cwd=REPOSITORY_ROOT)
+    push = subprocess.run(["git", "push", "--atomic", "origin", RELEASE_BRANCH, tag], cwd=REPOSITORY_ROOT, check=False)
     if push.returncode:
         raise SystemExit(f"Nothing was pushed; the release commit and {tag} remain local for inspection.")
 

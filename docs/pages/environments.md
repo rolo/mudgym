@@ -6,8 +6,8 @@
 from mudgym import make_env
 
 env = make_env(
-    observation="parsed",   # bytes | text | parsed | cheats
-    actions="text",         # text | directions
+    observation="parsed",  # bytes | text | parsed | cheats
+    actions="text",  # text | directions
 )
 env.close()
 ```

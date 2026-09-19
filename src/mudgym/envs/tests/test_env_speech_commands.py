@@ -10,7 +10,7 @@ def test_say_step_completes_with_fields_populated(scripted_env_factory):
     env = scripted_env_factory()
     env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("say hello")
+    obs, _reward, terminated, truncated, _info = env.step("say hello")
 
     assert truncated is False
     assert terminated is False
@@ -26,7 +26,7 @@ def test_speech_response_lands_in_the_text_observation(scripted_env_factory):
     env = scripted_env_factory()
     env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("say hello")
+    obs, _reward, _terminated, _truncated, _info = env.step("say hello")
 
     # the speech line's re-emitted body arrives ahead of the autos line and must stay in the text
     assert 'says "hello"' in obs["text"]
@@ -36,7 +36,7 @@ def test_plain_commands_use_separate_action_and_observation_lines(scripted_env_f
     env = scripted_env_factory()
     env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("look")
+    _obs, _reward, _terminated, truncated, _info = env.step("look")
 
     assert truncated is False
     connection = env.unwrapped.session.connection

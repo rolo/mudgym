@@ -6,9 +6,9 @@ import mudgym
 def main() -> None:
     print("mudgym", mudgym.__version__)
     with mudgym.make_env(observation="parsed") as env:
-        observation, info = env.reset(seed=123)
+        observation, _info = env.reset(seed=123)
         assert env.observation_space.contains(observation)
-        observation, reward, terminated, truncated, info = env.step("look")
+        observation, _reward, terminated, truncated, _info = env.step("look")
         assert not terminated and not truncated
         assert env.observation_space.contains(observation)
         print("wasm", observation["text"][:120])

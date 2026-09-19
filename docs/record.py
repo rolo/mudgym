@@ -337,7 +337,7 @@ def watch(poll_seconds: float = 0.5) -> None:
                 try:
                     EXAMPLES = discover_examples()
                     refresh_example(name)
-                except (Exception, SystemExit):  # one save must not end the watch; the next retries
+                except (Exception, SystemExit):  # noqa: BLE001 - report failed refreshes and keep watching
                     traceback.print_exc()
     except KeyboardInterrupt:
         print("Stopped watching.")

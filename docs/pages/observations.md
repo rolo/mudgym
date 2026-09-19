@@ -16,9 +16,11 @@ Every observation includes `text` and `points`, including custom field selection
 
 Contains the common `text` and `points` observations only.
 
+<!-- fmt: off -->
 ```python
 --8<-- "docs/code/observations_text.py:observations-text"
 ```
+<!-- fmt: on -->
 
 --8<-- "docs/recordings/observations-text.md"
 

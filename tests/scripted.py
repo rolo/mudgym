@@ -123,7 +123,7 @@ class ScriptedConnection(MudConnection):
         self,
         responses: Mapping[str, ScriptedResponse] | None = None,
         *,
-        send_errors: Mapping[str, Exception] | None = None,
+        send_errors: Mapping[str, BaseException] | None = None,
     ):
         super().__init__()
         self.responses = dict(responses or {})

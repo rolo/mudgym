@@ -5,7 +5,7 @@ We use a `text` action space by default, but wrappers can change this to a discr
 ```python
 from mudgym import make_env
 
-env = make_env(actions="text")        # step("get axe")
+env = make_env(actions="text")  # step("get axe")
 env = make_env(actions="directions")  # step(3)
 ```
 
@@ -13,9 +13,11 @@ env = make_env(actions="directions")  # step(3)
 
 `step()` takes a non-empty string of up to 64 characters.
 
+<!-- fmt: off -->
 ```python
 --8<-- "docs/code/actions_text.py:actions-text"
 ```
+<!-- fmt: on -->
 
 --8<-- "docs/recordings/actions-text.md"
 
@@ -53,11 +55,7 @@ env = make_env(observation="parsed", actions="directions")
 observation, info = env.reset()
 
 candidate_actions = np.flatnonzero(observation["available_exits"])
-action = (
-    int(rng.choice(candidate_actions))
-    if len(candidate_actions)
-    else int(env.action_space.sample())
-)
+action = int(rng.choice(candidate_actions)) if len(candidate_actions) else int(env.action_space.sample())
 
 observation, reward, terminated, truncated, info = env.step(action)
 print(DIRECTIONS[action])

@@ -3,7 +3,7 @@ import os
 import sys
 import time
 from threading import RLock
-from typing import Any, TextIO
+from typing import Any, ClassVar, TextIO
 
 import structlog
 from structlog.typing import EventDict, Processor, WrappedLogger
@@ -48,7 +48,7 @@ def _format_value(value: object) -> str:
 class CompactConsoleRenderer:
     """Compact console renderer: time [LEVEL] message key=val ... t=elapsed"""
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "debug": "\033[36m",  # cyan
         "info": "\033[32m",  # green
         "warning": "\033[33m",  # yellow

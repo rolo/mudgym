@@ -71,11 +71,11 @@ def close_players(players: Mapping[Any, MudEnv], provider: ConnectionProvider) -
     for child in players.values():
         try:
             child.close()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - collect failures for the group raised after cleanup
             errors.append(error)
     try:
         provider.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - include provider failures in the same cleanup group
         errors.append(error)
     if errors:
         raise ExceptionGroup("Player cleanup failed", errors)

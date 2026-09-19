@@ -55,6 +55,6 @@ def test_an_ordinary_step_observation_fits_the_observation_space(scripted_env_fa
     env = scripted_env_factory()
     env.reset()
 
-    obs, reward, terminated, truncated, info = env.step("look")
+    obs, _reward, _terminated, _truncated, _info = env.step("look")
 
     assert env.observation_space.contains(obs)

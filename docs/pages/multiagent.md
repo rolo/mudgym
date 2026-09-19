@@ -9,9 +9,7 @@ from mudgym import make_parallel_env
 
 env = make_parallel_env(agents=4)
 obs, infos = env.reset(seed=123)
-obs, rewards, terminates, truncates, infos = env.step(
-    {agent: "look" for agent in env.agents}
-)
+obs, rewards, terminates, truncates, infos = env.step({agent: "look" for agent in env.agents})
 env.close()
 ```
 

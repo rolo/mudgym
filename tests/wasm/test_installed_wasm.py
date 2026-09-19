@@ -130,14 +130,10 @@ def test_civil_anchor_controls_halloween_startup_and_seeded_replay(wasm_runtime)
 def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, mode):
     anchor = datetime(2026, 1, 15, 1, 1, 58, tzinfo=timezone(timedelta(hours=5, minutes=30)))
     if mode == "scalar":
-        env = make_env(
-            connection="wasm", connection_kwargs={"runtime": wasm_runtime, "civil_time_anchor": anchor}
-        )
+        env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime, "civil_time_anchor": anchor})
         action = "time"
     else:
-        env = make_parallel_env(
-            1, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor)
-        )
+        env = make_parallel_env(1, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor))
         action = {"player_0": "time"}
     try:
         runs = []
@@ -161,7 +157,7 @@ def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, 
 @pytest.mark.parametrize(
     ("anchor", "message"),
     [
-        (datetime(2026, 1, 1), "must include a UTC offset"),
+        (datetime(2026, 1, 1), "must include a UTC offset"),  # noqa: DTZ001 - deliberately test a naive anchor
         (datetime(2026, 1, 1, microsecond=1, tzinfo=UTC), "whole-second precision"),
         (datetime(2026, 1, 1, tzinfo=timezone(timedelta(microseconds=1))), "whole-second precision"),
     ],

@@ -41,15 +41,15 @@ def test_soak_post_death_resets_survive_live(connection_factory, live_env_factor
         with subtests.test(iteration=iteration, action=action):
             # a speech step every few iterations keeps the split wire format under soak pressure
             if iteration % 5 == 0:
-                obs, reward, terminated, truncated, info = env.step(f"say soak iteration {iteration}")
+                _obs, _reward, terminated, truncated, _info = env.step(f"say soak iteration {iteration}")
                 assert truncated is False, "speech step lost the auto command batch"
                 assert terminated is False
 
-            obs, reward, terminated, truncated, info = env.step(action)
+            _obs, _reward, terminated, _truncated, _info = env.step(action)
             assert terminated is True, f"{action!r} did not terminate the episode"
 
             started = time.monotonic()
-            obs, info = env.reset(seed=iteration + 1)
+            obs, _info = env.reset(seed=iteration + 1)
             reset_durations.append(time.monotonic() - started)
             assert obs["text"], "post-death reset returned an empty observation"
 
@@ -60,17 +60,17 @@ def test_soak_parallel_post_death_resets_survive_live(wasm_runtime, live_paralle
     provider = WasmtimeProvider(worlds=1, runtime=wasm_runtime)
     env = live_parallel_env_factory(agents=3, provider=provider)
     rounds = max(SOAK_ITERATIONS // 2, 5)
-    obs, infos = env.reset(seed=0)
+    env.reset(seed=0)
     reset_durations: list[float] = []
 
     for round_index in range(rounds):
         with subtests.test(round=round_index):
             commands = {agent: DEATH_ACTIONS[round_index % len(DEATH_ACTIONS)] for agent in env.agents}
-            obs, rewards, terminates, truncates, infos = env.step(commands)
+            _obs, _rewards, terminates, _truncates, _infos = env.step(commands)
             assert all(terminates.values()), f"round {round_index}: not all agents terminated"
 
             started = time.monotonic()
-            obs, infos = env.reset(seed=round_index + 1)
+            env.reset(seed=round_index + 1)
             reset_durations.append(time.monotonic() - started)
             assert env.agents, "parallel reset came back with no agents"
 
@@ -84,7 +84,7 @@ def test_soak_fresh_logins_survive_live(connection_factory, live_env_factory, su
         with subtests.test(iteration=iteration):
             env = live_env_factory(connection=connection_factory)
             started = time.monotonic()
-            obs, info = env.reset(seed=iteration)
+            obs, _info = env.reset(seed=iteration)
             login_durations.append(time.monotonic() - started)
             assert obs["text"], "fresh login returned an empty observation"
             env.close()

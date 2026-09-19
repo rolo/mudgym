@@ -19,13 +19,13 @@ def instantiate_field(spec: FieldSpec) -> ObservationField:
 
 
 __all__ = [
-    "ObservationField",
-    "FieldSpec",
     "FEInventoryField",
     "FEScoreField",
     "FEXitsField",
+    "FieldSpec",
     "MGCheatsField",
+    "ObservationField",
     "RawBytesField",
-    "instantiate_field",
     "SuperQuickLookField",
+    "instantiate_field",
 ]

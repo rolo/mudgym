@@ -27,7 +27,7 @@ def ordered_future_results[Result](
                 continue
             try:
                 future.result()
-            except BaseException as error:
+            except BaseException as error:  # noqa: BLE001 - retain interruptions in the group raised below
                 if error is not first_error:
                     additional_errors.append(error)
         if additional_errors:
