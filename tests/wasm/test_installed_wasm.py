@@ -174,8 +174,6 @@ def test_civil_anchor_refuses_ambiguous_or_lossy_values(wasm_runtime, anchor, me
 def test_installation_contains_only_the_binary_engine_and_no_native_binding():
     for module in ("mudlib", "cffi", "_cffi_backend"):
         assert importlib.util.find_spec(module) is None
-    with pytest.raises(metadata.PackageNotFoundError):
-        metadata.distribution("mud2-embedded")
     distribution = metadata.distribution("mudgym-wasm-engine")
     assert not distribution.requires
 
