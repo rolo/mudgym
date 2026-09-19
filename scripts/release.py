@@ -1,6 +1,6 @@
-"""Validate, version, commit, tag, and push a release. GitHub Actions publishes it via OIDC.
+"""Show release guidance, or validate, version, commit, tag, and push a release.
 
-Use `just release VERSION` for a new release or `just release-retry VERSION` after fixing a failed release.
+Use `just release` for version guidance, `just release VERSION` for a new release, or `just release-retry VERSION` after fixing a failed release. GitHub Actions publishes releases via OIDC.
 """
 
 import argparse
@@ -206,13 +206,44 @@ def retry_release(version: str, tag: str) -> None:
     print(f"Pushed a new release attempt for {tag}. Follow it with: gh run list --workflow release.yml")
 
 
+def show_release_guidance() -> None:
+    project = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())["project"]
+    version = project["version"]
+    print(f"Current package version: {project['name']} {version}")
+    print("\nChoose a version for the changes you want to release:")
+    if re.search(r"(?:a|b|rc|\.dev)\d+", version.partition("+")[0]):
+        stable_version = read(["uv", "version", "--bump", "stable", "--dry-run", "--short"])
+        print(f"  Final {stable_version} - finish the current prerelease")
+        print(f"    just release {stable_version}")
+    for bump, description in (
+        ("patch", "bug fixes and small compatible changes"),
+        ("minor", "new features"),
+        ("major", "first stable API" if version.startswith("0.") else "breaking API changes"),
+    ):
+        next_version = read(["uv", "version", "--bump", bump, "--dry-run", "--short"])
+        print(f"  {bump.capitalize()} {next_version} - {description}")
+        print(f"    just release {next_version}")
+    if version.startswith("0."):
+        print("\nBefore 1.0, use a minor bump for incompatible API changes.")
+    print("\nTo retry a failed release that has not been published to PyPI:")
+    print(f"  just release-retry {version}")
+    print("\nRun releases from a clean main branch synced with origin/main.")
+    print("An explicit release version runs checks, commits, tags and pushes to GitHub.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("version", help="package version without the v prefix")
+    parser.add_argument("version", nargs="?", help="package version without the v prefix, or omit for guidance")
     parser.add_argument(
         "--retry", action="store_true", help="replace a failed unpublished release tag with current main"
     )
     arguments = parser.parse_args()
+
+    if arguments.version is None:
+        if arguments.retry:
+            parser.error("--retry requires a version. Use: just release-retry VERSION")
+        show_release_guidance()
+        return
 
     version = canonical_version(arguments.version)
     tag = f"v{version}"

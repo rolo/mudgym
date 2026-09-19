@@ -3,6 +3,7 @@
 import importlib.util
 import shutil
 import subprocess
+import sys
 import tomllib
 from contextlib import nullcontext
 from datetime import date
@@ -78,6 +79,50 @@ def release_repository(release_script):
     ):
         release_script.run(command)
     return release_script
+
+
+@pytest.mark.parametrize(
+    ("version", "next_versions"),
+    [
+        ("0.4.6", ("0.4.7", "0.5.0", "1.0.0")),
+        ("2.9.9", ("2.9.10", "2.10.0", "3.0.0")),
+        ("0.5.0rc1", ("0.5.0", "0.5.1", "0.6.0", "1.0.0")),
+    ],
+)
+def test_release_without_version_shows_choices_without_changing_files(release_script, version, next_versions):
+    root = release_script.REPOSITORY_ROOT
+    project = root / "pyproject.toml"
+    original = f'[project]\nname = "release-test"\nversion = "{version}"\n'
+    project.write_text(original)
+
+    result = subprocess.run(
+        [sys.executable, "scripts/release.py"], cwd=root, capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"release-test {version}" in result.stdout
+    for next_version in next_versions:
+        assert f"just release {next_version}" in result.stdout
+    assert f"just release-retry {version}" in result.stdout
+    assert "Patch" in result.stdout
+    assert "Minor" in result.stdout
+    assert "Major" in result.stdout
+    assert project.read_text() == original
+    assert not (root / "uv.lock").exists()
+    assert not (root / ".git").exists()
+
+
+def test_retry_without_version_still_requires_an_explicit_version(release_script):
+    result = subprocess.run(
+        [sys.executable, "scripts/release.py", "--retry"],
+        cwd=release_script.REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "version" in result.stderr
 
 
 def test_write_version_updates_package_lock_and_citation(release_repository):
