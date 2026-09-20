@@ -8,8 +8,6 @@ class MudConnection(ABC):
     Reset prepares a session in the tearoom. Sending and reading are separate so several players can act before collecting their observations. Closing releases the connection's resources.
     """
 
-    requires_end_of_turn_marker = True
-
     @abstractmethod
     def reset(self, *, seed: int | None = None) -> None:
         """Prepare the session in the tearoom for a new episode."""

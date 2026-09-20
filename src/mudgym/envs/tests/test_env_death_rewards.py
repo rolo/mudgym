@@ -25,7 +25,7 @@ QUIT_BYTES = b"\x1b[0;33;40mCheerio!\x1b[1;37;40m\r\n"
 
 def terminal_step(action: str, body: bytes):
     """Build a terminal response without fes."""
-    return action.encode("latin-1") + b"\r\n" + body, True, False, {"marker_arrived": False}
+    return action.encode("latin-1") + b"\r\n" + body, True, False, {}
 
 
 def scoring_step(action: str, *, delta: int, points: int) -> bytes:

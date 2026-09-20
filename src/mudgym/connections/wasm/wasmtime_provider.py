@@ -82,8 +82,6 @@ class WasmtimeResponse:
 class WasmtimeConnection(MudConnection):
     """One stable MudGym connection rebound to each fresh WASI session."""
 
-    requires_end_of_turn_marker = False
-
     def __init__(self, *, provider: WasmtimeProvider, connection_index: int, timeout_ms: int) -> None:
         self.provider = provider
         self.connection_index = connection_index
@@ -216,7 +214,6 @@ class WasmtimeConnection(MudConnection):
                     "sex": session.persona.sex,
                 },
                 "bytes_length": len(raw_bytes),
-                "marker_arrived": not (terminated or incomplete),
                 "rejected": any(pattern.search(game_bytes) for pattern in INVALID_COMMAND_PROMPTS),
                 "sent_lines": [response.echoed_line for response in responses if response.echoed_line is not None],
             },

@@ -12,7 +12,7 @@ from mudgym.logs import get_logger
 logger = get_logger(__name__)
 
 CAPTURE_FORMAT = "mudgym-connection-capture"
-CAPTURE_VERSION = 4
+CAPTURE_VERSION = 5
 
 
 class ReplayMismatchError(RuntimeError):
@@ -70,12 +70,10 @@ class RecordingConnection(MudConnection):
         path: str | Path,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        self.requires_end_of_turn_marker = connection.requires_end_of_turn_marker
         self.tick_for_step = getattr(connection, "tick_for_step", None)
         metadata = {
             "connection": type(connection).__name__,
             **(metadata or {}),
-            "requires_end_of_turn_marker": self.requires_end_of_turn_marker,
         }
         self.connection = connection
         self.capture = _CaptureWriter(path, metadata)
@@ -101,7 +99,6 @@ class RecordingConnection(MudConnection):
             terminated=bool(terminated),
             incomplete=bool(incomplete),
             rejected=bool(debug_info.get("rejected", False)),
-            marker_arrived=bool(debug_info.get("marker_arrived", False)),
             sent_lines=debug_info["sent_lines"],
             persona=debug_info.get("persona"),
             world_seed=debug_info.get("world_seed"),
@@ -125,7 +122,6 @@ class ReplayConnection(MudConnection):
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.header, self.calls = _read_capture(self.path)
-        self.requires_end_of_turn_marker = self.header["requires_end_of_turn_marker"]
         self.cursor = 0
 
     def _take(self, expected: str) -> dict[str, Any]:
@@ -161,7 +157,6 @@ class ReplayConnection(MudConnection):
             call["incomplete"],
             {
                 "rejected": call["rejected"],
-                "marker_arrived": call["marker_arrived"],
                 "replayed": True,
                 "capture": str(self.path),
                 "sent_lines": call["sent_lines"],

@@ -108,7 +108,7 @@ def test_recording_replays_complete_coordinated_resets(wasm_runtime, preset, tmp
                         {key: value for key, value in actual_info.items() if key != "transport"},
                         {key: value for key, value in recorded_info.items() if key != "transport"},
                     )
-                    for key in ("sent_lines", "rejected", "marker_arrived", "incomplete"):
+                    for key in ("sent_lines", "rejected", "incomplete"):
                         np.testing.assert_equal(actual_info["transport"][key], recorded_info["transport"][key])
         children = replay.envs.values()
         for child in children:

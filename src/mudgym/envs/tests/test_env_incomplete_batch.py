@@ -1,4 +1,6 @@
-# seagull death jump off cliff captured with no trailing prompt marker (the episode terminates).
+import pytest
+
+# seagull death jump off cliff captured with no trailing prompt (the episode terminates).
 SEAGULL_DEATH_BYTES = (
     b"You are splattered over a very large area, or at least most of you is. "
     b"The rest of your remains are, even now, being eaten by the seagulls "
@@ -8,6 +10,14 @@ SEAGULL_DEATH_BYTES = (
     b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\r\n"
     b"Overall, you scored 189 points this game.\r"
 )
+
+
+def test_completed_response_requires_observation_fields_without_extra_transport_metadata(scripted_env_factory):
+    env = scripted_env_factory(responses={"look": (b"look\r\nNothing else.\r\n", False, False, {})})
+    env.reset()
+
+    with pytest.raises(RuntimeError, match="response completed but fields"):
+        env.step("look")
 
 
 def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_factory):
@@ -37,7 +47,7 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
 
 
 def test_incomplete_window_carries_the_current_score(scripted_env_factory):
-    rejected = b'xyzzy\r\nI don\'t know the word "xyzzy".\r\n', False, True, {"rejected": True, "marker_arrived": False}
+    rejected = b'xyzzy\r\nI don\'t know the word "xyzzy".\r\n', False, True, {"rejected": True}
     env = scripted_env_factory(observation="parsed", responses={"xyzzy": rejected})
     env.reset()
 

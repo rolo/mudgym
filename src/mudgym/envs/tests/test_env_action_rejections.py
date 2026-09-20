@@ -23,7 +23,7 @@ def rejected_response(action: str = ACTION, *, preceding_output: bytes = b""):
         + PROMPT
         + scripted_response([OBSERVATION_COMMAND_LINE])
     )
-    return raw_bytes, False, False, {"rejected": True, "marker_arrived": True}
+    return raw_bytes, False, False, {"rejected": True}
 
 
 def assert_observations_equal(actual, expected):

@@ -50,21 +50,6 @@ def close_quietly(*closeables: Any) -> None:
                 closeable.close()
 
 
-def _resolve_field_parsers(
-    observation: str,
-    field_parsers: Sequence[FieldSpec] | None,
-    *,
-    requires_end_of_turn_marker: bool = True,
-) -> tuple[FieldSpec, ...]:
-    if field_parsers is not None:
-        return tuple(field_parsers)
-    fields = OBSERVATION_PRESETS[observation]
-    if requires_end_of_turn_marker and observation in {"text", "bytes"}:
-        # Marker-based transports still need a command that closes the read window.
-        return (*fields, FEScoreField(include_keys=()))
-    return fields
-
-
 def make_env(
     observation: str = "parsed",
     field_parsers: Sequence[FieldSpec] | None = None,
@@ -85,8 +70,8 @@ def make_env(
 
     ``world_ticker`` runs between the action and observation, defaulting to the connection's ``tick_for_step`` hook if present.
     """
-    if actions not in {"text", "directions"}:
-        raise ValueError(f"actions must be one of: 'text', 'directions' (got {actions!r})")
+    action_wrapper = {"text": None, "directions": DiscreteDirectionsWrapper}[actions]
+    fields = OBSERVATION_PRESETS[observation] if field_parsers is None else tuple(field_parsers)
     options = {"persona": persona, "sex": sex, "persona_pool": persona_pool}
     connection_kwargs = {
         **(connection_kwargs or {}),
@@ -94,9 +79,6 @@ def make_env(
     }
     if isinstance(connection, MudConnection) and connection_kwargs:
         raise ValueError("Configure connection options on the provider when passing an explicit connection instance.")
-    if field_parsers is None and observation not in OBSERVATION_PRESETS:
-        raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})")
-
     connection_factory = registry.default_connection if connection is None else connection
     if isinstance(connection_factory, str):
         connection_factory = registry.connections[connection_factory]
@@ -111,9 +93,7 @@ def make_env(
         # validation or session setup fails.
         env: gym.Env = MudEnv(
             connection=resolved_connection,
-            field_parsers=_resolve_field_parsers(
-                observation, field_parsers, requires_end_of_turn_marker=resolved_connection.requires_end_of_turn_marker
-            ),
+            field_parsers=fields,
             render_mode=render_mode,
             tearoom_commands=tearoom_commands,
             world_ticker=world_ticker,
@@ -121,11 +101,8 @@ def make_env(
     except BaseException:
         close_quietly(resolved_connection)
         raise
-    if actions == "text":
-        return env
-
     try:
-        return DiscreteDirectionsWrapper(env)
+        return env if action_wrapper is None else action_wrapper(env)
     except BaseException:
         close_quietly(env)
         raise
@@ -134,8 +111,7 @@ def make_env(
 def create_players(
     count: int,
     provider: ConnectionProvider,
-    observation: str,
-    field_parsers: Sequence[FieldSpec] | None,
+    field_parsers: Sequence[FieldSpec],
     render_mode: str | None,
     tearoom_commands: str | None,
     *,
@@ -157,9 +133,7 @@ def create_players(
             children.append(
                 MudEnv(
                     connection=connection,
-                    field_parsers=_resolve_field_parsers(
-                        observation, field_parsers, requires_end_of_turn_marker=connection.requires_end_of_turn_marker
-                    ),
+                    field_parsers=field_parsers,
                     render_mode=render_mode,
                     tearoom_commands=tearoom_commands,
                 )
@@ -187,8 +161,8 @@ def make_parallel_env(
 
     ``world_ticker`` runs after all actions and before any observations, defaulting to the provider's ``tick_for_step`` hook if present.
     """
-    if field_parsers is None and observation not in OBSERVATION_PRESETS:
-        raise ValueError(f"observation must be one of {sorted(OBSERVATION_PRESETS)} (got {observation!r})")
+    action_wrapper = {"text": None, "directions": ParallelDiscreteDirectionsWrapper}[actions]
+    fields = OBSERVATION_PRESETS[observation] if field_parsers is None else tuple(field_parsers)
     child_render_mode = "ansi" if render_mode is not None else None
 
     if provider is not None and (personas is not None or persona_pool is not None):
@@ -206,8 +180,7 @@ def make_parallel_env(
             create_players(
                 agents,
                 provider,
-                observation,
-                field_parsers,
+                fields,
                 child_render_mode,
                 tearoom_commands,
                 require_shared_world=True,
@@ -221,9 +194,7 @@ def make_parallel_env(
             render_mode=render_mode,
             world_ticker=world_ticker,
         )
-        if actions == "directions":
-            return ParallelDiscreteDirectionsWrapper(base_env)
-        return base_env
+        return base_env if action_wrapper is None else action_wrapper(base_env)
     except BaseException:
         close_quietly(*children.values(), provider)
         raise

@@ -8,7 +8,7 @@ import gymnasium as gym
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
-from mudgym.envs.fields import FEScoreField, FieldSpec, ObservationField, instantiate_field
+from mudgym.envs.fields import FieldSpec, ObservationField, instantiate_field
 from mudgym.envs.specs import ACTION_CHARSET, ACTION_MAX_LENGTH, INT_DTYPE, TEXT_CHARSET, TEXT_MAX_LENGTH
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.points import parse_points_changes
@@ -22,8 +22,6 @@ from mudgym.logs import get_logger
 from mudgym.session import MudSession
 
 logger = get_logger(__name__)
-
-DEFAULT_FIELDS: tuple[FieldSpec, ...] = (FEScoreField(include_keys=()),)
 
 # tearoom exits messages end with "..." but differ prior to that. Not exiting via the usual north exit and seeing one
 # of these means an episode doesn't really begin in the mudgym sense, so this may either break, or be useful for, some
@@ -48,7 +46,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
     def __init__(
         self,
         *,
-        field_parsers: Sequence[FieldSpec] | None = None,
+        field_parsers: Sequence[FieldSpec] = (),
         tearoom_commands: str | None = None,
         connection: MudConnection,
         render_mode: str | None = None,
@@ -64,8 +62,6 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             charset=ACTION_CHARSET,
         )
 
-        if field_parsers is None:
-            field_parsers = DEFAULT_FIELDS
         self.fields = [instantiate_field(field) for field in field_parsers]
 
         observation_space: dict[str, gym.spaces.Space] = {
@@ -277,7 +273,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             observation, render_bytes, field_refusals = self.bytes_to_observation(
                 raw_bytes,
                 sent_lines=transport["sent_lines"],
-                response_complete=bool(transport.get("marker_arrived", False)),
+                response_complete=True,
             )
         except Exception as error:
             error.add_note(f"reset raw_bytes={raw_bytes!r}, transport={transport!r}")
@@ -357,6 +353,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         if points_before_step is None:
             raise RuntimeError("step called before reset established the persona score")
         raw_bytes, terminated, incomplete, debug_info = self.session.receive()
+        response_complete = not (terminated or incomplete)
         truncated = incomplete
         event_points = self.update_points(raw_bytes, terminated=terminated)
         if event_points == WIZARD_POINTS:
@@ -369,7 +366,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         obs, render_bytes, field_refusals = self.bytes_to_observation(
             raw_bytes,
             sent_lines=debug_info["sent_lines"],
-            response_complete=bool(debug_info.get("marker_arrived", False)) and not incomplete,
+            response_complete=response_complete,
         )
         self.last_render_bytes = render_bytes
         info = self.make_info(

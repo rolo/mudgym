@@ -31,7 +31,7 @@ def test_live_reset_and_step_keep_complete_command_echoes(live_env_factory, tmp_
             pending_lines.append(call["line"])
         elif call["call"] == "read_response":
             raw_bytes = call["raw_text"].encode("latin-1")
-            assert call["marker_arrived"] and not call["incomplete"] and not call["terminated"]
+            assert not call["incomplete"] and not call["terminated"]
             for line in pending_lines:
                 assert len(list(echo_pattern(line).finditer(raw_bytes))) == 1, (line, raw_bytes)
             pending_lines.clear()

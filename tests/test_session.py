@@ -91,7 +91,7 @@ def test_reset_reads_quickscore_without_requesting_an_observation(tmp_path):
 
 @pytest.mark.parametrize(("terminated", "incomplete"), [(True, False), (False, True)])
 def test_terminal_or_incomplete_response_invalidates_the_connection(terminated, incomplete):
-    response = b"response", terminated, incomplete, {"marker_arrived": not incomplete}
+    response = b"response", terminated, incomplete, {}
     connection = ScriptedConnection(responses={"look": response})
     session = make_session(connection)
 

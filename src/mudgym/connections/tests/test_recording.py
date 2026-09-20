@@ -37,7 +37,7 @@ def drive_conversation(connection):
 
 def test_connection_capture_round_trips_every_byte_value(tmp_path):
     path = tmp_path / "bytes.jsonl"
-    response = (bytes(range(256)), False, False, {"rejected": False, "marker_arrived": True})
+    response = (bytes(range(256)), False, False, {"rejected": False})
     recording = RecordingConnection(ScriptedConnection(responses={"look": response}), path, {"purpose": "test"})
 
     recording.reset()
@@ -68,26 +68,26 @@ def test_capture_version_deliberately_rejects_v2(tmp_path):
         ReplayConnection(path)
 
 
-def test_replay_rejects_v3_before_reading_transport_fields(tmp_path):
+@pytest.mark.parametrize("version", [3, 4])
+def test_replay_rejects_old_versions_before_reading_transport_fields(tmp_path, version):
     path = tmp_path / "old.jsonl"
-    path.write_text(json.dumps({"format": CAPTURE_FORMAT, "version": 3}) + "\n", encoding="utf-8")
+    path.write_text(json.dumps({"format": CAPTURE_FORMAT, "version": version}) + "\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="version 3"):
+    with pytest.raises(ValueError, match=f"version {version}"):
         ReplayConnection(path)
 
 
-@pytest.mark.parametrize("missing_field", ["sent_lines", "requires_end_of_turn_marker"])
-def test_replay_requires_the_recorded_transport_contract(tmp_path, missing_field):
+def test_replay_requires_recorded_sent_lines(tmp_path):
     path = tmp_path / "capture.jsonl"
     recording = RecordingConnection(ScriptedConnection(), path)
     drive_conversation(recording)
     recording.close()
     records = [json.loads(line) for line in path.read_text().splitlines()]
     for record in records:
-        record.pop(missing_field, None)
+        record.pop("sent_lines", None)
     path.write_text("\n".join(json.dumps(record) for record in records) + "\n")
 
-    with pytest.raises(KeyError, match=missing_field):
+    with pytest.raises(KeyError, match="sent_lines"):
         drive_conversation(ReplayConnection(path))
 
 
@@ -114,9 +114,9 @@ def test_recorded_connection_transcript_replays_identically(tmp_path):
     ]
 
 
-def test_replay_preserves_rejected_outcome_and_completed_marker(tmp_path):
+def test_replay_preserves_rejected_outcome_and_response_completion(tmp_path):
     path = tmp_path / "capture.jsonl"
-    response = (b"rejected\r\n", False, False, {"rejected": True, "marker_arrived": True})
+    response = (b"rejected\r\n", False, False, {"rejected": True})
     recording = RecordingConnection(ScriptedConnection(responses={"xyzzyfrobnicate": response}), path)
     recording.reset()
     send_and_read(recording, ["xyzzyfrobnicate"])
@@ -124,11 +124,11 @@ def test_replay_preserves_rejected_outcome_and_completed_marker(tmp_path):
 
     replay = ReplayConnection(path)
     replay.reset()
-    _, _, _, debug_info = send_and_read(replay, ["xyzzyfrobnicate"])
+    _, terminated, incomplete, debug_info = send_and_read(replay, ["xyzzyfrobnicate"])
     replay.assert_exhausted()
 
     assert debug_info["rejected"] is True
-    assert debug_info["marker_arrived"] is True
+    assert not terminated and not incomplete
 
 
 def test_replay_verifies_each_sent_line_immediately(tmp_path):
@@ -186,7 +186,7 @@ def test_recorded_connection_closed_send_replays_before_action_response_is_drain
         b"buffered death output",
         True,
         False,
-        {"rejected": False, "marker_arrived": False},
+        {"rejected": False},
     )
     live_connection = ScriptedConnection(
         responses={"quit": response},

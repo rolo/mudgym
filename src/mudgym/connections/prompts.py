@@ -52,10 +52,7 @@ def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
     """
     Return a regex that matches up to the next game prompt beyond the given match.
 
-    This should give us an easy and consistent way to match game responses of the form "any stuff
-    in a response matching this but then up to the next prompt". The terminator stops at the first
-    genuine prompt, so responses that ran ahead of the reader don't swallow the following
-    command's echo and marker.
+    The terminator stops at the first genuine prompt, so responses that ran ahead of the reader don't swallow the following command's response.
     """
     return re.compile(
         needle + rb".*?" + NEXT_PROMPT_BOUNDARY,

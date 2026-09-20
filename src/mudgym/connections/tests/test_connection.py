@@ -21,7 +21,6 @@ def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
         session.send("move north")
         raw, terminated, incomplete, transport = session.read_pending_response()
         assert not terminated and not incomplete
-        assert transport["marker_arrived"]
         assert transport["sent_lines"] == ["move north"]
         narration = TEAROOM_EXIT_NARRATION_END.search(raw)
         assert narration is not None
@@ -81,8 +80,8 @@ def test_player_authored_control_text_does_not_close_the_command_window(connecti
 
 
 @pytest.mark.parametrize("connection_key", connections)
-def test_rejection_before_final_line_echo_is_reported_after_marker_arrives(connection_key):
-    """A rejected first line stays visible after a split batch reaches its final marker."""
+def test_rejection_before_final_line_echo_is_reported_after_batch_completes(connection_key):
+    """A rejected first line stays visible after a split batch completes."""
     connection = connections[connection_key]()
     try:
         connection.reset()
@@ -91,7 +90,6 @@ def test_rejection_before_final_line_echo_is_reported_after_marker_arrives(conne
         assert b"xyzzyfrobnicate" in raw_bytes
         assert b"========" in raw_bytes
         assert debug_info["rejected"] is True
-        assert debug_info["marker_arrived"] is True
         assert terminated is False
         assert incomplete is False
     finally:
@@ -111,7 +109,6 @@ def test_spoken_rejection_text_is_not_reported_as_a_rejected_command(connection_
         assert b"says" in raw_bytes
         assert b"========" in raw_bytes
         assert debug_info["rejected"] is False
-        assert debug_info["marker_arrived"] is True
         assert terminated is False
         assert incomplete is False
     finally:
@@ -130,7 +127,6 @@ def test_player_command_with_too_many_parts_does_not_prevent_the_observation_lin
         assert b"Your command is too long for me, sorry!" in raw_bytes
         assert b"========" in raw_bytes
         assert debug_info["rejected"] is True
-        assert debug_info["marker_arrived"] is True
         assert terminated is False
         assert incomplete is False
     finally:

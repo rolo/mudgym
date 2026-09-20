@@ -41,7 +41,7 @@ def test_parallel_env_accepts_connections_in_one_wasm_world(wasm_runtime):
 
 def test_create_players_allows_independent_wasm_worlds(wasm_runtime):
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
-    children = create_players(2, provider, "text", None, None, None)
+    children = create_players(2, provider, (), None, None)
     try:
         assert [provider.world_for_connection(index) for index in range(2)] == [0, 1]
     finally:

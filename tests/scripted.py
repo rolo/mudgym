@@ -154,6 +154,8 @@ class ScriptedConnection(MudConnection):
 
     def complete_command(self, lines: list[str]) -> tuple[bytes, bool, bool, dict[str, Any]]:
         self.sent_lines.append(lines)
+        if not lines:
+            return b"", False, False, {"scripted": True}
         user_command = lines[0]
         reset_step = user_command == "move north" and not self.entered_land
         if reset_step:
@@ -165,10 +167,10 @@ class ScriptedConnection(MudConnection):
                 scripted_response(lines, reset_step=reset_step),
                 False,
                 False,
-                {"scripted": True, "marker_arrived": True},
+                {"scripted": True},
             )
         if isinstance(response, bytes):
-            return response, False, False, {"scripted": True, "marker_arrived": True}
+            return response, False, False, {"scripted": True}
 
         raw_bytes, terminated, incomplete, debug_info = response
         return raw_bytes, terminated, incomplete, dict(debug_info)

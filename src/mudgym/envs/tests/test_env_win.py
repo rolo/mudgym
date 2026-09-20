@@ -11,7 +11,7 @@ def test_winning_score_ends_the_episode_and_clamps_reward(scripted_env_factory, 
     env = scripted_env_factory(
         observation=observation_mode,
         responses={
-            "look": (raw_bytes, False, True, {"marker_arrived": False, "matched_prompt": "OPTION"}),
+            "look": (raw_bytes, False, True, {"matched_prompt": "OPTION"}),
         },
     )
     obs, _ = env.reset()
@@ -26,7 +26,6 @@ def test_winning_score_ends_the_episode_and_clamps_reward(scripted_env_factory, 
     assert env.observation_space.contains(obs)
     assert info["raw_bytes"] == raw_bytes
     assert info["transport"]["incomplete"] is True
-    assert info["transport"]["marker_arrived"] is False
     assert info["transport"]["matched_prompt"] == "OPTION"
 
     obs, _ = env.reset()
@@ -36,7 +35,7 @@ def test_winning_score_ends_the_episode_and_clamps_reward(scripted_env_factory, 
 
 def test_winning_total_does_not_require_a_nonzero_delta(scripted_env_factory):
     raw_bytes = b"look\r\n(+0 = \x1b[0;32;40m204,800\x1b[1;37;40m).\r\n"
-    env = scripted_env_factory(responses={"look": (raw_bytes, False, True, {"marker_arrived": False})})
+    env = scripted_env_factory(responses={"look": (raw_bytes, False, True, {})})
     env.reset()
 
     obs, _, terminated, truncated, _ = env.step("look")
@@ -61,7 +60,7 @@ def test_a_win_with_a_complete_observation_still_closes_the_session(scripted_env
 
 def test_an_incomplete_response_below_wizard_score_stays_truncated(scripted_env_factory):
     raw_bytes = b"look\r\n(+12,800 = \x1b[0;32;40m204,799\x1b[1;37;40m).\r\n"
-    env = scripted_env_factory(responses={"look": (raw_bytes, False, True, {"marker_arrived": False})})
+    env = scripted_env_factory(responses={"look": (raw_bytes, False, True, {})})
     env.reset()
 
     obs, _, terminated, truncated, _ = env.step("look")

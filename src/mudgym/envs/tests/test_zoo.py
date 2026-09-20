@@ -170,7 +170,7 @@ def test_failed_provider_reset_after_all_agents_finish_blocks_the_step_clock(mon
 
     with closing(make_parallel_env(2, provider=provider, world_ticker=lambda: ticker_calls.append("tick"))) as env:
         for connection in provider.connections:
-            connection.responses["quit"] = (b"quit\r\nCheerio!\r\n", True, False, {"marker_arrived": False})
+            connection.responses["quit"] = (b"quit\r\nCheerio!\r\n", True, False, {})
         env.reset()
         env.step(dict.fromkeys(env.agents, "quit"))
         assert env.agents == []

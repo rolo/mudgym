@@ -8,10 +8,11 @@ from mudgym.envs.fields import RawBytesField
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
 
-def test_make_env_invalid_actions_rejected_before_constructing_env():
+@pytest.mark.parametrize("options", [{"actions": "unknown"}, {"observation": "unknown"}])
+def test_make_env_invalid_options_rejected_before_constructing_env(options):
     conn = ScriptedConnection()
-    with pytest.raises(ValueError, match="actions must be one of"):
-        make_env(connection=conn, actions="sideways")
+    with pytest.raises(KeyError, match="unknown"):
+        make_env(connection=conn, **options)
     assert conn.sent_lines == []
     assert not conn.closed
 
@@ -39,8 +40,18 @@ def test_make_env_resolves_the_registry_default_at_call_time(monkeypatch):
 def test_invalid_observation_is_rejected_before_adopting_provider():
     provider = ScriptedProvider()
 
-    with pytest.raises(ValueError, match="observation must be one of"):
+    with pytest.raises(KeyError, match="nope"):
         make_parallel_env(1, provider=provider, observation="nope")
+
+    assert provider.requested_count is None
+    assert provider.closed is False
+
+
+def test_invalid_actions_are_rejected_before_adopting_provider():
+    provider = ScriptedProvider()
+
+    with pytest.raises(KeyError, match="direction"):
+        make_parallel_env(2, provider=provider, actions="direction")
 
     assert provider.requested_count is None
     assert provider.closed is False

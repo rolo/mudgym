@@ -116,28 +116,28 @@ def test_default_observation_batch_parses_fields_and_hides_inventory_divider(scr
     assert "========" not in obs["text"]
 
 
-def test_text_mode_hides_probe_output_and_keeps_tracked_points(scripted_env_factory):
+def test_text_mode_keeps_tracked_points_without_a_score_probe(scripted_env_factory):
     env = scripted_env_factory(observation="text")
     env.reset()
     obs = env.step("look")[0]
     connection = env.unwrapped.session.connection
 
-    assert env.unwrapped.session.observation_line == "fes"
-    assert connection.sent_lines[-1] == ["look", "fes"]
+    assert env.unwrapped.session.observation_line == ""
+    assert connection.sent_lines[-1] == ["look"]
     assert set(obs) == {"text", "points"}
     assert obs["points"] == 200
     assert "75 75" not in obs["text"]
 
 
-def test_bare_env_defaults_to_text_and_points_with_a_score_probe():
+def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
     env = MudEnv(connection=ScriptedConnection())
     try:
         env.reset()
         obs = env.step("look")[0]
         connection = env.session.connection
 
-        assert env.session.observation_line == "fes"
-        assert connection.sent_lines[-1] == ["look", "fes"]
+        assert env.session.observation_line == ""
+        assert connection.sent_lines[-1] == ["look"]
 
         assert set(obs) == {"text", "points"}
         assert obs["points"] == 200

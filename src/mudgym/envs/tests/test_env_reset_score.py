@@ -39,7 +39,7 @@ def test_final_reset_points_and_rejections_are_in_the_initial_baseline(scripted_
     fields = b"(+50 = \x1b[0;32;40m250\x1b[1;37;40m).\r\n" + scripted_response(["sql,fes,fex,fei"])
     env = scripted_env_factory(
         responses={
-            "move north": (entry, False, False, {"marker_arrived": True, "rejected": True}),
+            "move north": (entry, False, False, {"rejected": True}),
             "sql,fes,fex,fei": fields,
         }
     )
@@ -71,7 +71,7 @@ def test_reset_failure_requires_a_new_reset_without_printing(
 ):
     env = scripted_env_factory(
         render_mode="human",
-        responses={command: (body, terminated, incomplete, {"marker_arrived": not incomplete})},
+        responses={command: (body, terminated, incomplete, {})},
     )
     with pytest.raises((RuntimeError, ValueError)) as raised:
         env.reset()
