@@ -192,6 +192,7 @@ class RecordingProvider(ConnectionProvider):
     ):
         self.provider = provider
         self.tick_for_step = getattr(provider, "tick_for_step", None)
+        self.world_for_connection = getattr(provider, "world_for_connection", None)
         self.capture_path_for_index = capture_path_for_index
         self.metadata = metadata
 

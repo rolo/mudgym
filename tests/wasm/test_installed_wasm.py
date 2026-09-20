@@ -11,15 +11,20 @@ import pytest
 
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.persona import DEFAULT_PERSONA_POOL, Persona
+from mudgym.connections.recording import RecordingProvider
 from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
 from mudgym.envs.factory import create_players
 
 
-def test_parallel_env_rejects_multiple_wasm_worlds_and_closes_provider(wasm_runtime):
+@pytest.mark.parametrize("recording", [False, True])
+def test_parallel_env_rejects_multiple_wasm_worlds_and_closes_provider(wasm_runtime, tmp_path, recording):
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
+    wrapped = provider
+    if recording:
+        wrapped = RecordingProvider(provider, lambda index: tmp_path / f"player{index}.jsonl")
 
     with pytest.raises(ValueError, match="connections must share one world"):
-        make_parallel_env(2, provider=provider)
+        make_parallel_env(2, provider=wrapped)
 
     assert provider._closed
     assert provider._connections == []
