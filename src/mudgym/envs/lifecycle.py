@@ -53,11 +53,13 @@ def step_players[Player](
     actions: Mapping[Player, str],
     world_ticker: Callable[[], None] | None,
 ) -> Iterator[tuple[Player, tuple[dict[str, Any], float, bool, bool, dict[str, Any]]]]:
-    """Act in player order and tick on the call, then return a lazy observation iterator.
+    """Validate all actions, act in player order and tick, then return a lazy observation iterator.
 
     A caller must consume these results before relogging finished players. Yielding each transition lets the caller retain completed observations if a later player fails. Providers without a manual clock supply no ticker.
     """
     selected = [(player, players[player], action) for player, action in actions.items()]
+    for player, child, action in selected:
+        child.validate_action(action)
     for player, child, action in selected:
         child.act(action)
     if selected and world_ticker is not None:

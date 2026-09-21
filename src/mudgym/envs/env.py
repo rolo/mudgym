@@ -334,10 +334,14 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             self.world_ticker()
         return self.observe()
 
+    def validate_action(self, action: str) -> None:
+        """Validate an action without changing player or session state."""
+        if not self.action_space.contains(action):
+            raise ValueError(f"Invalid action {action!r}. Expected {self.action_space}.")
+
     def act(self, action: str) -> None:
         """Send an action now, leaving its observation for a later ``observe`` call."""
-        if not self.action_space.contains(action):
-            raise ValueError(f"Invalid action {action!r}; expected {self.action_space}.")
+        self.validate_action(action)
         if self.points is None:
             raise RuntimeError("step called before reset established the persona score")
         self.session.send(action)

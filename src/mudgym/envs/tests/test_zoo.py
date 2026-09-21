@@ -5,6 +5,7 @@ from pettingzoo.test import parallel_api_test
 
 from mudgym import make_parallel_env
 from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.envs.specs import ACTION_MAX_LENGTH
 from tests.scripted import ScriptedProvider
 
 
@@ -83,6 +84,32 @@ def test_parallel_step_requires_an_action_for_every_live_agent(wasm_runtime):
         assert set(obs) == {"player_0", "player_1"}
         assert not any(terminates.values())
         assert not any(truncates.values())
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["", "look\nlook", "x" * (ACTION_MAX_LENGTH + 1), None],
+    ids=["empty", "line-break", "too-long", "non-string"],
+)
+def test_invalid_parallel_action_does_not_partially_step(action):
+    ticks = []
+    with closing(make_parallel_env(2, provider=ScriptedProvider(), world_ticker=lambda: ticks.append("tick"))) as env:
+        env.reset()
+
+        with pytest.raises(ValueError, match="Invalid action"):
+            env.step({"player_0": "look", "player_1": action})
+
+        assert ticks == []
+        assert all(child.step_count == 0 for child in env.envs.values())
+        assert all(child.session.pending_command is None for child in env.envs.values())
+        assert all(not child.session.connection.pending_lines for child in env.envs.values())
+
+        obs, _rewards, _terminates, _truncates, _infos = env.step(dict.fromkeys(env.agents, "look"))
+
+        assert set(obs) == set(env.agents)
+        assert ticks == ["tick"]
+        assert all(child.step_count == 1 for child in env.envs.values())
+        assert all(child.session.pending_command is None for child in env.envs.values())
 
 
 def test_parallel_step_uses_only_live_agent_keys(wasm_runtime):
