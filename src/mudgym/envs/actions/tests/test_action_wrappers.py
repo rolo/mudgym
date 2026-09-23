@@ -23,13 +23,6 @@ def test_discrete_action_space_wrapper_action_and_mapping(scripted_env):
     assert wrapped.action(1) == "jump"
     assert wrapped.action(2) == "howl"
 
-    assert wrapped.discrete_actions.index("look") == 0
-    assert wrapped.discrete_actions.index("jump") == 1
-    assert wrapped.discrete_actions.index("howl") == 2
-
-    with pytest.raises(KeyError):
-        wrapped.discrete_actions.index("non_existent_action")
-
 
 def test_discrete_directions_wrapper_actions(scripted_env):
     wrapped = DiscreteDirectionsWrapper(scripted_env)
@@ -46,8 +39,7 @@ def test_parallel_directions_wrapper_has_matching_api_and_independent_spaces(scr
 
     try:
         assert wrapped.commands == tuple(f"move {direction}" for direction in DIRECTIONS)
-        assert wrapped.action_count == len(wrapped.commands)
-        assert wrapped.action_space("player_0").n == wrapped.action_count
+        assert wrapped.action_space("player_0").n == len(wrapped.commands)
         assert wrapped.action_space("player_0") is not wrapped.action_space("player_1")
         assert wrapped.unwrapped.envs["player_0"] is children["player_0"]
     finally:
@@ -109,4 +101,4 @@ def test_discrete_action_wrapper_copies_commands(scripted_env):
     assert wrapped.commands == ("look", "dance")
     assert wrapped.action_space.n == 2
     assert wrapped.action(0) == "look"
-    assert wrapped.discrete_actions.index("dance") == 1
+    assert wrapped.action(1) == "dance"

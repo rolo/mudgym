@@ -2,7 +2,7 @@ import pytest
 
 from mudgym.envs.fields import FEScoreField
 from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES
-from mudgym.featurizers.responses import split_on_echo, split_on_prompt
+from mudgym.featurizers.responses import split_on_echo_lines, split_on_prompt
 
 
 @pytest.fixture(
@@ -12,7 +12,7 @@ from mudgym.featurizers.responses import split_on_echo, split_on_prompt
     ]
 )
 def observation_response(request):
-    _, response = split_on_echo(request.param, "sql,fes,fex,fei")
+    _, response = split_on_echo_lines(request.param, ["sql,fes,fex,fei"])
     return response
 
 

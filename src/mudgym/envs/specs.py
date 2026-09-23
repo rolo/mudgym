@@ -8,7 +8,6 @@ from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
 # general purpose
 INDEX_DTYPE = np.int64
 INT_DTYPE = np.int32
-FLOAT_DTYPE = np.float32
 BYTE_DTYPE = np.uint8
 BIT_DTYPE = np.int8  # Gymnasium's MultiBinary space and discrete action masks use int8.
 

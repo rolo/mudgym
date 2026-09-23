@@ -50,27 +50,6 @@ def echo_pattern(last_command_joined: str | bytes) -> re.Pattern[bytes]:
     return re.compile(rb"(?m)^" + ECHO_PREFIX + re.escape(command_bytes) + LINE_BREAK_RE)
 
 
-def contains_echo(raw_bytes: bytes, last_command_joined: str | bytes) -> bool:
-    """
-    Check if the raw bytes contain the echoed command line.
-    """
-    return echo_pattern(last_command_joined).search(raw_bytes) is not None
-
-
-def split_on_echo(raw_bytes: bytes, last_command_joined: str | bytes) -> tuple[bytes, bytes]:
-    """
-    Split raw bytes around the echoed command line, removing the echo itself.
-
-    Returns:
-        (pre_echo_bytes, post_echo_bytes)
-    """
-    match = echo_pattern(last_command_joined).search(raw_bytes)
-    if match is None:
-        raise ValueError(f"Echoed command {last_command_joined!r} not found in raw bytes: {raw_bytes!r}")
-
-    return raw_bytes[: match.start()], raw_bytes[match.end() :]
-
-
 def split_on_echo_lines(raw_bytes: bytes, echo_lines: list[str | bytes]) -> list[bytes] | None:
     """
     Split raw bytes around each echoed line in order, removing the echoes themselves.
@@ -101,9 +80,6 @@ def split_on_prompt(raw_bytes: bytes) -> list[bytes]:
     if chunks[-1] == b"":
         return chunks[:-1]
 
-    # if it's not empty it means the game didn't send a prompt marker which happens upon episode end (death usually),
-    # so the final chunk is real content and we keep it. I'm logging this as it's helpful to see when it happens.
-    # print(f"Non-empty final chunk in {raw_bytes!r} was {chunks[-1]!r}.")
     return chunks
 
 

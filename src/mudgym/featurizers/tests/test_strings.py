@@ -1,11 +1,10 @@
-"""Game text is strict ASCII while raw diagnostics retain a total byte-to-text mapping."""
+"""Game text and player commands use strict ASCII."""
 
 import pytest
 
 from mudgym.featurizers.strings import (
     decode_text_bytes,
     decode_text_lines,
-    decode_wire_bytes,
     encode_command_bytes,
 )
 
@@ -31,12 +30,6 @@ def test_every_high_byte_is_rejected_in_text_paths():
         decode_text_bytes(b"caf\xe9")
     with pytest.raises(ValueError):
         decode_text_bytes(b"\xff")
-
-
-def test_wire_decode_is_total_for_diagnostics():
-    # error paths must always be able to render the wire without raising themselves
-    assert decode_wire_bytes(b"leak \x9b\xff here") == "leak \x9b\xff here"
-    assert decode_wire_bytes(bytes(range(256))) == "".join(chr(code) for code in range(256))
 
 
 def test_ascii_commands_encode_unchanged():

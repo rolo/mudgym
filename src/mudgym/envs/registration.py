@@ -16,8 +16,6 @@ env_configs = {
     },
 }
 
-default_env_id = "MUD2/Parsed-v0"
-
 
 def register_envs():
     for env_id, env_kwargs in env_configs.items():

@@ -2,7 +2,7 @@ import gymnasium as gym
 from gymnasium.envs.registration import registry
 
 import mudgym  # noqa: F401 - importing the package registers its Gymnasium envs
-from mudgym.envs.registration import default_env_id, env_configs, register_envs
+from mudgym.envs.registration import env_configs, register_envs
 
 
 def test_import_mudgym_registers_all_ids():
@@ -17,10 +17,6 @@ def test_specs_resolve_to_the_factory():
         spec = gym.spec(env_id)
         assert spec.entry_point == "mudgym.envs.factory:make_env"
         assert spec.kwargs == expected_kwargs
-
-
-def test_default_env_id_is_registered():
-    assert gym.spec(default_env_id).kwargs == {"observation": "parsed"}
 
 
 def test_register_envs_is_idempotent():

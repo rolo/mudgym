@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from mudgym.featurizers.responses import contains_echo, split_on_echo, split_on_prompt
+from mudgym.featurizers.responses import split_on_echo_lines, split_on_prompt
 
 
 @pytest.fixture
@@ -68,17 +68,17 @@ def test_split_on_prompt_keeps_empty_command_slots():
     assert [chunk for chunk in split_on_prompt(raw) if chunk] == [b"score\r\n"]
 
 
-def test_split_on_echo_preserves_pre_echo_output_before_prompt_marker():
+def test_split_on_echo_lines_preserves_pre_echo_output_before_prompt_marker():
     prompt = b"\x1b[1;34;40m*\x1b[0m"
     raw = b"The dragonfly has just flown away.\r\n" + prompt + b"look,sql,fes,fex,fei\r\nDally Lane.\r\n"
 
-    pre_echo, post_echo = split_on_echo(raw, "look,sql,fes,fex,fei")
+    pre_echo, post_echo = split_on_echo_lines(raw, ["look,sql,fes,fex,fei"])
 
     assert pre_echo == b"The dragonfly has just flown away.\r\n"
     assert post_echo == b"Dally Lane.\r\n"
 
 
-def test_contains_echo_stays_linear_on_many_inline_prompt_markers():
+def test_split_on_echo_lines_stays_linear_on_many_inline_prompt_markers():
     # Regression: a plain greedy ECHO_PREFIX backtracks exponentially on a run of inline
     # prompt markers that is not followed by the command echo (~12x per marker), hanging
     # MudEnv's observation parser on live payloads. The possessive quantifier keeps it linear.
@@ -86,11 +86,11 @@ def test_contains_echo_stays_linear_on_many_inline_prompt_markers():
     raw = marker * 50 + b"unrelated game text\r\n"
 
     start = time.perf_counter()
-    result = contains_echo(raw, "look,sql,fes,fex,fei")
+    result = split_on_echo_lines(raw, ["look,sql,fes,fex,fei"])
     elapsed = time.perf_counter() - start
 
-    assert result is False
-    assert elapsed < 1.0, f"contains_echo took {elapsed:.2f}s -- regex is backtracking"
+    assert result is None
+    assert elapsed < 1.0, f"split_on_echo_lines took {elapsed:.2f}s - regex is backtracking"
 
 
 def test_split_response_chunks_berk(raw_bytes_berk):

@@ -17,7 +17,6 @@ class DiscreteActions:
             raise ValueError("commands must be unique.")
 
         self.space = self.make_space()
-        self.command_indices = {command: index for index, command in enumerate(self.commands)}
 
     def make_space(self):
         return gym.spaces.Discrete(len(self.commands))
@@ -26,9 +25,6 @@ class DiscreteActions:
         if not self.space.contains(index):
             raise ValueError(f"Invalid discrete action {index!r}; expected {self.space}.")
         return self.commands[index]
-
-    def index(self, command):
-        return self.command_indices[command]
 
 
 class DiscreteActionSpaceWrapper(ActionWrapper):
@@ -44,7 +40,6 @@ class DiscreteActionSpaceWrapper(ActionWrapper):
         super().__init__(env)
         self.discrete_actions = DiscreteActions(commands)
         self.commands = self.discrete_actions.commands
-        self.action_count = len(self.commands)
         self.action_space = self.discrete_actions.space
 
     def action(self, index):
@@ -61,7 +56,6 @@ class ParallelDiscreteActionSpaceWrapper(BaseParallelWrapper):
         super().__init__(env)
         self.discrete_actions = DiscreteActions(commands)
         self.commands = self.discrete_actions.commands
-        self.action_count = len(self.commands)
         # Each agent owns a separate space, and therefore a separate sampling RNG stream.
         self.action_spaces = {agent: self.discrete_actions.make_space() for agent in env.possible_agents}
 
