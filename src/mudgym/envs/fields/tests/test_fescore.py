@@ -3,35 +3,51 @@ import pytest
 
 from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.fescore import FEScoreField
-from mudgym.envs.specs import INT_DTYPE
+from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 
-def test_matches_valid_line():
-    obs = FEScoreField().extract([b"58 58 61 61 61 61 0 58 0200 N N N N 53 F"])
+@pytest.mark.parametrize("points", ["0200", "3000000000"], ids=["ordinary-points", "oversized-ignored-points"])
+def test_extracts_status_without_points(points):
+    field = FEScoreField()
+    raw = f"58 78 41 61 32 52 7 68 {points} N N N N 53 F".encode()
+    obs = field.extract([raw])
 
-    assert "points" not in obs
-    np.testing.assert_array_equal(obs["vitals"], [58, 58, 61, 61, 61, 61, 0, 58])
-    np.testing.assert_array_equal(obs["flags"], [0, 0, 0, 0])
-    assert obs["reset_minutes"] == 53
-    assert obs["weather"] == "fair"
-    assert obs["weather_index"] == 1
-
-
-def test_handles_no_match_returns_empty_defaults():
-    obs = FEScoreField().extract([b"no fes here"])
-    assert obs["weather"] == UNKNOWN
-    assert obs["weather_index"] == 0
-    np.testing.assert_array_equal(obs["vitals"], np.zeros(8, dtype=INT_DTYPE))
+    assert field.matches(raw)
+    np.testing.assert_equal(
+        obs,
+        {
+            "vitals": [58, 78, 41, 61, 32, 52, 7, 68],
+            "flags": [0, 0, 0, 0],
+            "reset_minutes": 53,
+            "weather": "fair",
+            "weather_index": 1,
+        },
+    )
+    assert_valid_observation(field, obs)
 
 
 @pytest.mark.parametrize(
     "line",
-    [b"not a fes line", b"58 58", b"move north,fex,fei", b""],
+    [
+        pytest.param(b"not a fes line", id="prose"),
+        pytest.param(b"58 58", id="incomplete-status"),
+        pytest.param(b"move north,fex,fei", id="command-echo"),
+        pytest.param(b"", id="empty"),
+    ],
 )
-def test_rejects_invalid_lines(line):
-    obs = FEScoreField().extract([line])
-    assert obs["reset_minutes"] == 0
-    np.testing.assert_array_equal(obs["vitals"], np.zeros(8, dtype=INT_DTYPE))
+def test_no_match_returns_zero_defaults_and_unknown_weather(line):
+    field = FEScoreField()
+    expected = {
+        "vitals": [0] * 8,
+        "flags": [0] * 4,
+        "reset_minutes": 0,
+        "weather": UNKNOWN,
+        "weather_index": 0,
+    }
+
+    assert not field.matches(line)
+    np.testing.assert_equal(field.empty(), expected)
+    np.testing.assert_equal(field.extract([line]), expected)
 
 
 def test_latest_wins_when_multiple_matches():
@@ -44,12 +60,20 @@ def test_latest_wins_when_multiple_matches():
     )
     obs = FEScoreField().extract([raw])
 
-    assert obs["reset_minutes"] == 25
-    assert obs["weather"] == "cloudy"
+    np.testing.assert_equal(
+        obs,
+        {
+            "vitals": [60, 60, 12, 12, 12, 12, 0, 60],
+            "flags": [0, 0, 0, 0],
+            "reset_minutes": 25,
+            "weather": "cloudy",
+            "weather_index": 2,
+        },
+    )
 
 
 @pytest.mark.parametrize(
-    ("code", "expected_idx", "expected_name"),
+    ("code", "expected_index", "expected_name"),
     [
         ("F", 1, "fair"),
         ("C", 2, "cloudy"),
@@ -60,46 +84,39 @@ def test_latest_wins_when_multiple_matches():
         ("B", 7, "blizzard"),
     ],
 )
-def test_weather_mapping(code, expected_idx, expected_name):
-    obs = FEScoreField().extract([f"58 58 61 61 61 61 0 58 0200 N N N N 53 {code}".encode()])
+def test_weather_mapping(code, expected_index, expected_name):
+    field = FEScoreField()
+    obs = field.extract([f"58 58 61 61 61 61 0 58 0200 N N N N 53 {code}".encode()])
 
     assert obs["weather"] == expected_name
-    assert obs["weather_index"] == expected_idx
+    assert obs["weather_index"] == expected_index
+    assert_valid_observation(field, obs)
 
 
-def test_all_flags_set():
-    obs = FEScoreField().extract([b"58 58 61 61 61 61 0 58 0200 Y Y Y Y 53 S"])
-    np.testing.assert_array_equal(obs["flags"], [1, 1, 1, 1])
+@pytest.mark.parametrize(
+    ("flags", "expected"),
+    [
+        pytest.param("Y N N N", [1, 0, 0, 0], id="blind"),
+        pytest.param("N Y N N", [0, 1, 0, 0], id="deaf"),
+        pytest.param("N N Y N", [0, 0, 1, 0], id="crippled"),
+        pytest.param("N N N Y", [0, 0, 0, 1], id="dumb"),
+        pytest.param("Y Y Y Y", [1, 1, 1, 1], id="all-flags"),
+    ],
+)
+def test_flags_keep_their_positions(flags, expected):
+    field = FEScoreField()
+    obs = field.extract([f"58 58 61 61 61 61 0 58 0200 {flags} 53 S".encode()])
 
-
-def test_no_flags_set():
-    obs = FEScoreField().extract([b"58 58 61 61 61 61 0 58 0200 N N N N 53 S"])
-    np.testing.assert_array_equal(obs["flags"], [0, 0, 0, 0])
-
-
-def test_empty_returns_valid_defaults():
-    defaults = FEScoreField().empty()
-
-    assert defaults["vitals"].shape == (8,)
-    assert defaults["vitals"].dtype == INT_DTYPE
-    assert defaults["flags"].shape == (4,)
-    assert defaults["weather"] == UNKNOWN
-    assert defaults["weather_index"] == 0
+    np.testing.assert_equal(obs["flags"], expected)
+    assert_valid_observation(field, obs)
 
 
 def test_extracts_fes_from_real_captures(bytes_case):
-    obs = FEScoreField().extract(bytes_case["chunks"])
-    expected = bytes_case["fes"]
+    field = FEScoreField()
+    obs = field.extract(bytes_case["chunks"])
 
-    np.testing.assert_array_equal(obs["vitals"], expected["vitals"])
-    np.testing.assert_array_equal(obs["flags"], expected["flags"])
-    assert obs["reset_minutes"] == expected["reset_minutes"]
-    assert obs["weather"] == expected["weather"]
-
-
-def test_include_keys_must_be_space_keys():
-    with pytest.raises(ValueError, match="not in full_space"):
-        FEScoreField(include_keys=("vitals", "bogus"))
+    np.testing.assert_equal(obs, bytes_case["fes"])
+    assert_valid_observation(field, obs)
 
 
 def test_separator_controls_are_not_whitespace_around_a_status_line():

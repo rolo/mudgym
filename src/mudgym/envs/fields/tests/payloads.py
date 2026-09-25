@@ -98,6 +98,7 @@ BYTES_CASES = {
             "flags": [0, 0, 0, 0],
             "reset_minutes": 53,
             "weather": "raining",
+            "weather_index": 4,
         },
         "fex": {
             "names": {"up", "out", "swampward", "southwest", "south", "west", "east", "north"},
@@ -114,6 +115,7 @@ BYTES_CASES = {
             "flags": [0, 0, 0, 0],
             "reset_minutes": 53,
             "weather": "fair",
+            "weather_index": 1,
         },
         "fex": {
             "names": {
@@ -143,6 +145,7 @@ BYTES_CASES = {
             "flags": [0, 0, 0, 0],
             "reset_minutes": 46,
             "weather": "fair",
+            "weather_index": 1,
         },
         "fex": {
             "names": {"up", "down", "out", "swampward", "south", "southeast", "east", "north"},

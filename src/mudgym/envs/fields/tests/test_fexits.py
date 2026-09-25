@@ -5,36 +5,52 @@ from gymnasium import spaces as gym_spaces
 from mudgym.db.directions import DIRECTIONS
 from mudgym.db.index import DIRECTION_COUNT
 from mudgym.envs.fields.fexits import FEXitsField
-from mudgym.envs.specs import BIT_DTYPE
+from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 
-def expected_vector(names: set[str]) -> np.ndarray:
-    v = np.zeros(len(DIRECTIONS), dtype=BIT_DTYPE)
-    for i, d in enumerate(DIRECTIONS):
-        if d in names:
-            v[i] = 1
-    return v
+@pytest.mark.parametrize(
+    ("raw", "expected_names", "expected_mask"),
+    [
+        pytest.param(b"north", ("north",), [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], id="single"),
+        pytest.param(
+            b"up down out swampward southwest northeast northwest west",
+            ("west", "northeast", "southwest", "northwest", "up", "down", "out", "swampward"),
+            [0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
+            id="mixed-subset",
+        ),
+        pytest.param(
+            b"up in over down out swampward southwest south southeast northeast northwest west east north",
+            tuple(DIRECTIONS),
+            [1] * DIRECTION_COUNT,
+            id="all-in-noncanonical-order",
+        ),
+        pytest.param(
+            b"swampward over",
+            ("over", "swampward"),
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+            id="special-directions",
+        ),
+        pytest.param(
+            b"northwest north",
+            ("north", "northwest"),
+            [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            id="prefix-pair",
+        ),
+        pytest.param(
+            b"up out swampward south west east north\r\n",
+            ("north", "east", "south", "west", "up", "out", "swampward"),
+            [1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1],
+            id="real-exits-line",
+        ),
+    ],
+)
+def test_extracts_exits_in_game_direction_order(raw, expected_names, expected_mask):
+    field = FEXitsField()
+    obs = field.extract([raw])
 
-
-def test_matches_valid_line():
-    obs = FEXitsField().extract([b"up down out swampward southwest northeast northwest west"])
-
-    expected = {"up", "down", "out", "swampward", "southwest", "northeast", "northwest", "west"}
-    assert obs["available_exit_names"] == tuple(direction for direction in DIRECTIONS if direction in expected)
-
-    for direction in expected:
-        assert obs["available_exits"][DIRECTIONS.index(direction)] == 1
-
-    for direction in ("east", "north", "south"):
-        assert obs["available_exits"][DIRECTIONS.index(direction)] == 0
-
-
-def test_single_exit():
-    obs = FEXitsField().extract([b"north"])
-
-    assert obs["available_exit_names"] == ("north",)
-    assert obs["available_exits"][DIRECTIONS.index("north")] == 1
-    assert np.sum(obs["available_exits"]) == 1
+    assert field.matches(raw)
+    np.testing.assert_equal(obs, {"available_exit_names": expected_names, "available_exits": expected_mask})
+    assert_valid_observation(field, obs)
 
 
 def test_available_exits_is_a_gymnasium_action_mask():
@@ -45,115 +61,58 @@ def test_available_exits_is_a_gymnasium_action_mask():
     assert action_space.sample(mask=obs["available_exits"]) == DIRECTIONS.index("north")
 
 
-def test_all_exits():
-    obs = FEXitsField().extract([" ".join(DIRECTIONS).encode()])
-
-    assert obs["available_exit_names"] == tuple(DIRECTIONS)
-    assert np.all(obs["available_exits"] == 1)
-
-
-def test_exit_names_use_game_direction_order_regardless_of_fex_order():
-    raw_exit_names = tuple(reversed(DIRECTIONS))
-    obs = FEXitsField().extract([" ".join(raw_exit_names).encode()])
-
-    assert obs["available_exit_names"] == tuple(DIRECTIONS)
-
-
-def test_fex_direction_names_project_into_game_exit_order():
-    obs = FEXitsField().extract(
-        [b"up in over down out swampward southwest south southeast northeast northwest west east north"]
-    )
-
-    assert obs["available_exit_names"] == tuple(DIRECTIONS)
-    assert obs["available_exits"][DIRECTIONS.index("over")] == 1
-    assert obs["available_exits"][DIRECTIONS.index("swampward")] == 1
-
-
 @pytest.mark.parametrize(
     "line",
     [
-        b"no exits here",
-        b"not an exit line",
-        b"58 58 61 61 61 61 0 58 0200 N N N N 53 F",
-        b"move north,fex,fei",
-        b"north and south",
-        b"oo\r\n",
-        b"",
-        b"gibberish xyz 123",
+        pytest.param(b"58 58 61 61 61 61 0 58 0200 N N N N 53 F", id="another-command"),
+        pytest.param(b"move north,fex,fei", id="command-echo"),
+        pytest.param(b"north and south", id="prose-containing-directions"),
+        pytest.param(b"oo\r\n", id="darkness-marker"),
+        pytest.param(b"", id="empty"),
+        pytest.param(b"\r\n", id="blank-dark-room"),
     ],
 )
-def test_invalid_lines_return_all_exits(line):
-    """When no valid FEX line is found, default to all exits available."""
-    obs = FEXitsField().extract([line])
+def test_missing_exits_leave_every_direction_available(line):
+    field = FEXitsField()
+    expected = {"available_exit_names": tuple(DIRECTIONS), "available_exits": [1] * DIRECTION_COUNT}
 
-    assert np.all(obs["available_exits"] == 1)
-    assert set(obs["available_exit_names"]) == set(DIRECTIONS)
+    np.testing.assert_equal(field.empty(), expected)
+    np.testing.assert_equal(field.extract([line]), expected)
 
 
 def test_latest_wins_when_multiple_matches():
     raw = b"\r\n".join([b"north south", b"It is raining. ", b"east west"])
     obs = FEXitsField().extract([raw])
 
-    assert obs["available_exit_names"] == ("east", "west")
-
-
-def test_prefix_direction_regression():
-    """Ensure prefix directions (e.g. north/northwest) are matched correctly."""
-    pair = None
-    for a in DIRECTIONS:
-        for b in DIRECTIONS:
-            if a != b and b.startswith(a):
-                pair = (a, b)
-                break
-        if pair:
-            break
-
-    if pair is None:
-        pytest.skip("No prefix directions in DIRECTIONS set")
-
-    a, b = pair
-    obs = FEXitsField().extract([f"{b} {a}".encode()])
-    assert set(obs["available_exit_names"]) == {a, b}
-
-
-def test_empty_returns_valid_defaults():
-    defaults = FEXitsField().empty()
-
-    assert defaults["available_exits"].dtype == BIT_DTYPE
-    assert len(defaults["available_exits"]) == DIRECTION_COUNT
-    assert np.all(defaults["available_exits"] == 1)
-    assert defaults["available_exit_names"] == tuple(DIRECTIONS)
-
-
-def test_space_types():
-    spaces = FEXitsField().space()
-
-    assert isinstance(spaces["available_exits"], gym_spaces.MultiBinary)
-    assert spaces["available_exits"].dtype == np.dtype(np.int8)
-    assert isinstance(spaces["available_exit_names"], gym_spaces.Sequence)
-
-
-def test_matches_real_exits_line():
-    assert FEXitsField().matches(b"up out swampward south west east north\r\n")
+    np.testing.assert_equal(
+        obs,
+        {
+            "available_exit_names": ("east", "west"),
+            "available_exits": [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        },
+    )
 
 
 def test_matches_blank_dark_room_response():
-    # in the dark fex returns a blank exits line; matches() must still recognise it as valid fex output
-    # so the env's positional-routing cross-check holds.
+    # Dark rooms return a blank line that the env must recognise as valid FEX output.
     assert FEXitsField().matches(b"\r\n")
 
 
 def test_does_not_match_other_command_output():
-    # the fes status line is another command's output, not a valid fex response
     assert not FEXitsField().matches(b"58 58 61 61 61 61 0 58 0200 N N N N 53 F\r\n")
 
 
 def test_extracts_fex_from_real_captures(bytes_case):
-    obs = FEXitsField().extract(bytes_case["chunks"])
+    field = FEXitsField()
+    obs = field.extract(bytes_case["chunks"])
+    names = bytes_case["fex"]["names"]
+    expected = {
+        "available_exit_names": tuple(direction for direction in DIRECTIONS if direction in names),
+        "available_exits": [int(direction in names) for direction in DIRECTIONS],
+    }
 
-    expected_names = tuple(direction for direction in DIRECTIONS if direction in bytes_case["fex"]["names"])
-    assert obs["available_exit_names"] == expected_names
-    assert np.array_equal(obs["available_exits"], expected_vector(bytes_case["fex"]["names"]))
+    np.testing.assert_equal(obs, expected)
+    assert_valid_observation(field, obs)
 
 
 def test_separator_controls_are_not_whitespace_around_an_exits_line():

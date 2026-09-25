@@ -1,130 +1,64 @@
+from functools import partial
+
 import numpy as np
 import pytest
 
-from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
-from mudgym.db.weather import WEATHER
 from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.envs.fields.fescore import FEScoreField
 from mudgym.envs.fields.fexits import FEXitsField
 from mudgym.envs.fields.mgcheats import MGCheatsField
 from mudgym.envs.fields.rawbytes import RawBytesField
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
-
-ALL_FIELDS = [
-    MGCheatsField(),
-    FEInventoryField(),
-    FEScoreField(),
-    FEXitsField(),
-    RawBytesField(),
-    RawBytesField(max_bytes=100),
-    SuperQuickLookField(),
-]
-
-
-@pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)
-def test_space_keys_match_empty_keys(field):
-    """Every field's full space and empty defaults must declare the same keys."""
-    assert field.full_space().keys() == field.full_empty().keys()
-
-
-@pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)
-def test_empty_values_satisfy_spaces(field):
-    """Every field's empty() values must be valid for their declared spaces."""
-    spaces = field.space()
-    defaults = field.empty()
-
-    for key, space in spaces.items():
-        value = defaults[key]
-        assert space.contains(value), f"{key}: {value!r} not in {space}"
-
-
-@pytest.mark.parametrize("field", ALL_FIELDS, ids=lambda f: f.__class__.__name__)
-def test_empty_numeric_dtypes_match_spaces(field):
-    """Every NumPy-valued default must use its declared space dtype."""
-    spaces = field.space()
-    defaults = field.empty()
-
-    for key, space in spaces.items():
-        value = defaults[key]
-        if not isinstance(value, np.ndarray | np.generic):
-            continue
-        assert value.dtype == space.dtype, f"{key}: emitted {value.dtype}, declared {space.dtype}"
-
-
-FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 F"
-
-
-def test_space_empty_and_extract_apply_include_keys():
-    field = FEScoreField(include_keys=("vitals",))
-    assert set(field.space()) == {"vitals"}
-    assert set(field.empty()) == {"vitals"}
-    assert set(field.extract([FES_RESPONSE])) == {"vitals"}
-
-
-def test_full_methods_keep_every_parser_key():
-    field = FEScoreField(include_keys=("vitals",))
-    assert set(field.full_space()) > {"vitals"}
-    assert field.full_space().keys() == field.full_empty().keys()
-    assert field.full_extract([FES_RESPONSE]).keys() == field.full_space().keys()
-
-
-def test_space_empty_and_extract_match_full_capability_without_include_keys():
-    field = FEScoreField()
-    assert field.space().keys() == field.full_space().keys()
-    assert field.empty().keys() == field.full_empty().keys()
-    assert field.extract([FES_RESPONSE]).keys() == field.full_extract([FES_RESPONSE]).keys()
-
-
-def test_empty_include_keys_contributes_nothing():
-    field = FEScoreField(include_keys=())
-    assert field.space() == {}
-    assert field.empty() == {}
-    assert field.extract([FES_RESPONSE]) == {}
-
-
-def test_fes_does_not_extract_points_beyond_the_integer_range():
-    response = FES_RESPONSE.replace(b"0200", b"3000000000")
-    field = FEScoreField()
-
-    assert field.matches(response)
-    assert "points" not in field.extract([response])
-
-
-# Room and weather indices reserve 0 for missing observations, so their spaces need len(collection) + 1 slots.
-BLIZZARD_FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 B"
-
-
-def test_fescore_last_weather_is_inside_its_space():
-    field = FEScoreField()
-    obs = field.full_extract([BLIZZARD_FES_RESPONSE])
-    assert obs["weather"] == WEATHER[-1]
-    assert field.full_space()["weather_index"].contains(obs["weather_index"])
-
-
-def test_superquicklook_last_room_name_is_inside_its_space():
-    field = SuperQuickLookField()
-    payload = f'The place known as "{ROOM_NAMES[-1]}" contains nothing.\r\n'.encode("latin-1")
-    obs = field.full_extract([payload])
-    assert obs["room_name"] == ROOM_NAMES[-1]
-    assert field.full_space()["room_name_index"].contains(obs["room_name_index"])
+from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 
 @pytest.mark.parametrize(
-    ("room_id", "room_name", "index_key", "expected_index"),
+    "field_constructor",
     [
-        pytest.param("wthstp", "weathered steps", "room_id_index", len(ROOM_IDS), id="last-room-id"),
-        pytest.param("mzroom", "zombie room", "room_name_index", len(ROOM_NAMES), id="last-room-name"),
+        MGCheatsField,
+        FEInventoryField,
+        FEScoreField,
+        FEXitsField,
+        RawBytesField,
+        pytest.param(partial(RawBytesField, max_bytes=100), id="RawBytesField-custom-capacity"),
+        SuperQuickLookField,
     ],
 )
-def test_mgcheats_last_room_is_inside_its_space(room_id, room_name, index_key, expected_index):
-    field = MGCheatsField()
-    payload = (
-        f"[mgcheats]room_id={room_id}; room_name={room_name}; fighting=0; dark=0; "
-        f"glowing=0; asleep=0; gifted=0; here=[]; ticks=125; inventory=[][/mgcheats]"
-    ).encode("latin-1")
-    obs = field.full_extract([payload])
-    assert obs["room_id"] == room_id
-    assert obs["room_name"] == room_name
-    assert obs[index_key] == expected_index
-    assert field.full_space()["room_id_index"].contains(obs["room_id_index"])
-    assert field.full_space()["room_name_index"].contains(obs["room_name_index"])
+def test_empty_observation_satisfies_field_contract(field_constructor):
+    field = field_constructor()
+    assert_valid_observation(field, field.empty())
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_keys"),
+    [
+        pytest.param({}, {"vitals", "flags", "reset_minutes", "weather", "weather_index"}, id="omitted"),
+        pytest.param(
+            {"include_keys": None}, {"vitals", "flags", "reset_minutes", "weather", "weather_index"}, id="default"
+        ),
+        pytest.param({"include_keys": ("vitals",)}, {"vitals"}, id="one-key"),
+        pytest.param({"include_keys": ()}, set(), id="no-keys"),
+    ],
+)
+def test_include_keys_filters_public_methods_but_not_full_methods(kwargs, expected_keys):
+    # Every field inherits the filtering interface unchanged from ObservationField.
+    field = FEScoreField(**kwargs)
+    unfiltered = FEScoreField()
+    chunks = [b"58 78 41 61 32 52 7 68 0200 N N N N 53 F"]
+
+    assert field.full_space() == unfiltered.space()
+    np.testing.assert_equal(field.full_empty(), unfiltered.empty())
+    np.testing.assert_equal(field.full_extract(chunks), unfiltered.extract(chunks))
+
+    assert field.space() == {key: space for key, space in unfiltered.space().items() if key in expected_keys}
+    np.testing.assert_equal(
+        field.empty(), {key: value for key, value in unfiltered.empty().items() if key in expected_keys}
+    )
+    np.testing.assert_equal(
+        field.extract(chunks), {key: value for key, value in unfiltered.extract(chunks).items() if key in expected_keys}
+    )
+
+
+def test_include_keys_must_be_space_keys():
+    with pytest.raises(ValueError, match="not in full_space"):
+        FEScoreField(include_keys=("vitals", "bogus"))

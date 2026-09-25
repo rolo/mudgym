@@ -1,7 +1,10 @@
+import numpy as np
 import pytest
 
 from mudgym.db.index import UNKNOWN, room_id_to_index, room_name_to_index
+from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
 from mudgym.envs.fields.mgcheats import MGCheatsField
+from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 MGCHEATS_BEATEN_TRACK = (
     b"[mgcheats]room_id=mtrack2; room_name=beaten track; fighting=0; dark=0; glowing=0; "
@@ -9,37 +12,26 @@ MGCHEATS_BEATEN_TRACK = (
 )
 
 
-def test_cheats_uses_shared_room_indices():
-    raw = (
-        b"[mgcheats]room_id=groad1; room_name=dally lane; fighting=0; dark=0; "
-        b"glowing=0; asleep=0; gifted=0; here=[]; ticks=0[/mgcheats]"
-    )
-
-    obs = MGCheatsField().extract([raw])
-
-    assert obs["room_name"] == "dally lane"
-    assert obs["room_id"] == "groad1"
-    assert obs["room_id_index"] == room_id_to_index(obs["room_id"])
-    assert obs["room_name_index"] == room_name_to_index(obs["room_name"])
-
-
 @pytest.mark.parametrize(
-    ("room_id", "room_name", "index_key"),
+    ("room_id", "room_name", "index_key", "expected_index"),
     [
-        pytest.param("abcell", "abbot's cell", "room_id_index", id="first-room-id"),
-        pytest.param("monch", "abbatial church", "room_name_index", id="first-room-name"),
+        pytest.param("abcell", "abbot's cell", "room_id_index", 1, id="first-room-id"),
+        pytest.param("monch", "abbatial church", "room_name_index", 1, id="first-room-name"),
+        pytest.param("wthstp", "weathered steps", "room_id_index", len(ROOM_IDS), id="last-room-id"),
+        pytest.param("mzroom", "zombie room", "room_name_index", len(ROOM_NAMES), id="last-room-name"),
     ],
 )
-def test_first_room_index_is_one(room_id, room_name, index_key):
+def test_room_index_boundaries(room_id, room_name, index_key, expected_index):
     raw = MGCHEATS_BEATEN_TRACK.replace(b"mtrack2", room_id.encode())
     raw = raw.replace(b"beaten track", room_name.encode())
     field = MGCheatsField()
 
     obs = field.extract([raw])
 
-    assert obs[index_key] == 1
-    assert field.full_space()["room_id_index"].contains(obs["room_id_index"])
-    assert field.full_space()["room_name_index"].contains(obs["room_name_index"])
+    assert obs["room_id"] == room_id
+    assert obs["room_name"] == room_name
+    assert obs[index_key] == expected_index
+    assert_valid_observation(field, obs)
 
 
 @pytest.mark.parametrize(("original", "key"), [(b"mtrack2", "room_id"), (b"beaten track", "room_name")])
@@ -47,20 +39,27 @@ def test_first_room_index_is_one(room_id, room_name, index_key):
 def test_unknown_or_empty_rooms_fail_loudly(original, key, value):
     raw = MGCHEATS_BEATEN_TRACK.replace(original, value)
 
-    with pytest.raises(ValueError, match=f"mgcheats {key}={value.decode()!r} is not a known room") as error:
+    with pytest.raises(ValueError, match=f"mgcheats {key}={value.decode()!r} is not a known room"):
         MGCheatsField().extract([raw])
-
-    assert isinstance(error.value.__cause__, ValueError)
 
 
 def test_missing_mgcheats_returns_empty_defaults():
-    """When mgcheats is missing (e.g., episode ended), return the empty defaults."""
-    out = MGCheatsField().extract([b""])
-    assert out["room_id"] == UNKNOWN
-    assert out["room_name"] == UNKNOWN
-    assert out["room_id_index"] == 0
-    assert out["room_name_index"] == 0
-    assert out["here"] == ()
+    field = MGCheatsField()
+    expected = {
+        "room_id": UNKNOWN,
+        "room_id_index": 0,
+        "room_name": UNKNOWN,
+        "room_name_index": 0,
+        "fighting": 0,
+        "dark": 0,
+        "glowing": 0,
+        "asleep": 0,
+        "gifted": 0,
+        "here": (),
+    }
+
+    np.testing.assert_equal(field.empty(), expected)
+    np.testing.assert_equal(field.extract([b""]), expected)
 
 
 @pytest.mark.parametrize(
@@ -72,29 +71,33 @@ def test_missing_mgcheats_returns_empty_defaults():
 )
 def test_extracts_mgcheats_chunk_with_or_without_ticks(raw):
     field = MGCheatsField()
-    out = field.extract([raw])
+    obs = field.extract([raw])
 
-    assert out["room_id"] == "mtrack2"
-    assert out["room_name"] == "beaten track"
-    assert out["here"] == ("necklace0", "road")
-    assert "ticks" not in out
-    assert field.full_space()["here"].contains(out["here"])
+    np.testing.assert_equal(
+        obs,
+        {
+            "room_id": "mtrack2",
+            "room_id_index": room_id_to_index("mtrack2"),
+            "room_name": "beaten track",
+            "room_name_index": room_name_to_index("beaten track"),
+            "fighting": 0,
+            "dark": 0,
+            "glowing": 0,
+            "asleep": 0,
+            "gifted": 0,
+            "here": ("necklace0", "road"),
+        },
+    )
+    assert_valid_observation(field, obs)
 
 
 def test_printable_names_fit_the_mgcheats_here_space():
     raw = MGCHEATS_BEATEN_TRACK.replace(b"necklace0, road", b"cloth-of-gold, ornate wall")
     field = MGCheatsField()
-    out = field.extract([raw])
+    obs = field.extract([raw])
 
-    assert out["here"] == ("cloth-of-gold", "ornate wall")
-    assert field.full_space()["here"].contains(out["here"])
-
-
-def test_empty_returns_valid_defaults_cheats():
-    defaults = MGCheatsField().empty()
-
-    assert "room_name" in defaults
-    assert "room_id" in defaults
+    assert obs["here"] == ("cloth-of-gold", "ornate wall")
+    assert_valid_observation(field, obs)
 
 
 @pytest.mark.parametrize("value", [b"01", b"+1", b"1_0", b"007", b"x", b"200", b"true", b""])
@@ -107,10 +110,11 @@ def test_a_flag_that_is_not_exactly_0_or_1_fails_loudly(value):
 
 def test_flags_are_read_as_bits():
     raw = MGCHEATS_BEATEN_TRACK.replace(b"fighting=0; dark=0", b"fighting=1; dark=1")
-    out = MGCheatsField().extract([raw])
+    field = MGCheatsField()
+    obs = field.extract([raw])
 
-    assert (out["fighting"], out["dark"], out["glowing"], out["asleep"], out["gifted"]) == (1, 1, 0, 0, 0)
-    assert all(MGCheatsField().full_space()[key].contains(out[key]) for key in MGCheatsField.BIT_KEYS)
+    assert (obs["fighting"], obs["dark"], obs["glowing"], obs["asleep"], obs["gifted"]) == (1, 1, 0, 0, 0)
+    assert_valid_observation(field, obs)
 
 
 def test_here_must_be_a_bracketed_list():
@@ -140,10 +144,10 @@ def test_a_pair_without_an_equals_sign_fails_loudly():
 def test_room_names_are_lowercased_to_match_the_room_tables():
     # the game capitalises proper names ("Dally Lane"), the room tables are all lowercase
     raw = MGCHEATS_BEATEN_TRACK.replace(b"room_name=beaten track", b"room_name=Dally Lane")
-    out = MGCheatsField().extract([raw])
+    obs = MGCheatsField().extract([raw])
 
-    assert out["room_name"] == "dally lane"
-    assert out["room_name_index"] == room_name_to_index("dally lane") > 0
+    assert obs["room_name"] == "dally lane"
+    assert obs["room_name_index"] == room_name_to_index("dally lane") > 0
 
 
 def test_orangery_colours_are_removed_before_room_name_lookup():
@@ -157,4 +161,4 @@ def test_orangery_colours_are_removed_before_room_name_lookup():
     assert obs["room_name"] == "orangery"
     assert obs["room_name_index"] == room_name_to_index("orangery") > 0
     assert obs["here"] == ("rain",)
-    assert field.full_space()["room_name"].contains(obs["room_name"])
+    assert_valid_observation(field, obs)

@@ -16,7 +16,7 @@ def test_reverse_format_levels_are_real_levels():
         # the usual shape: "<name> the <level>"
         ("Dood the protector", "Dood"),
         ("Dood the mage", "Dood"),
-        ("Keyser the archizard", "Keyser"),
+        ("Keyser the wizard", "Keyser"),
         ("Dood the guest", "Dood"),
         # prefixes the game issues itself sit between the "the" and the level
         ("Dood the dragon-slaying warrior", "Dood"),

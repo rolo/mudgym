@@ -1,7 +1,66 @@
+import numpy as np
 import pytest
 
 from mudgym.db.index import UNKNOWN, room_name_to_index
+from mudgym.db.rooms import ROOM_NAMES
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
+from mudgym.envs.fields.tests.helpers import assert_valid_observation
+
+COAL_BUNKER_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
+    b"\x1b[1;36;40mthe coal\x1b[0;37;40m, \x1b[36mthe door\x1b[37m, \x1b[31mJuan the protector\x1b[37m "
+    b"and \x1b[35m4 rats\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+    b"The large rat is carrying the following:\r\n"
+    b"        nothing.\r\n"
+    b"The rat is carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
+
+KEEP_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mthird floor of keep\x1b[0;37;40m" contains '
+    b"\x1b[1;36;40mthe manuscript\x1b[0;37;40m, \x1b[32mthe flickering haze\x1b[37m, "
+    b"\x1b[32mthe wall\x1b[37m, \x1b[31mJuan the protector\x1b[37m and \x1b[36mthe mortar\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+    b"The mortar contains:\r\n"
+    b"        powdered dragonblood.\r\n"
+)
+
+TWO_MORTALS_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
+    b"\x1b[36mthe door\x1b[37m, \x1b[31mDavid the sorcerer\x1b[37m, "
+    b"\x1b[31mJessica the protector\x1b[37m, \x1b[35m4 rats\x1b[37m and "
+    b"\x1b[1;36;40mthe coal\x1b[0;37;40m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
+
+ARCANE_FOREST_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40marcane forest\x1b[0;37;40m" contains '
+    b"\x1b[1;35;40mthe dragon\x1b[0;37;40m, \x1b[1;36;40mthe amulet\x1b[0;37;40m, "
+    b"\x1b[31mMark the protector\x1b[37m and \x1b[32mthe arcane tree\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+    b"The dragon is carrying the following:\r\n"
+    b"        the emerald.\r\n"
+)
+
+WIZ_PLAYER_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
+    b"\x1b[36mthe door\x1b[37m, \x1b[1;31;40mKeyser the wizard\x1b[0;37;40m and "
+    b"\x1b[31mDumbo the protector\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
+
+REVERSED_TITLES_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
+    b"\x1b[36mthe door\x1b[37m, \x1b[31mSir David\x1b[37m and \x1b[31mSister Jessica\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
 
 
 # Captured from the WASM game with seed 123 and persona Aaron.
@@ -29,14 +88,23 @@ from mudgym.envs.fields.superquicklook import SuperQuickLookField
     ],
 )
 def test_quoted_room_names_preserve_contents_and_inventory(raw, room_name, portable):
-    obs = SuperQuickLookField().extract([raw])
+    field = SuperQuickLookField()
+    obs = field.extract([raw])
 
-    assert obs["room_name"] == room_name
-    assert obs["room_name_index"] == room_name_to_index(room_name) > 0
-    assert obs["here"] == ("Aaron the protector", portable)
-    assert obs["portables"] == (portable,)
-    assert obs["players"] == ("Aaron the protector",)
-    assert obs["inventory"] == ("ribbon",)
+    np.testing.assert_equal(
+        obs,
+        {
+            "room_name": room_name,
+            "room_name_index": room_name_to_index(room_name),
+            "here": ("Aaron the protector", portable),
+            "portables": (portable,),
+            "players": ("Aaron the protector",),
+            "mobiles": (),
+            "features": (),
+            "inventory": ("ribbon",),
+        },
+    )
+    assert_valid_observation(field, obs)
 
 
 @pytest.mark.parametrize("line_break", ["\r", "\n", "\r\n"])
@@ -55,48 +123,6 @@ def test_unrecognised_or_empty_room_names_fail_loudly(room_name):
         SuperQuickLookField().extract([raw])
 
 
-@pytest.mark.parametrize("raw", [b"", b"It's too dark for you to see anything."])
-def test_missing_room_view_returns_empty_defaults(raw):
-    obs = SuperQuickLookField().extract([raw])
-
-    assert obs["room_name"] == UNKNOWN
-    assert obs["room_name_index"] == 0
-
-
-COAL_BUNKER_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
-    b"\x1b[1;36;40mthe coal\x1b[0;37;40m, \x1b[36mthe door\x1b[37m, \x1b[31mJuan the protector\x1b[37m "
-    b"and \x1b[35m4 rats\x1b[37m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
-    b"The large rat is carrying the following:\r\n"
-    b"        nothing.\r\n"
-    b"The rat is carrying the following:\r\n"
-    b"        nothing.\r\n"
-)
-
-KEEP_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mthird floor of keep\x1b[0;37;40m" contains '
-    b"\x1b[1;36;40mthe manuscript\x1b[0;37;40m, \x1b[32mthe flickering haze\x1b[37m, "
-    b"\x1b[32mthe wall\x1b[37m, \x1b[31mJuan the protector\x1b[37m and \x1b[36mthe mortar\x1b[37m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
-    b"The mortar contains:\r\n"
-    b"        powdered dragonblood.\r\n"
-)
-
-
-def test_classifies_coal_bunker_contents():
-    obs = SuperQuickLookField().extract([COAL_BUNKER_CHUNK])
-    assert obs["room_name"] == "coal bunker"
-    assert obs["here"] == ("coal", "door", "Juan the protector", "4 rats")
-    assert obs["portables"] == ("coal", "door")
-    assert obs["players"] == ("Juan the protector",)
-    assert obs["mobiles"] == ("4 rats",)
-    assert obs["features"] == ()
-    assert obs["inventory"] == ()
-
-
 def test_orangery_colours_are_removed_without_losing_content_classification():
     raw = (
         b'\x1b[0;37;40mThe place known as "\x1b[1;32;40m\x1b[0;33;40morange'
@@ -112,92 +138,131 @@ def test_orangery_colours_are_removed_without_losing_content_classification():
     assert obs["features"] == ("rain",)
     assert obs["players"] == ()
     assert obs["inventory"] == ()
-    assert field.full_space()["room_name"].contains(obs["room_name"])
+    assert_valid_observation(field, obs)
 
 
-TWO_MORTALS_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
-    b"\x1b[36mthe door\x1b[37m, \x1b[31mDavid the sorcerer\x1b[37m, "
-    b"\x1b[31mJessica the protector\x1b[37m, \x1b[35m4 rats\x1b[37m and "
-    b"\x1b[1;36;40mthe coal\x1b[0;37;40m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        pytest.param(
+            COAL_BUNKER_CHUNK,
+            {
+                "room_name": "coal bunker",
+                "here": ("coal", "door", "Juan the protector", "4 rats"),
+                "portables": ("coal", "door"),
+                "players": ("Juan the protector",),
+                "mobiles": ("4 rats",),
+                "features": (),
+                "inventory": (),
+            },
+            id="coal-bunker",
+        ),
+        pytest.param(
+            KEEP_CHUNK,
+            {
+                "room_name": "third floor of keep",
+                "here": ("manuscript", "flickering haze", "wall", "Juan the protector", "mortar"),
+                "portables": ("manuscript", "mortar"),
+                "players": ("Juan the protector",),
+                "mobiles": (),
+                "features": ("flickering haze", "wall"),
+                "inventory": (),
+            },
+            id="keep",
+        ),
+        pytest.param(
+            TWO_MORTALS_CHUNK,
+            {
+                "room_name": "coal bunker",
+                "here": ("door", "David the sorcerer", "Jessica the protector", "4 rats", "coal"),
+                "portables": ("door", "coal"),
+                "players": ("David the sorcerer", "Jessica the protector"),
+                "mobiles": ("4 rats",),
+                "features": (),
+                "inventory": (),
+            },
+            id="two-mortals",
+        ),
+        pytest.param(
+            ARCANE_FOREST_CHUNK,
+            {
+                "room_name": "arcane forest",
+                "here": ("dragon", "amulet", "Mark the protector", "arcane tree"),
+                "portables": ("amulet",),
+                "players": ("Mark the protector",),
+                "mobiles": ("dragon",),
+                "features": ("arcane tree",),
+                "inventory": (),
+            },
+            id="arcane-forest",
+        ),
+        pytest.param(
+            WIZ_PLAYER_CHUNK,
+            {
+                "room_name": "coal bunker",
+                "here": ("door", "Keyser the wizard", "Dumbo the protector"),
+                "portables": ("door",),
+                "players": ("Keyser the wizard", "Dumbo the protector"),
+                "mobiles": (),
+                "features": (),
+                "inventory": (),
+            },
+            id="wizard-player",
+        ),
+    ],
 )
+def test_classifies_captured_room_contents_and_player_inventory(raw, expected):
+    field = SuperQuickLookField()
+    obs = field.extract([raw])
+    expected = {**expected, "room_name_index": room_name_to_index(expected["room_name"])}
 
-ARCANE_FOREST_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40marcane forest\x1b[0;37;40m" contains '
-    b"\x1b[1;35;40mthe dragon\x1b[0;37;40m, \x1b[1;36;40mthe amulet\x1b[0;37;40m, "
-    b"\x1b[31mMark the protector\x1b[37m and \x1b[32mthe arcane tree\x1b[37m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
-    b"The dragon is carrying the following:\r\n"
-    b"        the emerald.\r\n"
+    np.testing.assert_equal(obs, expected)
+    assert_valid_observation(field, obs)
+
+
+@pytest.mark.parametrize(
+    ("raw", "persona", "observer", "remaining"),
+    [
+        pytest.param(
+            TWO_MORTALS_CHUNK, "David", "David the sorcerer", "Jessica the protector", id="ordinary-title-David"
+        ),
+        pytest.param(
+            TWO_MORTALS_CHUNK, "Jessica", "Jessica the protector", "David the sorcerer", id="ordinary-title-Jessica"
+        ),
+        pytest.param(REVERSED_TITLES_CHUNK, "David", "Sir David", "Sister Jessica", id="title-first-David"),
+        pytest.param(REVERSED_TITLES_CHUNK, "Jessica", "Sister Jessica", "Sir David", id="title-first-Jessica"),
+    ],
 )
+def test_persona_exclusion_only_removes_the_observer_from_players(raw, persona, observer, remaining):
+    obs = SuperQuickLookField().extract([raw], persona=persona)
 
-WIZ_PLAYER_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
-    b"\x1b[36mthe door\x1b[37m, \x1b[1;31;40mKeyser the archizard\x1b[0;37;40m and "
-    b"\x1b[31mDumbo the protector\x1b[37m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
-)
-
-
-def test_classifies_keep_contents():
-    obs = SuperQuickLookField().extract([KEEP_CHUNK])
-    assert obs["room_name"] == "third floor of keep"
-    assert obs["here"] == ("manuscript", "flickering haze", "wall", "Juan the protector", "mortar")
-    assert obs["features"] == ("flickering haze", "wall")
-    assert obs["portables"] == ("manuscript", "mortar")
-    assert obs["players"] == ("Juan the protector",)
-    assert obs["mobiles"] == ()
-
-
-def test_classifies_both_mortals_as_players():
-    obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK])
-    assert obs["players"] == ("David the sorcerer", "Jessica the protector")
-    assert obs["mobiles"] == ("4 rats",)
-    assert obs["portables"] == ("door", "coal")
-
-
-def test_players_excludes_the_observing_persona():
-    obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK], persona="David")
-    assert obs["players"] == ("Jessica the protector",)
-    # the here listing stays the room's full contents, self included
-    assert "David the sorcerer" in obs["here"]
-
-
-def test_persona_exclusion_matches_the_bare_name_not_the_title():
-    obs = SuperQuickLookField().extract([TWO_MORTALS_CHUNK], persona="Jessica")
-    assert obs["players"] == ("David the sorcerer",)
-
-
-REVERSED_TITLES_CHUNK = (
-    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '
-    b"\x1b[36mthe door\x1b[37m, \x1b[31mSir David\x1b[37m and \x1b[31mSister Jessica\x1b[37m.\r\n"
-    b"You are carrying the following:\r\n"
-    b"        nothing.\r\n"
-)
-
-
-@pytest.mark.parametrize("persona, remaining", [("David", "Sister Jessica"), ("Jessica", "Sir David")])
-def test_persona_exclusion_handles_titles_that_come_before_the_name(persona, remaining):
-    # Sir/Lady and Brother/Sister are rendered title-first, so the leading word is not the persona
-    obs = SuperQuickLookField().extract([REVERSED_TITLES_CHUNK], persona=persona)
     assert obs["players"] == (remaining,)
+    assert observer in obs["here"]
 
 
-def test_classifies_every_category_in_one_line():
-    obs = SuperQuickLookField().extract([ARCANE_FOREST_CHUNK])
-    assert obs["room_name"] == "arcane forest"
-    assert obs["mobiles"] == ("dragon",)
-    assert obs["portables"] == ("amulet",)
-    assert obs["players"] == ("Mark the protector",)
-    assert obs["features"] == ("arcane tree",)
+@pytest.mark.parametrize("raw", [b"", b"It's too dark for you to see anything."])
+def test_missing_room_view_returns_empty_defaults(raw):
+    field = SuperQuickLookField()
+    expected = {
+        "room_name": UNKNOWN,
+        "room_name_index": 0,
+        "here": (),
+        "inventory": (),
+        "features": (),
+        "portables": (),
+        "mobiles": (),
+        "players": (),
+    }
+
+    np.testing.assert_equal(field.empty(), expected)
+    np.testing.assert_equal(field.extract([raw]), expected)
 
 
-def test_wiz_player_folds_into_players():
-    obs = SuperQuickLookField().extract([WIZ_PLAYER_CHUNK])
-    assert obs["players"] == ("Keyser the archizard", "Dumbo the protector")
-    assert obs["portables"] == ("door",)
-    assert obs["mobiles"] == ()
+def test_last_room_name_uses_the_last_index_in_its_space():
+    field = SuperQuickLookField()
+    raw = f'The place known as "{ROOM_NAMES[-1]}" contains nothing.\r\n'.encode()
+    obs = field.extract([raw])
+
+    assert obs["room_name"] == ROOM_NAMES[-1]
+    assert obs["room_name_index"] == len(ROOM_NAMES)
+    assert_valid_observation(field, obs)
