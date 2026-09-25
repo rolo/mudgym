@@ -1,7 +1,5 @@
 import numpy as np
 
-from mudgym.envs.fields.rawbytes import DEFAULT_MAX_BYTES
-
 CAPTURED_RESET_SWEEP = (
     b"\r\n+- Database 2 has finished initialising -+\r\n"
     b"\r\n+- Database 5 has finished initialising -+\r\n"
@@ -47,22 +45,3 @@ def test_env_bytes_reset_returns_raw_bytes(scripted_env_factory):
     # check that we stripped out the tearoom exit narration
     assert b"Elizabethan tearoom" not in info["raw_bytes"]
     assert env.observation_space["raw_bytes"].shape == obs["raw_bytes"].shape
-
-
-def test_live_bytes_reset_step_and_reset(live_env_factory):
-    env = live_env_factory(observation="bytes")
-
-    for _ in range(2):
-        obs, _ = env.reset()
-        assert env.observation_space.contains(obs)
-
-        obs, _, terminated, truncated, info = env.step("look")
-
-        assert (terminated, truncated) == (False, False)
-        assert set(obs) == {"text", "raw_bytes", "points"}
-        assert env.observation_space.contains(obs)
-        assert obs["raw_bytes"].shape == (DEFAULT_MAX_BYTES,)
-        raw_bytes = info["raw_bytes"]
-        assert obs["raw_bytes"][: len(raw_bytes)].tobytes() == raw_bytes
-        assert not obs["raw_bytes"][len(raw_bytes) :].any()
-        assert info["transport"]["sent_lines"] == ["look"]

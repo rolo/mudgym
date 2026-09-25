@@ -1,3 +1,5 @@
+import pytest
+
 from mudgym.envs.factory import make_env, make_parallel_env
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
@@ -13,17 +15,22 @@ class WorldTickerRecorder:
         self.calls.append([len(connection.pending_lines) for connection in self.connections_supplier()])
 
 
-def test_scalar_step_ticks_between_the_action_and_its_observation():
+@pytest.mark.parametrize(
+    ("options", "action"),
+    [({}, "look"), ({"actions": "directions"}, 0)],
+    ids=["text-action", "directions-wrapper"],
+)
+def test_scalar_step_ticks_between_the_action_and_its_observation(options, action):
     connection = ScriptedConnection()
     world_ticker = WorldTickerRecorder(lambda: [connection])
-    env = make_env(connection=connection, world_ticker=world_ticker)
+    env = make_env(connection=connection, world_ticker=world_ticker, **options)
     try:
         env.reset()
         assert world_ticker.calls == []
-        env.step("look")
+        env.step(action)
         # One advancement, taken while the action line was sent but unread.
         assert world_ticker.calls == [[1]]
-        env.step("dance")
+        env.step(action)
         assert world_ticker.calls == [[1], [1]]
     finally:
         env.close()
@@ -52,17 +59,5 @@ def test_parallel_children_never_advance_shared_world_time():
         assert world_ticker.calls == []
         env.step({"player_0": "look", "player_1": "dance"})
         assert world_ticker.calls == [[1, 1]]
-    finally:
-        env.close()
-
-
-def test_directions_wrapper_preserves_the_world_ticker():
-    connection = ScriptedConnection()
-    world_ticker = WorldTickerRecorder(lambda: [connection])
-    env = make_env(connection=connection, actions="directions", world_ticker=world_ticker)
-    try:
-        env.reset()
-        env.step(0)
-        assert world_ticker.calls == [[1]]
     finally:
         env.close()

@@ -13,7 +13,7 @@ def test_make_env_invalid_options_rejected_before_constructing_env(options):
     conn = ScriptedConnection()
     with pytest.raises(KeyError, match="unknown"):
         make_env(connection=conn, **options)
-    assert conn.sent_lines == []
+    assert conn.send_calls == []
     assert not conn.closed
 
 
@@ -22,38 +22,29 @@ def test_make_env_rejects_connection_options_with_an_existing_connection(options
     conn = ScriptedConnection()
     with pytest.raises(ValueError, match="Configure connection options"):
         make_env(connection=conn, **options)
-    assert conn.sent_lines == []
+    assert conn.send_calls == []
     assert not conn.closed
 
 
 def test_make_env_resolves_the_registry_default_at_call_time(monkeypatch):
-    monkeypatch.setattr("mudgym.envs.factory.registry.default_connection", ScriptedConnection)
+    connection = ScriptedConnection()
+    monkeypatch.setattr("mudgym.envs.factory.registry.default_connection", lambda: connection)
 
     env = make_env(observation="parsed")
     try:
-        obs, _ = env.reset()
-        assert obs["room_name"]
+        assert env.unwrapped.session.connection is connection
     finally:
         env.close()
 
 
-def test_invalid_observation_is_rejected_before_adopting_provider():
+@pytest.mark.parametrize("options", [{"observation": "unknown"}, {"actions": "unknown"}])
+def test_invalid_options_are_rejected_before_adopting_provider(options):
     provider = ScriptedProvider()
 
-    with pytest.raises(KeyError, match="nope"):
-        make_parallel_env(1, provider=provider, observation="nope")
+    with pytest.raises(KeyError, match="unknown"):
+        make_parallel_env(2, provider=provider, **options)
 
-    assert provider.requested_count is None
-    assert provider.closed is False
-
-
-def test_invalid_actions_are_rejected_before_adopting_provider():
-    provider = ScriptedProvider()
-
-    with pytest.raises(KeyError, match="direction"):
-        make_parallel_env(2, provider=provider, actions="direction")
-
-    assert provider.requested_count is None
+    assert provider.requested_counts == []
     assert provider.closed is False
 
 
@@ -63,7 +54,7 @@ def test_persona_options_are_rejected_before_adopting_a_provider():
     with pytest.raises(ValueError, match="provider"):
         make_parallel_env(2, provider=provider, personas=[(None, None), (None, None)])
 
-    assert provider.requested_count is None
+    assert provider.requested_counts == []
     assert provider.closed is False
 
 
@@ -99,6 +90,7 @@ def test_child_constructor_failure_closes_entire_batch_and_provider():
     with pytest.raises(ValueError, match="Duplicate observation keys"):
         make_parallel_env(3, provider=provider, field_parsers=[RawBytesField, RawBytesField])
 
+    assert len(provider.connections) == 3
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True
 
@@ -114,6 +106,7 @@ def test_parallel_constructor_failure_closes_children_and_provider(monkeypatch):
     with pytest.raises(RuntimeError, match="parallel constructor failed"):
         make_parallel_env(3, provider=provider)
 
+    assert len(provider.connections) == 3
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True
 
@@ -129,6 +122,7 @@ def test_wrapper_constructor_failure_closes_children_and_provider(monkeypatch):
     with pytest.raises(RuntimeError, match="wrapper constructor failed"):
         make_parallel_env(3, provider=provider, actions="directions")
 
+    assert len(provider.connections) == 3
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True
 
@@ -139,6 +133,7 @@ def test_provider_returning_wrong_batch_size_is_closed_with_its_connections():
     with pytest.raises(RuntimeError, match="returned 2 connections, expected 3"):
         make_parallel_env(3, provider=provider)
 
+    assert len(provider.connections) == 2
     assert all(connection.closed for connection in provider.connections)
     assert provider.closed is True
 
@@ -148,7 +143,7 @@ def test_factory_requests_one_connection_batch():
 
     env = make_parallel_env(3, provider=provider)
     try:
-        assert provider.requested_count == 3
+        assert provider.requested_counts == [3]
     finally:
         env.close()
 

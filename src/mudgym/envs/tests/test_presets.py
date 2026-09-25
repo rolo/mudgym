@@ -74,14 +74,14 @@ def observation_keys(env) -> set[str]:
     return set(env.observation_space.spaces)
 
 
-@pytest.mark.parametrize("preset", OBSERVATION_PRESETS)
+@pytest.mark.parametrize("preset", PRESET_KEYS)
 def test_preset_uses_expected_field_types(preset):
     field_types = {type(instantiate_field(field)) for field in OBSERVATION_PRESETS[preset]}
 
     assert field_types == PRESET_FIELD_TYPES[preset]
 
 
-@pytest.mark.parametrize("preset", OBSERVATION_PRESETS)
+@pytest.mark.parametrize("preset", PRESET_KEYS)
 def test_preset_exposes_exact_observation_keys(scripted_env_factory, preset):
     env = scripted_env_factory(observation=preset)
 
@@ -106,15 +106,13 @@ EXPLICIT_RAW_BYTES_KEYS = {
 }
 
 
-def test_explicit_fields_instances(scripted_env_factory):
-    env = scripted_env_factory(field_parsers=[RawBytesField(), FEScoreField()])
-
-    assert observation_keys(env) == EXPLICIT_RAW_BYTES_KEYS
-
-
-def test_explicit_fields_classes(scripted_env_factory):
-    env = scripted_env_factory(field_parsers=[RawBytesField, FEScoreField])
-
+@pytest.mark.parametrize(
+    "field_parsers",
+    [[RawBytesField, FEScoreField], [RawBytesField(), FEScoreField()]],
+    ids=["classes", "instances"],
+)
+def test_explicit_fields_accept_classes_and_instances(scripted_env_factory, field_parsers):
+    env = scripted_env_factory(field_parsers=field_parsers)
     assert observation_keys(env) == EXPLICIT_RAW_BYTES_KEYS
 
 
@@ -155,8 +153,15 @@ def test_commandless_presets_send_only_the_player_action(preset, mode):
         env = make_parallel_env(2, provider=ScriptedProvider(), observation=preset)
         action = {"player_0": "look", "player_1": "look"}
     try:
+        children = [env.unwrapped] if mode == "scalar" else env.unwrapped.envs.values()
+        assert all(child.session.observation_line == "" for child in children)
         env.reset()
         result = env.step(action)
+        observations = [result[0]] if mode == "scalar" else result[0].values()
+        for obs in observations:
+            assert set(obs) == PRESET_KEYS[preset]
+            assert obs["points"] == 200
+            assert "75 75" not in obs["text"]
         infos = [result[-1]] if mode == "scalar" else result[-1].values()
         for info in infos:
             assert info["transport"]["sent_lines"] == ["look"]
@@ -198,3 +203,7 @@ def test_include_keys_resolves_duplicate_keys(scripted_env_factory):
     assert "room_id" in keys
     assert "fighting" in keys
     assert "dark" not in keys
+
+
+def test_preset_names_match_the_public_contract():
+    assert set(OBSERVATION_PRESETS) == set(PRESET_KEYS) == set(PRESET_FIELD_TYPES)

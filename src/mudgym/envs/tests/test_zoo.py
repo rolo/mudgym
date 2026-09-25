@@ -24,28 +24,24 @@ def test_parallel_construction_forwards_render_mode_and_spaces(render_mode, expe
             assert env.render() is None
 
 
-def test_ansi_render_labels_child_output(wasm_runtime):
-    with closing(
-        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), render_mode="ansi")
-    ) as env:
+def test_ansi_render_labels_child_output():
+    with closing(make_parallel_env(2, provider=ScriptedProvider(), render_mode="ansi")) as env:
         env.reset(seed=10)
         rendered = env.render()
         assert rendered.startswith("[player_0]\n")
         assert "[player_1]\n" in rendered
-        assert rendered.count("Badly-paved road") == 2
+        assert rendered.count("Dally Lane") == 2
 
 
-def test_human_render_prints_labeled_child_output(wasm_runtime, capsys):
-    with closing(
-        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), render_mode="human")
-    ) as env:
+def test_human_render_prints_labeled_child_output(capsys):
+    with closing(make_parallel_env(2, provider=ScriptedProvider(), render_mode="human")) as env:
         env.reset(seed=10)
         capsys.readouterr()
         assert env.render() is None
         captured = capsys.readouterr()
         assert captured.out.startswith("[player_0]\n")
         assert "[player_1]\n" in captured.out
-        assert captured.out.count("Badly-paved road") == 2
+        assert captured.out.count("Dally Lane") == 2
 
 
 @pytest.mark.parametrize("preset", ["text", "parsed"])
@@ -73,8 +69,8 @@ def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, p
         assert not any(truncates.values())
 
 
-def test_parallel_step_requires_an_action_for_every_live_agent(wasm_runtime):
-    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+def test_parallel_step_requires_an_action_for_every_live_agent():
+    with closing(make_parallel_env(2, provider=ScriptedProvider())) as env:
         env.reset(seed=10)
         with pytest.raises(KeyError, match="player_1"):
             env.step({"player_0": "look"})
@@ -95,11 +91,14 @@ def test_invalid_parallel_action_does_not_partially_step(action):
     ticks = []
     with closing(make_parallel_env(2, provider=ScriptedProvider(), world_ticker=lambda: ticks.append("tick"))) as env:
         env.reset()
+        connections = [child.session.connection for child in env.envs.values()]
+        sent_before = [list(connection.send_calls) for connection in connections]
 
         with pytest.raises(ValueError, match="Invalid action"):
             env.step({"player_0": "look", "player_1": action})
 
         assert ticks == []
+        assert [connection.send_calls for connection in connections] == sent_before
         assert all(child.step_count == 0 for child in env.envs.values())
         assert all(child.session.pending_command is None for child in env.envs.values())
         assert all(not child.session.connection.pending_lines for child in env.envs.values())
@@ -112,16 +111,18 @@ def test_invalid_parallel_action_does_not_partially_step(action):
         assert all(child.session.pending_command is None for child in env.envs.values())
 
 
-def test_parallel_step_uses_only_live_agent_keys(wasm_runtime):
-    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
-        env.reset(seed=10)
+def test_parallel_step_uses_only_live_agent_keys():
+    with closing(make_parallel_env(2, provider=ScriptedProvider())) as env:
+        env.reset()
 
-        obs, _, terminates, truncates, infos = env.step({"player_0": "look", "player_1": "dance", "player_2": "bow"})
+        obs, rewards, terminates, truncates, infos = env.step(
+            {"player_0": "look", "player_1": "dance", "player_2": "bow"}
+        )
 
-        assert set(obs) == {"player_0", "player_1"}
-        assert set(infos) == {"player_0", "player_1"}
-        assert "Badly-paved road" in obs["player_0"]["text"]
-        assert "dance" in obs["player_1"]["text"].lower()
+        for result in (obs, rewards, terminates, truncates, infos):
+            assert set(result) == {"player_0", "player_1"}
+        assert infos["player_0"]["transport"]["sent_lines"] == ["look", "sql,fes,fex,fei"]
+        assert infos["player_1"]["transport"]["sent_lines"] == ["dance", "sql,fes,fex,fei"]
         assert not any(terminates.values()) and not any(truncates.values())
 
 
@@ -143,8 +144,8 @@ def test_step_removes_terminated_and_truncated_agents(wasm_runtime):
         assert truncates == {"player_2": False}
 
 
-def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces(wasm_runtime):
-    with closing(make_parallel_env(3, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces():
+    with closing(make_parallel_env(3, provider=ScriptedProvider())) as env:
         env.reset(seed=17)
         assert [child.np_random_seed for child in env.envs.values()] == [17, 18, 19]
         actions = [child.action_space.sample() for child in env.envs.values()]
@@ -243,7 +244,7 @@ def test_coordinated_reset_stops_on_failure_and_can_retry(phase, command, capsys
         assert any(phase in note for note in failure.__notes__)
         assert capsys.readouterr().out == ""
         assert all(connection.invalidated and not connection.pending_lines for connection in provider.connections)
-        sent = [line for connection in provider.connections for batch in connection.sent_lines for line in batch]
+        sent = [line for connection in provider.connections for line in connection.send_calls]
         if phase == "preparation":
             assert "move north" not in sent
         if phase in {"preparation", "entry"}:

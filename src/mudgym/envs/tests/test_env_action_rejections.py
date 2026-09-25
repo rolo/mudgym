@@ -1,7 +1,8 @@
-import numpy as np
+from contextlib import closing
 
 from mudgym.connections.recording import RecordingConnection, ReplayConnection
 from mudgym.envs.factory import make_env
+from mudgym.envs.tests.assertions import assert_observations_equal
 from tests.scripted import (
     OK_RESPONSE,
     PROMPT,
@@ -24,15 +25,6 @@ def rejected_response(action: str = ACTION, *, preceding_output: bytes = b""):
         + scripted_response([OBSERVATION_COMMAND_LINE])
     )
     return raw_bytes, False, False, {"rejected": True}
-
-
-def assert_observations_equal(actual, expected):
-    assert set(actual) == set(expected)
-    for key, value in expected.items():
-        if isinstance(value, np.ndarray):
-            assert np.array_equal(actual[key], value), key
-        else:
-            assert actual[key] == value, key
 
 
 def test_rejected_action_keeps_structured_observation(scripted_env_factory):
@@ -78,22 +70,22 @@ def test_output_before_a_compound_player_command_rejection_survives_observation(
 def test_rejected_env_step_records_and_replays_identically(tmp_path):
     capture_path = tmp_path / "rejected-step.jsonl"
     live_connection = ScriptedConnection(responses={ACTION: rejected_response()})
-    env = make_env(
-        observation="parsed",
-        render_mode="ansi",
-        connection=RecordingConnection(live_connection, capture_path),
-    )
-    env.reset()
-    expected = env.step(ACTION)
-    expected_render = env.render()
-    env.close()
+    with closing(
+        make_env(
+            observation="parsed",
+            render_mode="ansi",
+            connection=RecordingConnection(live_connection, capture_path),
+        )
+    ) as env:
+        env.reset()
+        expected = env.step(ACTION)
+        expected_render = env.render()
 
     replay_connection = ReplayConnection(capture_path)
-    replay_env = make_env(observation="parsed", render_mode="ansi", connection=replay_connection)
-    replay_env.reset()
-    actual = replay_env.step(ACTION)
-    actual_render = replay_env.render()
-    replay_env.close()
+    with closing(make_env(observation="parsed", render_mode="ansi", connection=replay_connection)) as env:
+        env.reset()
+        actual = env.step(ACTION)
+        actual_render = env.render()
 
     assert_observations_equal(actual[0], expected[0])
     assert actual[1:4] == expected[1:4]

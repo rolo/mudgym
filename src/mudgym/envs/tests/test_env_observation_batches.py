@@ -10,7 +10,7 @@ from mudgym.envs.fields import (
     RawBytesField,
     SuperQuickLookField,
 )
-from tests.scripted import ScriptedConnection, make_scripted_env
+from tests.scripted import ScriptedConnection
 
 PROMPT = b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
 
@@ -109,25 +109,13 @@ def test_incomplete_response_keeps_field_output_as_text(scripted_env_factory, ra
 def test_default_observation_batch_parses_fields_and_hides_inventory_divider(scripted_env_factory):
     env = scripted_env_factory(observation="parsed")
     env.reset()
-    obs = env.step("look")[0]
+    obs, _, terminated, truncated, _ = env.step("look")
     connection = env.unwrapped.session.connection
 
+    assert (terminated, truncated) == (False, False)
     assert connection.sent_lines[-1] == ["look", "sql,fes,fex,fei"]
     assert obs["available_exits"].sum() == 8
     assert "========" not in obs["text"]
-
-
-def test_text_mode_keeps_tracked_points_without_a_score_probe(scripted_env_factory):
-    env = scripted_env_factory(observation="text")
-    env.reset()
-    obs = env.step("look")[0]
-    connection = env.unwrapped.session.connection
-
-    assert env.unwrapped.session.observation_line == ""
-    assert connection.sent_lines[-1] == ["look"]
-    assert set(obs) == {"text", "points"}
-    assert obs["points"] == 200
-    assert "75 75" not in obs["text"]
 
 
 def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
@@ -148,68 +136,75 @@ def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
         env.close()
 
 
+@pytest.mark.parametrize("field_parsers", [[FEScoreField, FEXitsField], [FEScoreField, FEXitsField, RawBytesField]])
+def test_observation_fields_do_not_require_a_final_marker(scripted_env_factory, field_parsers):
+    env = scripted_env_factory(field_parsers=field_parsers)
+    env.reset()
+    obs, _, terminated, truncated, _ = env.step("look")
+
+    assert env.session.observation_line == "fes,fex"
+    assert obs["available_exits"].sum() == 8
+    assert obs["vitals"].size == 8
+    assert (terminated, truncated) == (False, False)
+
+
 @pytest.mark.parametrize(
-    "field_parsers",
+    ("field_parsers", "observation_line", "room_key", "room_value"),
     [
-        [MGCheatsField],
-        [FEScoreField],
-        [
-            SuperQuickLookField(
-                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
-            ),
-            FEScoreField,
-            FEXitsField,
-            FEInventoryField,
-        ],
+        pytest.param(
+            [
+                FEXitsField,
+                FEScoreField,
+                SuperQuickLookField(
+                    include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
+                ),
+                FEInventoryField,
+            ],
+            "fex,fes,sql,fei",
+            "room_name",
+            "dally lane",
+            id="exits-first",
+        ),
+        pytest.param(
+            [
+                SuperQuickLookField(
+                    include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
+                ),
+                FEXitsField,
+                FEInventoryField,
+                FEScoreField,
+            ],
+            "sql,fex,fei,fes",
+            "room_name",
+            "dally lane",
+            id="score-last",
+        ),
+        pytest.param(
+            [FEScoreField, FEXitsField, FEInventoryField, MGCheatsField],
+            "fes,fex,fei,mgcheats",
+            "room_id",
+            "groad3",
+            id="cheats-last",
+        ),
     ],
 )
-def test_tearoom_exit_uses_the_quickscore_points(field_parsers):
-    env = make_scripted_env(field_parsers=field_parsers)
-    try:
-        obs, _ = env.reset()
-        connection = env.unwrapped.session.connection
-
-        assert env.unwrapped.points == 200
-        assert "75 75 52 52" not in obs["text"]
-        assert connection.sent_lines == [["qs"], ["move north"], [env.unwrapped.session.observation_line]]
-
-        env.step("look")
-        assert connection.sent_lines[-1] == ["look", env.unwrapped.session.observation_line]
-    finally:
-        env.close()
-
-
-@pytest.mark.parametrize("field_parsers", [[FEScoreField, FEXitsField], [FEScoreField, FEXitsField, RawBytesField]])
-def test_observation_fields_do_not_require_a_final_marker(field_parsers):
-    env = make_scripted_env(field_parsers=field_parsers)
-    try:
-        env.reset()
-        obs, _, terminated, truncated, _ = env.step("look")
-        assert env.session.observation_line == "fes,fex"
-        assert obs["available_exits"].sum() == 8
-        assert obs["vitals"].size == 8
-        assert not terminated and not truncated
-    finally:
-        env.close()
-
-
-def test_field_order_drives_observation_command_order_and_claiming():
-    env = make_scripted_env(
-        field_parsers=[
-            FEXitsField,
-            FEScoreField,
-            SuperQuickLookField(
-                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
-            ),
-            FEInventoryField,
-        ]
-    )
+def test_field_order_controls_commands_and_response_claiming(
+    scripted_env_factory, field_parsers, observation_line, room_key, room_value
+):
+    env = scripted_env_factory(field_parsers=field_parsers)
     env.reset()
-    obs, _, _, _, _ = env.step("look")
+    obs, _, terminated, truncated, _ = env.step("look")
 
-    assert env.unwrapped.session.observation_line == "fex,fes,sql,fei"
-    assert obs["room_name"] == "dally lane"
+    assert env.session.observation_line == observation_line
+    assert env.session.connection.sent_lines[-1] == ["look", observation_line]
+    assert (terminated, truncated) == (False, False)
+    assert obs["points"] == 200
+    assert obs["vitals"][0] == 75
     assert obs["available_exits"].sum() == 8
+    assert obs[room_key] == room_value
+    assert "ticks" not in obs
+    assert "========" not in obs["text"]
+    assert "[/mgcheats]" not in obs["text"]
 
 
 def test_reordered_fields_extract_from_the_live_game(live_env_factory):
@@ -230,37 +225,18 @@ def test_reordered_fields_extract_from_the_live_game(live_env_factory):
     assert obs["vitals"].sum() > 0
 
 
-def test_fes_parses_correctly_when_listed_last():
-    env = make_scripted_env(
-        field_parsers=[
-            SuperQuickLookField(
-                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
-            ),
-            FEXitsField,
-            FEInventoryField,
-            FEScoreField,
-        ]
-    )
+def test_speech_keeps_narrative_and_populates_observation_fields(scripted_env_factory):
+    env = scripted_env_factory()
     env.reset()
-    obs = env.step("look")[0]
+
+    obs, _reward, terminated, truncated, _info = env.step("say hello")
+
+    assert truncated is False
+    assert terminated is False
     connection = env.unwrapped.session.connection
-
-    assert env.unwrapped.session.observation_line == "sql,fex,fei,fes"
-    assert connection.sent_lines[-1] == ["look", "sql,fex,fei,fes"]
-    assert obs["points"] == 200
-    assert obs["vitals"][0] == 75
-    assert obs["room_name"] == "dally lane"
-    assert "========" not in obs["text"]
-
-
-def test_mgcheats_parses_correctly_when_listed_last():
-    env = make_scripted_env(field_parsers=[FEScoreField, FEXitsField, FEInventoryField, MGCheatsField])
-    env.reset()
-    obs = env.step("look")[0]
-    connection = env.unwrapped.session.connection
-
-    assert env.unwrapped.session.observation_line == "fes,fex,fei,mgcheats"
-    assert connection.sent_lines[-1] == ["look", "fes,fex,fei,mgcheats"]
-    assert obs["room_id"] == "groad3"
-    assert "ticks" not in obs
-    assert "[/mgcheats]" not in obs["text"]
+    assert connection.sent_lines[-1] == ["say hello", "sql,fes,fex,fei"]
+    # the auto command responses were claimed into fields, not swallowed into the speech
+    assert obs["available_exits"].sum() == 8
+    assert "say hello" not in obs["text"]
+    assert "sql,fes,fex,fei" not in obs["text"]
+    assert 'says "hello"' in obs["text"]

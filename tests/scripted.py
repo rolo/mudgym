@@ -129,6 +129,7 @@ class ScriptedConnection(MudConnection):
         self.responses = dict(responses or {})
         self.send_errors = dict(send_errors or {})
         self.sent_lines: list[list[str]] = []
+        self.send_calls: list[str] = []
         self.pending_lines: list[str] = []
         self.entered_land = False
         self.invalidated = False
@@ -141,6 +142,7 @@ class ScriptedConnection(MudConnection):
         self.closed = False
 
     def send_line(self, line: str) -> None:
+        self.send_calls.append(line)
         if error := self.send_errors.get(line):
             raise error
         self.pending_lines.append(line)
@@ -199,12 +201,12 @@ class ScriptedProvider:
     def __init__(self, *, returned_count: int | None = None):
         self.returned_count = returned_count
         self.connections: list[ScriptedConnection] = []
-        self.requested_count: int | None = None
+        self.requested_counts: list[int] = []
         self.reset_seeds: list[int | list[int | None] | None] = []
         self.closed = False
 
     def create_connections(self, count: int) -> list[MudConnection]:
-        self.requested_count = count
+        self.requested_counts.append(count)
         returned_count = count if self.returned_count is None else self.returned_count
         self.connections = [ScriptedConnection() for _ in range(returned_count)]
         return list(self.connections)

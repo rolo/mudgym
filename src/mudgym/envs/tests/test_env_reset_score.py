@@ -1,6 +1,6 @@
 import pytest
 
-from mudgym.envs.fields import FEInventoryField
+from mudgym.envs.fields import FEInventoryField, FEScoreField, FEXitsField, MGCheatsField, SuperQuickLookField
 from tests.scripted import FES_RESPONSE, TEAROOM_EXIT_TEXT, ScriptedConnection, scripted_response
 
 
@@ -186,3 +186,31 @@ def test_separate_entry_and_fields_preserve_a_live_capture(scripted_env_factory)
     assert obs["portables"] == ()
     assert obs["inventory"] == ()
     assert env.observation_space.contains(obs)
+
+
+@pytest.mark.parametrize(
+    "field_parsers",
+    [
+        [MGCheatsField],
+        [FEScoreField],
+        [
+            SuperQuickLookField(
+                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
+            ),
+            FEScoreField,
+            FEXitsField,
+            FEInventoryField,
+        ],
+    ],
+)
+def test_tearoom_exit_uses_the_quickscore_points(scripted_env_factory, field_parsers):
+    env = scripted_env_factory(field_parsers=field_parsers)
+    obs, _ = env.reset()
+    connection = env.unwrapped.session.connection
+
+    assert env.unwrapped.points == 200
+    assert "75 75 52 52" not in obs["text"]
+    assert connection.sent_lines == [["qs"], ["move north"], [env.unwrapped.session.observation_line]]
+
+    env.step("look")
+    assert connection.sent_lines[-1] == ["look", env.unwrapped.session.observation_line]

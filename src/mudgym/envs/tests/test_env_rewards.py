@@ -120,14 +120,7 @@ def test_points_pattern_spoken_in_game_output_forges_no_reward(scripted_env_fact
     # nor the spoken output of a points-shaped message counts as an event. Speech batches go out
     # on two wire lines, hence the two echoes in the canned bytes.
     speech_body = b'\x1b[0;33;40mDumbo the novice says "\x1b[1;33;40mhello (+10 = 10)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
-    raw_bytes = (
-        b"say hello (+10 = 10)\r\n"
-        + speech_body
-        + PROMPT
-        + b"sql,fes,fex,fei\r\n"
-        + PROMPT.join(OBSERVATION_COMMAND_RESPONSES[command] for command in ["sql", "fes", "fex", "fei"])
-        + PROMPT
-    )
+    raw_bytes = scripted_step_bytes("say hello (+10 = 10)", speech_body)
     env = scripted_env_factory(responses={"say hello (+10 = 10)": raw_bytes})
     env.reset()
 

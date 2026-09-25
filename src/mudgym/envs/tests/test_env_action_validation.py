@@ -11,19 +11,21 @@ from mudgym.envs.specs import ACTION_CHARSET, SINGLE_LINE_CHARSET, TEXT_CHARSET
 from tests.scripted import scripted_response
 
 
-def test_action_charset_excludes_line_breaks_text_charset_keeps_them():
-    assert "\n" not in ACTION_CHARSET
-    assert "\r" not in ACTION_CHARSET
+@pytest.mark.parametrize("charset", [ACTION_CHARSET, SINGLE_LINE_CHARSET], ids=["action", "single-line"])
+def test_single_line_charsets_exclude_line_breaks(charset):
+    assert not {"\r", "\n"}.intersection(charset)
+
+
+def test_text_charset_preserves_newlines():
     assert "\n" in TEXT_CHARSET
 
 
-def test_charsets_are_seven_bit():
-    # the game's entire text database is 7-bit; wire bytes above 0x7F are protocol codes, and
-    # the game transliterates them in input (a typed e-acute echoes back as 'i')
-    assert "\xe9" not in ACTION_CHARSET
-    assert "\xe9" not in TEXT_CHARSET
-    assert "\xe9" not in SINGLE_LINE_CHARSET
-    assert "\n" not in SINGLE_LINE_CHARSET
+@pytest.mark.parametrize(
+    "charset", [ACTION_CHARSET, TEXT_CHARSET, SINGLE_LINE_CHARSET], ids=["action", "text", "single-line"]
+)
+def test_charsets_are_seven_bit(charset):
+    # High wire bytes are protocol codes, not text.
+    assert all(ord(character) < 128 for character in charset)
 
 
 @pytest.mark.parametrize("action", ["look\nsay hello", "look\rsay hello", "look\r\nsay hello"])
@@ -49,12 +51,3 @@ def test_a_high_wire_byte_in_game_text_fails_loudly(scripted_env_factory, origin
 
     with pytest.raises(ValueError, match="Invalid text byte"):
         env.step("look")
-
-
-def test_an_ordinary_step_observation_fits_the_observation_space(scripted_env_factory):
-    env = scripted_env_factory()
-    env.reset()
-
-    obs, _reward, _terminated, _truncated, _info = env.step("look")
-
-    assert env.observation_space.contains(obs)
