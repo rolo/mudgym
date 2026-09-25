@@ -1,6 +1,6 @@
 import numpy as np
 
-from mudgym.db.index import room_name_to_index, weather_count
+from mudgym.db.index import WEATHER_COUNT, room_id_to_index, room_name_to_index
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.db.rooms import ROOM_NAMES
 
@@ -36,7 +36,7 @@ def assert_common_observation_is_valid(obs, subtests):
 
     with subtests.test(msg="weather_index"):
         assert isinstance(obs["weather_index"], (int, np.integer))
-        assert 0 <= obs["weather_index"] <= weather_count
+        assert 0 <= obs["weather_index"] <= WEATHER_COUNT
 
 
 def assert_parsed_observation_is_valid(obs, subtests):
@@ -74,6 +74,7 @@ def assert_cheats_observation_is_valid(obs, subtests):
 
     with subtests.test(msg="room_id_index"):
         assert "room_id_index" in obs
+        assert obs["room_id_index"] == room_id_to_index(obs["room_id"])
 
     with subtests.test(msg="room_name"):
         assert obs["room_name"] != "" and obs["room_name"] in ROOM_NAMES

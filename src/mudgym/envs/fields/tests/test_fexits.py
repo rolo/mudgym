@@ -3,7 +3,7 @@ import pytest
 from gymnasium import spaces as gym_spaces
 
 from mudgym.db.directions import DIRECTIONS
-from mudgym.db.index import direction_count, direction_to_bit
+from mudgym.db.index import DIRECTION_COUNT
 from mudgym.envs.fields.fexits import FEXitsField
 from mudgym.envs.specs import BIT_DTYPE
 
@@ -23,26 +23,26 @@ def test_matches_valid_line():
     assert obs["available_exit_names"] == tuple(direction for direction in DIRECTIONS if direction in expected)
 
     for direction in expected:
-        assert obs["available_exits"][direction_to_bit(direction)] == 1
+        assert obs["available_exits"][DIRECTIONS.index(direction)] == 1
 
     for direction in ("east", "north", "south"):
-        assert obs["available_exits"][direction_to_bit(direction)] == 0
+        assert obs["available_exits"][DIRECTIONS.index(direction)] == 0
 
 
 def test_single_exit():
     obs = FEXitsField().extract([b"north"])
 
     assert obs["available_exit_names"] == ("north",)
-    assert obs["available_exits"][direction_to_bit("north")] == 1
+    assert obs["available_exits"][DIRECTIONS.index("north")] == 1
     assert np.sum(obs["available_exits"]) == 1
 
 
 def test_available_exits_is_a_gymnasium_action_mask():
     obs = FEXitsField().extract([b"north"])
-    action_space = gym_spaces.Discrete(direction_count)
+    action_space = gym_spaces.Discrete(DIRECTION_COUNT)
 
     assert obs["available_exits"].dtype == np.dtype(np.int8)
-    assert action_space.sample(mask=obs["available_exits"]) == direction_to_bit("north")
+    assert action_space.sample(mask=obs["available_exits"]) == DIRECTIONS.index("north")
 
 
 def test_all_exits():
@@ -65,8 +65,8 @@ def test_fex_direction_names_project_into_game_exit_order():
     )
 
     assert obs["available_exit_names"] == tuple(DIRECTIONS)
-    assert obs["available_exits"][direction_to_bit("over")] == 1
-    assert obs["available_exits"][direction_to_bit("swampward")] == 1
+    assert obs["available_exits"][DIRECTIONS.index("over")] == 1
+    assert obs["available_exits"][DIRECTIONS.index("swampward")] == 1
 
 
 @pytest.mark.parametrize(
@@ -120,7 +120,7 @@ def test_empty_returns_valid_defaults():
     defaults = FEXitsField().empty()
 
     assert defaults["available_exits"].dtype == BIT_DTYPE
-    assert len(defaults["available_exits"]) == direction_count
+    assert len(defaults["available_exits"]) == DIRECTION_COUNT
     assert np.all(defaults["available_exits"] == 1)
     assert defaults["available_exit_names"] == tuple(DIRECTIONS)
 

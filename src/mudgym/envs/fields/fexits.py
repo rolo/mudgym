@@ -6,7 +6,7 @@ import numpy as np
 from gymnasium import spaces
 
 from mudgym.db.directions import DIRECTION_INDEX_BY_NAME, DIRECTIONS
-from mudgym.db.index import direction_count
+from mudgym.db.index import DIRECTION_COUNT
 from mudgym.envs.specs import BIT_DTYPE, IDENTIFIER_CHARSET
 
 from .field import ObservationField
@@ -17,7 +17,7 @@ MAX_DIRECTION_LENGTH = max(len(direction) for direction in DIRECTIONS)
 def all_exits() -> dict[str, Any]:
     """All directions available - the default when no exits line is recognised."""
     return {
-        "available_exits": np.ones(direction_count, dtype=BIT_DTYPE),
+        "available_exits": np.ones(DIRECTION_COUNT, dtype=BIT_DTYPE),
         "available_exit_names": tuple(DIRECTIONS),
     }
 
@@ -42,7 +42,7 @@ class FEXitsField(ObservationField):
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {
-            "available_exits": spaces.MultiBinary(direction_count),
+            "available_exits": spaces.MultiBinary(DIRECTION_COUNT),
             "available_exit_names": spaces.Sequence(
                 spaces.Text(
                     max_length=MAX_DIRECTION_LENGTH,
@@ -65,7 +65,7 @@ class FEXitsField(ObservationField):
         return any(self.REGEX.match(line) for line in lines)
 
     def exits_to_vector(self, exit_names: Sequence[str]) -> np.ndarray:
-        vector = np.zeros(direction_count, dtype=BIT_DTYPE)
+        vector = np.zeros(DIRECTION_COUNT, dtype=BIT_DTYPE)
         for d in exit_names:
             try:
                 vector[DIRECTION_INDEX_BY_NAME[d]] = 1

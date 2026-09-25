@@ -34,7 +34,7 @@ print(show_ansi(Path("docs/recordings/actions-text.ansi").read_bytes()).data)
 `Discrete(14)` mapped onto `move <direction>` commands in the game's canonical exit order.
 
 ```python exec="true"
-from mudgym.actions import DIRECTIONS
+from mudgym.db.directions import DIRECTIONS
 
 print("| Index | Command |")
 print("|---|---|")
@@ -48,7 +48,7 @@ for index, direction in enumerate(DIRECTIONS):
 import numpy as np
 
 from mudgym import make_env
-from mudgym.actions import DIRECTIONS
+from mudgym.db.directions import DIRECTIONS
 
 rng = np.random.default_rng(1)
 env = make_env(observation="parsed", actions="directions")

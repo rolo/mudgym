@@ -1,6 +1,6 @@
 import pytest
 
-from mudgym.db.index import room_name_to_index
+from mudgym.db.index import UNKNOWN, room_id_to_index, room_name_to_index
 from mudgym.envs.fields.mgcheats import MGCheatsField
 
 MGCHEATS_BEATEN_TRACK = (
@@ -9,23 +9,57 @@ MGCHEATS_BEATEN_TRACK = (
 )
 
 
-def test_cheats_includes_room_id():
+def test_cheats_uses_shared_room_indices():
     raw = (
         b"[mgcheats]room_id=groad1; room_name=dally lane; fighting=0; dark=0; "
         b"glowing=0; asleep=0; gifted=0; here=[]; ticks=0[/mgcheats]"
     )
 
-    out = MGCheatsField().extract([raw])
+    obs = MGCheatsField().extract([raw])
 
-    assert out["room_name"] == "dally lane"
-    assert out["room_id"] == "groad1"
+    assert obs["room_name"] == "dally lane"
+    assert obs["room_id"] == "groad1"
+    assert obs["room_id_index"] == room_id_to_index(obs["room_id"])
+    assert obs["room_name_index"] == room_name_to_index(obs["room_name"])
+
+
+@pytest.mark.parametrize(
+    ("room_id", "room_name", "index_key"),
+    [
+        pytest.param("abcell", "abbot's cell", "room_id_index", id="first-room-id"),
+        pytest.param("monch", "abbatial church", "room_name_index", id="first-room-name"),
+    ],
+)
+def test_first_room_index_is_one(room_id, room_name, index_key):
+    raw = MGCHEATS_BEATEN_TRACK.replace(b"mtrack2", room_id.encode())
+    raw = raw.replace(b"beaten track", room_name.encode())
+    field = MGCheatsField()
+
+    obs = field.extract([raw])
+
+    assert obs[index_key] == 1
+    assert field.full_space()["room_id_index"].contains(obs["room_id_index"])
+    assert field.full_space()["room_name_index"].contains(obs["room_name_index"])
+
+
+@pytest.mark.parametrize(("original", "key"), [(b"mtrack2", "room_id"), (b"beaten track", "room_name")])
+@pytest.mark.parametrize("value", [b"notknown", b""], ids=["notknown", "empty"])
+def test_unknown_or_empty_rooms_fail_loudly(original, key, value):
+    raw = MGCHEATS_BEATEN_TRACK.replace(original, value)
+
+    with pytest.raises(ValueError, match=f"mgcheats {key}={value.decode()!r} is not a known room") as error:
+        MGCheatsField().extract([raw])
+
+    assert isinstance(error.value.__cause__, ValueError)
 
 
 def test_missing_mgcheats_returns_empty_defaults():
     """When mgcheats is missing (e.g., episode ended), return the empty defaults."""
     out = MGCheatsField().extract([b""])
-    assert out["room_id"] == ""
-    assert out["room_name"] == ""
+    assert out["room_id"] == UNKNOWN
+    assert out["room_name"] == UNKNOWN
+    assert out["room_id_index"] == 0
+    assert out["room_name_index"] == 0
     assert out["here"] == ()
 
 

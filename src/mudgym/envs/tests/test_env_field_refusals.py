@@ -1,5 +1,6 @@
 import pytest
 
+from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES
 from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 
@@ -19,7 +20,7 @@ def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_en
     )
 
     # sql was refused: its keys stay at the empty defaults
-    assert obs["room_name"] == ""
+    assert obs["room_name"] == UNKNOWN
 
     # the other observation commands answered normally and still extract
     assert obs["available_exits"].sum() == 13
@@ -48,7 +49,7 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     )
 
     # sql was refused: its keys stay at the empty defaults
-    assert obs["room_name"] == ""
+    assert obs["room_name"] == UNKNOWN
     assert field_refusals == {"SuperQuickLookField": b"You can't see a thing, you're blind.\r\n"}
 
     # fes answered normally and still extracts

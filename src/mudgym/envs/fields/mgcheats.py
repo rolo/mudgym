@@ -4,13 +4,7 @@ from typing import Any
 
 from gymnasium import spaces
 
-from mudgym.db.index import (
-    indexed_discrete_size,
-    room_id_count,
-    room_id_to_index,
-    room_name_count,
-    room_name_to_index,
-)
+from mudgym.db.index import ROOM_ID_COUNT, ROOM_NAME_COUNT, UNKNOWN, room_id_to_index, room_name_to_index
 from mudgym.envs.specs import (
     BIT_DTYPE,
     IDENTIFIER_CHARSET,
@@ -32,6 +26,8 @@ class MGCheatsField(ObservationField):
     """
     Reads the mgcheats block.
 
+    Missing data uses index 0. Supplied room values must be recognised.
+
     Sample game response:
     `[mgcheats]room_id=mtrack1; room_name=beaten track near cliff; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; here=[rain, cliff, road]; inventory=[][/mgcheats]`
     """
@@ -43,9 +39,9 @@ class MGCheatsField(ObservationField):
     def full_space(self) -> dict[str, spaces.Space]:
         return {
             "room_id": spaces.Text(max_length=ROOM_ID_MAX_LENGTH, min_length=0, charset=IDENTIFIER_CHARSET),
-            "room_id_index": spaces.Discrete(indexed_discrete_size(room_id_count)),
+            "room_id_index": spaces.Discrete(ROOM_ID_COUNT + 1),
             "room_name": spaces.Text(max_length=ROOM_NAME_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "room_name_index": spaces.Discrete(indexed_discrete_size(room_name_count)),
+            "room_name_index": spaces.Discrete(ROOM_NAME_COUNT + 1),
             "fighting": spaces.Discrete(2, dtype=BIT_DTYPE),
             "dark": spaces.Discrete(2, dtype=BIT_DTYPE),
             "glowing": spaces.Discrete(2, dtype=BIT_DTYPE),
@@ -56,9 +52,9 @@ class MGCheatsField(ObservationField):
 
     def full_empty(self) -> dict[str, Any]:
         return {
-            "room_id": "",
+            "room_id": UNKNOWN,
             "room_id_index": INDEX_DTYPE(0),
-            "room_name": "",
+            "room_name": UNKNOWN,
             "room_name_index": INDEX_DTYPE(0),
             **{k: BIT_DTYPE(0) for k in self.BIT_KEYS},
             "here": (),
@@ -87,6 +83,14 @@ class MGCheatsField(ObservationField):
 
         room_id = parsed["room_id"].lower()
         room_name = parsed["room_name"].lower()
+        try:
+            room_id_index = room_id_to_index(room_id)
+        except ValueError as error:
+            raise ValueError(f"mgcheats room_id={room_id!r} is not a known room") from error
+        try:
+            room_name_index = room_name_to_index(room_name)
+        except ValueError as error:
+            raise ValueError(f"mgcheats room_name={room_name!r} is not a known room") from error
         bits = {}
         for key in self.BIT_KEYS:
             value = parsed[key]
@@ -100,9 +104,9 @@ class MGCheatsField(ObservationField):
 
         return {
             "room_id": room_id,
-            "room_id_index": INDEX_DTYPE(room_id_to_index(room_id) if room_id else 0),
+            "room_id_index": INDEX_DTYPE(room_id_index),
             "room_name": room_name,
-            "room_name_index": INDEX_DTYPE(room_name_to_index(room_name) if room_name else 0),
+            "room_name_index": INDEX_DTYPE(room_name_index),
             **bits,
             "here": tuple(inner.split(", ")) if inner else (),
         }

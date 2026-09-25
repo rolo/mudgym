@@ -90,8 +90,7 @@ def test_fes_does_not_extract_points_beyond_the_integer_range():
     assert "points" not in field.extract([response])
 
 
-# Index keys are 1-based with 0 reserved for unknown, so the last member of each collection lands
-# on index len(collection) and needs a Discrete space of len + 1 slots (see db.index).
+# Room and weather indices reserve 0 for missing observations, so their spaces need len(collection) + 1 slots.
 BLIZZARD_FES_RESPONSE = b"58 58 61 61 61 61 0 58 0200 N N N N 53 B"
 
 
@@ -110,14 +109,22 @@ def test_superquicklook_last_room_name_is_inside_its_space():
     assert field.full_space()["room_name_index"].contains(obs["room_name_index"])
 
 
-def test_mgcheats_last_room_is_inside_its_space():
+@pytest.mark.parametrize(
+    ("room_id", "room_name", "index_key", "expected_index"),
+    [
+        pytest.param("wthstp", "weathered steps", "room_id_index", len(ROOM_IDS), id="last-room-id"),
+        pytest.param("mzroom", "zombie room", "room_name_index", len(ROOM_NAMES), id="last-room-name"),
+    ],
+)
+def test_mgcheats_last_room_is_inside_its_space(room_id, room_name, index_key, expected_index):
     field = MGCheatsField()
     payload = (
-        f"[mgcheats]room_id={ROOM_IDS[-1]}; room_name={ROOM_NAMES[-1]}; fighting=0; dark=0; "
+        f"[mgcheats]room_id={room_id}; room_name={room_name}; fighting=0; dark=0; "
         f"glowing=0; asleep=0; gifted=0; here=[]; ticks=125; inventory=[][/mgcheats]"
     ).encode("latin-1")
     obs = field.full_extract([payload])
-    assert obs["room_id"] == ROOM_IDS[-1]
-    assert obs["room_name"] == ROOM_NAMES[-1]
+    assert obs["room_id"] == room_id
+    assert obs["room_name"] == room_name
+    assert obs[index_key] == expected_index
     assert field.full_space()["room_id_index"].contains(obs["room_id_index"])
     assert field.full_space()["room_name_index"].contains(obs["room_name_index"])

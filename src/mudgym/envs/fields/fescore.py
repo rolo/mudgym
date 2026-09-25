@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 
-from mudgym.db.index import indexed_discrete_size, weather_count, weather_to_index
+from mudgym.db.index import UNKNOWN, WEATHER_COUNT, weather_to_index
 from mudgym.db.weather import WEATHER_CODE_TO_NAME
 from mudgym.envs.specs import BIT_DTYPE, INDEX_DTYPE, INT_DTYPE, SINGLE_LINE_CHARSET
 
@@ -53,17 +53,16 @@ class FEScoreField(ObservationField):
             "flags": spaces.MultiBinary(4),
             "reset_minutes": spaces.Box(low=0, high=MAX_RESET_MINUTES, shape=(), dtype=INT_DTYPE),
             "weather": spaces.Text(max_length=16, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "weather_index": spaces.Discrete(indexed_discrete_size(weather_count)),
+            "weather_index": spaces.Discrete(WEATHER_COUNT + 1),
         }
 
     def full_empty(self) -> dict[str, Any]:
-        default_weather = "unknown"
         return {
             "vitals": np.zeros(8, dtype=INT_DTYPE),
             "flags": np.zeros(4, dtype=BIT_DTYPE),
             "reset_minutes": INT_DTYPE(0),
-            "weather": default_weather,
-            "weather_index": INDEX_DTYPE(weather_to_index(default_weather)),
+            "weather": UNKNOWN,
+            "weather_index": INDEX_DTYPE(0),
         }
 
     def matches(self, chunk: bytes) -> bool:
@@ -75,7 +74,7 @@ class FEScoreField(ObservationField):
         if match is None:
             return self.full_empty()
 
-        weather_name = WEATHER_CODE_TO_NAME.get(match.group("weather"), "unknown")
+        weather_name = WEATHER_CODE_TO_NAME[match.group("weather")]
 
         vitals = np.array(
             [

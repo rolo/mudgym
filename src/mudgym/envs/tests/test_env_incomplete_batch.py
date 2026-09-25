@@ -1,5 +1,7 @@
 import pytest
 
+from mudgym.db.index import UNKNOWN
+
 # seagull death jump off cliff captured with no trailing prompt (the episode terminates).
 SEAGULL_DEATH_BYTES = (
     b"You are splattered over a very large area, or at least most of you is. "
@@ -33,7 +35,7 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
     )
 
     # without observation responses the fields stay at their empty defaults
-    assert obs["room_name"] == ""
+    assert obs["room_name"] == UNKNOWN
     assert obs["here"] == ()
     assert obs["points"] == 0
 
@@ -56,5 +58,5 @@ def test_incomplete_window_carries_the_current_score(scripted_env_factory):
     assert truncated is True
     assert info["action_rejected"] is True
     # the other fields have nothing to report, but the score is still known
-    assert obs["room_name"] == ""
+    assert obs["room_name"] == UNKNOWN
     assert obs["points"] == 200

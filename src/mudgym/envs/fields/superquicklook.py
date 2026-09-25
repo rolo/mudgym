@@ -5,7 +5,7 @@ from typing import Any
 from gymnasium import spaces
 
 from mudgym.connections.prompts import SGR_ONE_PLUS_STR
-from mudgym.db.index import indexed_discrete_size, room_name_count, room_name_to_index
+from mudgym.db.index import ROOM_NAME_COUNT, UNKNOWN, room_name_to_index
 from mudgym.envs.specs import INDEX_DTYPE, ITEM_SPACE, ROOM_NAME_MAX_LENGTH, SINGLE_LINE_CHARSET
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.persona_names import bare_persona_name
@@ -18,7 +18,7 @@ ROOM_MARKER_BYTES = ROOM_MARKER.encode("ascii")
 
 SGR_RE = re.compile(SGR_ONE_PLUS_STR)
 ROOM_LINE_RE = re.compile(
-    rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^"]+)" contains '
+    rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
 )
 CARRYING_RE = re.compile(
@@ -167,8 +167,9 @@ def parse_carrying_and_inventory(clean_text: str, block_start: int) -> tuple[str
 
 class SuperQuickLookField(ObservationField):
     """
-    Parses room contents and inventory from the superquicklook command. Pure: reads the step bytes and
-    returns its own keys only.
+    Parses room contents and inventory from the superquicklook command.
+
+    Missing views use index 0. Supplied room names must be recognised.
     """
 
     command = "sql"
@@ -176,7 +177,7 @@ class SuperQuickLookField(ObservationField):
     def full_space(self) -> dict[str, spaces.Space]:
         return {
             "room_name": spaces.Text(max_length=ROOM_NAME_MAX_LENGTH, min_length=0, charset=SINGLE_LINE_CHARSET),
-            "room_name_index": spaces.Discrete(indexed_discrete_size(room_name_count)),
+            "room_name_index": spaces.Discrete(ROOM_NAME_COUNT + 1),
             "here": ITEM_SPACE,
             "inventory": ITEM_SPACE,
             "features": ITEM_SPACE,
@@ -187,7 +188,7 @@ class SuperQuickLookField(ObservationField):
 
     def full_empty(self) -> dict[str, Any]:
         return {
-            "room_name": "",
+            "room_name": UNKNOWN,
             "room_name_index": INDEX_DTYPE(0),
             "here": (),
             "inventory": (),
@@ -213,6 +214,7 @@ class SuperQuickLookField(ObservationField):
 
         _, room_name = parse_token(room_match.group("place"))
         room_name = room_name.lower()
+        room_name_index = room_name_to_index(room_name)
 
         here, classified = parse_room_contents(room_match.group("contents"))
 
@@ -229,7 +231,7 @@ class SuperQuickLookField(ObservationField):
 
         return {
             "room_name": room_name,
-            "room_name_index": INDEX_DTYPE(room_name_to_index(room_name) if room_name else 0),
+            "room_name_index": INDEX_DTYPE(room_name_index),
             "here": here,
             "inventory": inventory,
             "features": tuple(classified["features"]),

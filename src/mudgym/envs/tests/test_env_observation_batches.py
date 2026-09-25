@@ -1,5 +1,6 @@
 import pytest
 
+from mudgym.db.index import UNKNOWN
 from mudgym.envs.env import MudEnv
 from mudgym.envs.fields import (
     FEInventoryField,
@@ -101,7 +102,7 @@ def test_incomplete_response_keeps_field_output_as_text(scripted_env_factory, ra
 
     obs = parse(env, raw_bytes, "move jump", response_complete=False)
 
-    assert obs["room_name"] == ""
+    assert obs["room_name"] == UNKNOWN
     assert 'The place known as "fast-flowing river"' in obs["text"]
 
 

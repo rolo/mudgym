@@ -1,7 +1,67 @@
 import pytest
 
-from mudgym.db.index import room_name_to_index
+from mudgym.db.index import UNKNOWN, room_name_to_index
 from mudgym.envs.fields.superquicklook import SuperQuickLookField
+
+
+# Captured from the WASM game with seed 123 and persona Aaron.
+@pytest.mark.parametrize(
+    ("raw", "room_name", "portable"),
+    [
+        pytest.param(
+            b'sql\r\n\x1b[0;37;40mThe place known as "\x1b[1;32;40mback entrance to "Il Castellare"'
+            b'\x1b[0;37;40m" contains \x1b[31mAaron the protector\x1b[37m and '
+            b"\x1b[36mthe kitchen door\x1b[37m.\nYou are carrying the following:\n"
+            b"        \x1b[1;36;40mthe ribbon\x1b[0;37;40m.\n",
+            'back entrance to "il castellare"',
+            "kitchen door",
+            id="back-entrance",
+        ),
+        pytest.param(
+            b'sql\r\n\x1b[0;37;40mThe place known as "\x1b[1;32;40moutside bedroom in "Il Castellare"'
+            b'\x1b[0;37;40m" contains \x1b[31mAaron the protector\x1b[37m and '
+            b"\x1b[36mthe door\x1b[37m.\nYou are carrying the following:\n"
+            b"        \x1b[1;36;40mthe ribbon\x1b[0;37;40m.\n",
+            'outside bedroom in "il castellare"',
+            "door",
+            id="outside-bedroom",
+        ),
+    ],
+)
+def test_quoted_room_names_preserve_contents_and_inventory(raw, room_name, portable):
+    obs = SuperQuickLookField().extract([raw])
+
+    assert obs["room_name"] == room_name
+    assert obs["room_name_index"] == room_name_to_index(room_name) > 0
+    assert obs["here"] == ("Aaron the protector", portable)
+    assert obs["portables"] == (portable,)
+    assert obs["players"] == ("Aaron the protector",)
+    assert obs["inventory"] == ("ribbon",)
+
+
+@pytest.mark.parametrize("line_break", ["\r", "\n", "\r\n"])
+def test_room_names_cannot_span_lines(line_break):
+    raw = f'The place known as "{line_break}coal bunker" contains nothing.\r\n'.encode()
+    field = SuperQuickLookField()
+
+    assert field.extract([raw]) == field.empty()
+
+
+@pytest.mark.parametrize("room_name", ["unlisted room", "", "   "])
+def test_unrecognised_or_empty_room_names_fail_loudly(room_name):
+    raw = f'The place known as "{room_name}" contains nothing.\r\n'.encode()
+
+    with pytest.raises(ValueError):
+        SuperQuickLookField().extract([raw])
+
+
+@pytest.mark.parametrize("raw", [b"", b"It's too dark for you to see anything."])
+def test_missing_room_view_returns_empty_defaults(raw):
+    obs = SuperQuickLookField().extract([raw])
+
+    assert obs["room_name"] == UNKNOWN
+    assert obs["room_name_index"] == 0
+
 
 COAL_BUNKER_CHUNK = (
     b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mcoal bunker\x1b[0;37;40m" contains '

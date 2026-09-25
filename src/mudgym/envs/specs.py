@@ -3,6 +3,8 @@ import string
 import numpy as np
 from gymnasium import spaces
 
+from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
+
 # general purpose
 INDEX_DTYPE = np.int64
 INT_DTYPE = np.int32
@@ -51,6 +53,8 @@ IDENTIFIER_SPACE = spaces.Sequence(
 )
 ROOM_ID_MAX_LENGTH = 9
 ROOM_NAME_MAX_LENGTH = 60
+ROOM_ID_COUNT = len(ROOM_IDS)
+ROOM_NAME_COUNT = len(ROOM_NAMES)
 
 ACTION_MAX_LENGTH = 64
 TEXT_MAX_LENGTH = 4096

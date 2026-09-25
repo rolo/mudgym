@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.fescore import FEScoreField
 from mudgym.envs.specs import INT_DTYPE
 
@@ -18,7 +19,7 @@ def test_matches_valid_line():
 
 def test_handles_no_match_returns_empty_defaults():
     obs = FEScoreField().extract([b"no fes here"])
-    assert obs["weather"] == "unknown"
+    assert obs["weather"] == UNKNOWN
     assert obs["weather_index"] == 0
     np.testing.assert_array_equal(obs["vitals"], np.zeros(8, dtype=INT_DTYPE))
 
@@ -82,7 +83,7 @@ def test_empty_returns_valid_defaults():
     assert defaults["vitals"].shape == (8,)
     assert defaults["vitals"].dtype == INT_DTYPE
     assert defaults["flags"].shape == (4,)
-    assert defaults["weather"] == "unknown"
+    assert defaults["weather"] == UNKNOWN
     assert defaults["weather_index"] == 0
 
 
