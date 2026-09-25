@@ -214,7 +214,6 @@ class SuperQuickLookField(ObservationField):
 
         _, room_name = parse_token(room_match.group("place"))
         room_name = room_name.lower()
-        room_name_index = room_name_to_index(room_name)
 
         here, classified = parse_room_contents(room_match.group("contents"))
 
@@ -231,7 +230,7 @@ class SuperQuickLookField(ObservationField):
 
         return {
             "room_name": room_name,
-            "room_name_index": INDEX_DTYPE(room_name_index),
+            "room_name_index": INDEX_DTYPE(room_name_to_index(room_name)),
             "here": here,
             "inventory": inventory,
             "features": tuple(classified["features"]),

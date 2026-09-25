@@ -16,7 +16,10 @@ UNKNOWN = "unknown"
 
 def member_to_index(collection: Sequence[str], member: str) -> int:
     """Return a one-based member index, raising ValueError if the member is absent."""
-    return collection.index(member) + 1
+    try:
+        return collection.index(member) + 1
+    except ValueError:
+        raise ValueError(f"{member!r} not in collection") from None
 
 
 def index_to_member(collection, index: int, unknown: str = UNKNOWN) -> str:

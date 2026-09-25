@@ -83,14 +83,6 @@ class MGCheatsField(ObservationField):
 
         room_id = parsed["room_id"].lower()
         room_name = parsed["room_name"].lower()
-        try:
-            room_id_index = room_id_to_index(room_id)
-        except ValueError as error:
-            raise ValueError(f"mgcheats room_id={room_id!r} is not a known room") from error
-        try:
-            room_name_index = room_name_to_index(room_name)
-        except ValueError as error:
-            raise ValueError(f"mgcheats room_name={room_name!r} is not a known room") from error
         bits = {}
         for key in self.BIT_KEYS:
             value = parsed[key]
@@ -104,9 +96,9 @@ class MGCheatsField(ObservationField):
 
         return {
             "room_id": room_id,
-            "room_id_index": INDEX_DTYPE(room_id_index),
+            "room_id_index": INDEX_DTYPE(room_id_to_index(room_id)),
             "room_name": room_name,
-            "room_name_index": INDEX_DTYPE(room_name_index),
+            "room_name_index": INDEX_DTYPE(room_name_to_index(room_name)),
             **bits,
             "here": tuple(inner.split(", ")) if inner else (),
         }
