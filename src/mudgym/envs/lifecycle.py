@@ -14,7 +14,7 @@ def reset_worlds(players: Mapping[Any, MudEnv], provider: ConnectionProvider, se
     except BaseException as error:
         error.add_note("player reset failed while resetting the provider")
         for child in players.values():
-            child._invalidate_reset(error)
+            child._invalidate_episode(error)
         raise
 
 
@@ -44,7 +44,7 @@ def reset_players[Player](
     except BaseException as error:
         error.add_note(f"player reset failed during {phase} for player {player!r}")
         for child in players.values():
-            child._invalidate_reset(error)
+            child._invalidate_episode(error)
         raise
 
 

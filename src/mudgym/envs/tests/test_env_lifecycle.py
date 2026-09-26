@@ -7,6 +7,7 @@ from mudgym.db.weather import WEATHER
 from mudgym.envs.env import MudEnv
 from mudgym.envs.fields.rawbytes import DEFAULT_MAX_BYTES
 from mudgym.envs.tests.assertions import assert_observation_in_space, assert_observations_equal
+from tests.scripted import SQL_RESPONSE, scripted_response
 
 
 def assert_live_observation(env, obs, info, preset):
@@ -88,6 +89,30 @@ def test_step_matches_act_followed_by_observe(scripted_env_factory):
     split_info = split_rest[3]
     for key in ("raw_bytes", "render_bytes", "step", "persona", "action_rejected"):
         assert split_info[key] == stepped_info[key], key
+
+
+def test_step_that_fails_after_a_points_event_requires_a_reset(scripted_env_factory):
+    event = b"(+100 = \x1b[0;32;40m300\x1b[1;37;40m).\r\n"
+    step_bytes = (
+        scripted_response(["look", "sql,fes,fex,fei"])
+        .replace(b"look\r\n", b"look\r\n" + event)
+        .replace(SQL_RESPONSE, SQL_RESPONSE.replace(b"Dally Lane", b"Nowhere Lane"))
+    )
+    env = scripted_env_factory(responses={"look": step_bytes})
+    env.reset()
+
+    with pytest.raises(ValueError, match="nowhere lane"):
+        env.step("look")
+
+    assert env.unwrapped.points is None
+    assert env.unwrapped.session.connection.invalidated
+    with pytest.raises(RuntimeError, match="reset"):
+        env.step("look")
+
+    env.unwrapped.session.connection.responses.clear()
+    env.reset()
+    _, reward, _, _, _ = env.step("look")
+    assert reward == 0
 
 
 def test_only_player_actions_advance_the_env_step_count(scripted_env_factory):

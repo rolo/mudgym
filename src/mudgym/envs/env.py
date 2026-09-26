@@ -288,14 +288,14 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         self.last_render_bytes = render_bytes
         return observation, info
 
-    def _invalidate_reset(self, error: BaseException) -> None:
-        """Preserve the original reset failure, recording cleanup interruptions as notes."""
+    def _invalidate_episode(self, error: BaseException) -> None:
+        """Require a new reset, preserving the original failure and recording cleanup interruptions as notes."""
         self.points = None
         self.last_render_bytes = b""
         try:
             self.session.connection.invalidate()
-        except BaseException as cleanup_error:  # noqa: BLE001 - attach cleanup failures to the original reset error
-            error.add_note(f"reset invalidation failed for persona {self.persona!r}: {cleanup_error!r}")
+        except BaseException as cleanup_error:  # noqa: BLE001 - attach cleanup failures to the original error
+            error.add_note(f"episode invalidation failed for persona {self.persona!r}: {cleanup_error!r}")
 
     def reset(
         self,
@@ -313,7 +313,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             observation, info = self._finish_reset(entry_bytes, entry_rejected)
         except BaseException as error:
             error.add_note(f"reset failed during {phase} for persona {self.persona!r}")
-            self._invalidate_reset(error)
+            self._invalidate_episode(error)
             raise
         if self.render_mode == "human":
             self.render()
@@ -356,6 +356,16 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         points_before_step = self.points
         if points_before_step is None:
             raise RuntimeError("step called before reset established the persona score")
+        # The response is consumed and the game has moved on, so a failure here loses this transition.
+        try:
+            return self._receive_transition(points_before_step)
+        except BaseException as error:
+            error.add_note(f"step {self.step_count} failed for persona {self.persona!r}, reset required")
+            self._invalidate_episode(error)
+            raise
+
+    def _receive_transition(self, points_before_step: int) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
+        """Read the pending response and build its transition."""
         raw_bytes, terminated, incomplete, debug_info = self.session.receive()
         response_complete = not (terminated or incomplete)
         truncated = incomplete
