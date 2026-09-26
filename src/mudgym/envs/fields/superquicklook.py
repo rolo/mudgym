@@ -21,10 +21,6 @@ ROOM_LINE_RE = re.compile(
     rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
 )
-CARRYING_RE = re.compile(
-    r"^(?P<carrier>.+?)\s+is carrying the following:\s*$",
-    re.MULTILINE,
-)
 INVENTORY_RE = re.compile(
     r"^You are carrying the following:\s*$",
     re.MULTILINE,
@@ -145,24 +141,12 @@ def parse_block_items(block: str) -> tuple[str, ...]:
     return tuple(items)
 
 
-def parse_carrying_and_inventory(clean_text: str, block_start: int) -> tuple[str, tuple[str, ...]]:
+def parse_inventory(clean_text: str, block_start: int) -> tuple[str, ...]:
     block_text = clean_text[block_start:]
-
-    carrying: list[str] = []
-    for match in CARRYING_RE.finditer(block_text):
-        carrier = clean_name(match.group("carrier").strip())
-        block = extract_indented_block(block_text, match.start())
-        items = parse_block_items(block)
-        if carrier and items:
-            carrying.append(f"{carrier}: [{', '.join(items)}]")
-
-    inventory: tuple[str, ...] = ()
     inventory_match = INVENTORY_RE.search(block_text)
-    if inventory_match:
-        block = extract_indented_block(block_text, inventory_match.start())
-        inventory = parse_block_items(block)
-
-    return ", ".join(carrying), inventory
+    if inventory_match is None:
+        return ()
+    return parse_block_items(extract_indented_block(block_text, inventory_match.start()))
 
 
 class SuperQuickLookField(ObservationField):
@@ -222,7 +206,7 @@ class SuperQuickLookField(ObservationField):
         if block_start == -1:
             block_start = 0
 
-        _, inventory = parse_carrying_and_inventory(clean_text, block_start)
+        inventory = parse_inventory(clean_text, block_start)
 
         # exclude the current persona from the players list, since we don't want to include ourselves in the
         # observation. the listing gives name with level (which isn't always first, eg, Sir Dave)
