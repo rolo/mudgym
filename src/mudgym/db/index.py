@@ -22,11 +22,12 @@ def member_to_index(collection: Sequence[str], member: str) -> int:
         raise ValueError(f"{member!r} not in collection") from None
 
 
-def index_to_member(collection, index: int, unknown: str = UNKNOWN) -> str:
-    """Return the member corresponding to a one-based index, or the unknown placeholder if the index is 0."""
-    # we subtract 1 from the index to get the index of the member in the collection
+def index_to_member(collection: Sequence[str], index: int, unknown: str = UNKNOWN) -> str:
+    """Decode a one-based index, where 0 is missing data, raising IndexError outside 0..len(collection)."""
     if index == 0:
         return unknown
+    if not 1 <= index <= len(collection):
+        raise IndexError(f"Index {index} outside 0..{len(collection)}")
     return collection[index - 1]
 
 
