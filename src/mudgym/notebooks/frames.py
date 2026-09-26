@@ -40,7 +40,6 @@ FRAME_STYLE = (
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
     "border:1px solid var(--notebook-primary,#18352f);"
-    "border-left:4px solid var(--notebook-accent,#b58a2a);"
     "border-radius:12px;"
     "box-shadow:0 12px 28px rgba(24,53,47,0.12);"
 )

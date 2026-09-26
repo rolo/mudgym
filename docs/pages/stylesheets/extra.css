@@ -242,12 +242,11 @@ body {
 /* --- Game-output frames ------------------------------------------------------ */
 
 /* Plain (```text) fences render like the notebooks' game-output frames:
- * terminal text on near-black with a brass left border. */
+ * terminal text on near-black. */
 .md-typeset .language-text pre > code {
   background: var(--notebook-code-background);
   color: #dde0ed;
   border: 1px solid var(--notebook-primary);
-  border-left: 4px solid var(--notebook-accent);
   border-radius: 12px;
   box-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
   padding: 1.1em 1.2em;
