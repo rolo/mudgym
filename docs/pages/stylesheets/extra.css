@@ -245,7 +245,7 @@ body {
  * terminal text on near-black with a brass left border. */
 .md-typeset .language-text pre > code {
   background: var(--notebook-code-background);
-  color: #eee;
+  color: #dde0ed;
   border: 1px solid var(--notebook-primary);
   border-left: 4px solid var(--notebook-accent);
   border-radius: 12px;
@@ -262,13 +262,6 @@ body {
   margin: 1em 0;
   max-width: 100%;
   overflow-x: auto;
-}
-
-/* ansi2html emits a background on the spans as well as the frame; keep long
- * unbroken game lines from forcing the page to scroll sideways. */
-.md-typeset .game-frame span {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 /* --- Generated observation tables --------------------------------------------- */

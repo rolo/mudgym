@@ -6,10 +6,9 @@ import operator
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-import ansi2html
-
 from mudgym.db.directions import DIRECTIONS
 from mudgym.featurizers.strings import decode_text_bytes
+from mudgym.notebooks.ansi import TERMINAL_INK, TERMINAL_SURFACE, ansi_html
 from mudgym.notebooks.style import (
     HTML,
     LABEL_STYLE,
@@ -31,14 +30,15 @@ from mudgym.notebooks.tables import show_table
 # content sits behind a boundary a page stylesheet does not reach, and in static
 # HTML exports with no kernel attached. Duplicated blocks are harmless.
 FRAME_STYLE = (
-    "background:var(--notebook-code-background,#0b0d0c);"
-    "color:#eee;"
+    f"background:{TERMINAL_SURFACE};"
+    f"color:{TERMINAL_INK};"
     "font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;"
     "font-size:14px;"
     "line-height:1.5;"
     "padding:1.1em 1.2em;"
     "margin:0;"
     "white-space:pre-wrap;"
+    "overflow-wrap:anywhere;"
     "border:1px solid var(--notebook-primary,#18352f);"
     "border-left:4px solid var(--notebook-accent,#b58a2a);"
     "border-radius:12px;"
@@ -177,9 +177,7 @@ def show_ansi(value: Any, *, scroll: bool = True) -> HTML:
     ``scroll=False`` renders the frame at its full height instead.
     """
     text = display_text(value)
-    converter = ansi2html.Ansi2HTMLConverter(inline=True)
-    html = converter.convert(text, full=False)
-    return frame_html(html, collapse=scroll and is_long_output(text))
+    return frame_html(ansi_html(text), collapse=scroll and is_long_output(text))
 
 
 def show_text(value: Any, *, scroll: bool = True) -> HTML:
