@@ -68,6 +68,20 @@ def test_split_on_prompt_keeps_empty_command_slots():
     assert [chunk for chunk in split_on_prompt(raw) if chunk] == [b"score\r\n"]
 
 
+def test_render_chunks_keep_inherited_and_explicit_response_styles():
+    prompt = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    raw = b"\x1b[32mDally Lane\x1b[37m.\r\n" + prompt + b"\x1b[0;32;40mIt is raining.\r\n" + prompt
+
+    rendered = split_on_prompt(raw, preserve_ansi=True)
+
+    assert rendered == [
+        b"\x1b[1;37;40m\x1b[32mDally Lane\x1b[37m.\r\n",
+        b"\x1b[0;34;40m\x1b[1;34;40m\x1b[0;34;40m\x1b[1;37;40m\x1b[0;32;40mIt is raining.\r\n",
+    ]
+    assert split_on_prompt(raw) == [b"\x1b[32mDally Lane\x1b[37m.\r\n", b"It is raining.\r\n"]
+    assert split_on_prompt(b"*score\r\n*", preserve_ansi=True) == [b"", b"score\r\n"]
+
+
 def test_split_on_echo_lines_preserves_pre_echo_output_before_prompt_marker():
     prompt = b"\x1b[1;34;40m*\x1b[0m"
     raw = b"The dragonfly has just flown away.\r\n" + prompt + b"look,sql,fes,fex,fei\r\nDally Lane.\r\n"

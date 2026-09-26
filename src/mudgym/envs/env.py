@@ -113,14 +113,13 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         obs = deepcopy(self.empty_observation)
 
         # split the response into pre and post echo
-        segments = split_on_echo_lines(raw_bytes, sent_lines)
-        if segments is not None:
-            # anything that came from the game before our echo we don't try and parse into observation fields
-            pre_echo_chunks = [chunk for segment in segments[:-1] for chunk in split_on_prompt(segment)]
-            chunks = split_on_prompt(segments[-1])
-        else:
-            pre_echo_chunks = []
-            chunks = split_on_prompt(raw_bytes)
+        segments = split_on_echo_lines(raw_bytes, sent_lines) or [raw_bytes]
+        # anything that came from the game before our echo we don't try and parse into observation fields
+        pre_echo_render_chunks = [
+            chunk for segment in segments[:-1] for chunk in split_on_prompt(segment, preserve_ansi=True)
+        ]
+        chunks = split_on_prompt(segments[-1])
+        render_chunks = split_on_prompt(segments[-1], preserve_ansi=True)
 
         # fields with no command set use the whole step's bytes.
         for field in (field for field in self.fields if field.command is None):
@@ -131,30 +130,30 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         if response_complete:
             # claim in the same order commands were sent. A refusal still consumes, eg, asleep
             pending_fields = list(self.observation_command_fields)
-            for chunk in chunks:
+            for chunk, render_chunk in zip(chunks, render_chunks, strict=True):
                 field = pending_fields[0] if pending_fields else None
                 if field is not None and field.is_refusal(chunk):
                     field_refusals[field.__class__.__name__] = chunk
-                    payload_text_chunks.append(chunk)
+                    payload_text_chunks.append(render_chunk)
                     pending_fields.pop(0)
                 elif field is not None and field.matches(chunk):
                     obs.update(field.extract([chunk], persona=self.persona))
                     if not field.remove_on_match:
-                        payload_text_chunks.append(chunk)
+                        payload_text_chunks.append(render_chunk)
                     pending_fields.pop(0)
                 else:
-                    payload_text_chunks.append(chunk)
+                    payload_text_chunks.append(render_chunk)
             if pending_fields:
                 raise RuntimeError(
                     f"response completed but fields {[f.__class__.__name__ for f in pending_fields]} "
                     f"found no matching response among {len(chunks)} window chunks"
                 )
 
-        text_chunks = [*pre_echo_chunks, *payload_text_chunks]
+        text_chunks = [*pre_echo_render_chunks, *payload_text_chunks]
         if not response_complete:
             # Without a complete response we cannot safely line chunks up with fields. Preserve the bytes as text
             # rather than pretending the structured observation is complete.
-            text_chunks.extend(chunks)
+            text_chunks.extend(render_chunks)
 
         # keeps the game's ANSI colour - text observation space doesn't.
         render_payload = b"\n".join(text_chunks)

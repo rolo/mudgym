@@ -22,11 +22,13 @@ No awareness of env, specs or RL concepts here.
 
 import re
 
-from mudgym.connections.prompts import SGR, STARLINE
+from mudgym.connections.prompts import SGR, SGR_ONE_PLUS_BYTES, STARLINE
+from mudgym.featurizers.ansi import INPUT_STYLE
 from mudgym.featurizers.strings import LINE_BREAK_RE, encode_command_bytes
 
 # pattern for splitting by prompt markers. The line anchor keeps inline asterisks out of routing.
 RESPONSE_PROMPT_RE = re.compile(rb"(?m)^" + SGR + STARLINE + SGR)
+RESPONSE_STYLE_RE = re.compile(SGR_ONE_PLUS_BYTES)
 
 # the echo line if a newline, possibly some ANSI/control bytes and a prompt marker, our command and then a newline.
 ECHO_CONTROL_PREFIX = rb"(?:\x1b\[[0-?]*[ -/]*[@-~]|[\x00-\x09\x0b-\x1a\x1c-\x1f])"
@@ -70,11 +72,26 @@ def split_on_echo_lines(raw_bytes: bytes, echo_lines: list[str | bytes]) -> list
     return segments
 
 
-def split_on_prompt(raw_bytes: bytes) -> list[bytes]:
+def split_on_prompt(raw_bytes: bytes, *, preserve_ansi: bool = False) -> list[bytes]:
     """
     Split raw bytes into a list of chunks delimited by prompt markers.
     We discard the final chunk, which should be empty, as the game always sends a prompt marker after the last command.
     """
+    if preserve_ansi:
+        chunks = []
+        offset = 0
+        # Each chunk starts in the style its prompt left: the input style after the echoed command, then the codes
+        # consumed with each prompt, including any explicit style at the start of its response.
+        style = INPUT_STYLE
+        for prompt in RESPONSE_PROMPT_RE.finditer(raw_bytes):
+            chunk = raw_bytes[offset : prompt.start()]
+            chunks.append(style + chunk if chunk else b"")
+            style = b"".join(RESPONSE_STYLE_RE.findall(prompt.group()))
+            offset = prompt.end()
+        if offset < len(raw_bytes):
+            chunks.append(style + raw_bytes[offset:])
+        return chunks
+
     chunks = RESPONSE_PROMPT_RE.split(raw_bytes)
     # the final chunk will be empty if a new prompt marker came after it so we discard it.
     if chunks[-1] == b"":
