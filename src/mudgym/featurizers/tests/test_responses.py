@@ -61,6 +61,33 @@ def test_split_response_chunks(raw_bytes):
     assert [chunk for chunk in split_on_prompt(raw_bytes) if chunk] == expected
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        b"\x1b[0;34;40m>\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m",
+        b"\x1b[0;34;40m(\x1b[1;34;40m*\x1b[0;34;40m)\x1b[1;37;40m",
+    ],
+    ids=["conversing", "invisible"],
+)
+def test_split_on_prompt_recognises_decorated_prompts(prompt):
+    # a reply captured while conversing, replayed with each decorated prompt
+    raw = (
+        b"sql,fes,fex\r\n"
+        b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mbadly-paved road\x1b[0;37;40m" contains '
+        b"\x1b[32mthe road\x1b[37m.\nYou are carrying the following:\n        nothing.\n"
+        b"\x1b[1;37;40m" + prompt + b"\x1b[0;37;40m\x1b[1;32;40m63\x1b[0;37;40m \x1b[1;32;40m63\x1b[0;37;40m "
+        b"50 50 67 67 0 63 0200 N N N N 105 R\n"
+        b"\x1b[1;37;40m" + prompt + b"\x1b[0;37;40mup in down out west east north\n"
+        b"\x1b[1;37;40m" + prompt
+    )
+
+    chunks = split_on_prompt(raw)
+
+    assert len(chunks) == 3
+    assert chunks[1] == b"63\x1b[0;37;40m \x1b[1;32;40m63\x1b[0;37;40m 50 50 67 67 0 63 0200 N N N N 105 R\n"
+    assert chunks[2] == b"up in down out west east north\n"
+
+
 def test_split_on_prompt_keeps_empty_command_slots():
     raw = b"*score\r\n*"
 

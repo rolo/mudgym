@@ -60,6 +60,24 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
         assert all("Badly-paved road" not in text for text in texts)
 
 
+def test_conversation_keeps_structured_observations(wasm_runtime):
+    with closing(make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})) as env:
+        env.reset(seed=0)
+        for command, conversing in [
+            ("converse rat", True),
+            ("frobnicate", True),
+            ("look", True),
+            ("unconverse", False),
+            ("look", False),
+        ]:
+            obs, _, terminated, truncated, info = env.step(command)
+            assert not terminated and not truncated
+            assert obs["room_name"] == "badly-paved road"
+            assert ">*" not in obs["text"]
+            assert (b">\x1b[1;34;40m*" in info["raw_bytes"]) == conversing
+            assert info["action_rejected"] == (command == "frobnicate")
+
+
 def test_real_peer_output_after_a_field_response_survives_parsing(wasm_runtime):
     provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1, seed=123)
     connection, peer_connection = provider.create_connections(2)
