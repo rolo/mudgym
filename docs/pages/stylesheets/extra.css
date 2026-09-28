@@ -54,6 +54,12 @@ body {
     var(--notebook-background);
 }
 
+/* The theme pins the TOC title on an opaque box, a white patch on the glow. */
+.md-nav--secondary .md-nav__title {
+  position: static;
+  background: none;
+}
+
 /* --- Header ----------------------------------------------------------------- */
 
 /* Same treatment as the notebook nav brand: small mono caps. */
