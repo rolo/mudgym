@@ -48,6 +48,18 @@ VAMPIRE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
+# Captured from native seed 3 when sql wakes a blind player after the vampire's sleep spell.
+VAMPIRE_WAKE_BLIND_BYTES = (
+    b"move southwest\r\nYou can't wake yourself up yet!\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei\r\n"
+    b"You wake up!\nYour stamina is \x1b[33m32\x1b[37m.\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+    b"\x1b[1;33;40m32\x1b[0;37;40m \x1b[1;32;40m47\x1b[0;37;40m 54 54 19 49 0 47 01 Y N N N 101 F\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m--\n========\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+)
+
 DALLY_LANE_BYTES = (
     b"move north,fes,fex,fei\r\nAs you step through the opening, you become swathed in a fine, gossamer mist. "
     b"The Elizabethan tearoom fades hazily away, and vague, new shapes begin to form around you. Their outlines "

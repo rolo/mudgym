@@ -1,7 +1,7 @@
 import pytest
 
 from mudgym.db.index import UNKNOWN
-from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES
+from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES, VAMPIRE_WAKE_BLIND_BYTES
 from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 
 
@@ -66,6 +66,21 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     assert "You have suddenly and magically gone blind!" in obs["text"]
     assert "You can't see a thing, you're blind." in obs["text"]
     assert "\x1b" not in obs["text"]
+
+
+def test_step_continues_when_sql_wakes_a_blind_player(scripted_env_factory):
+    env = scripted_env_factory(observation="parsed", responses={"move southwest": VAMPIRE_WAKE_BLIND_BYTES})
+    env.reset()
+
+    obs, _, terminated, truncated, info = env.step("move southwest")
+
+    # waking spent sql: its keys stay at the empty defaults while fes still extracts
+    assert obs["room_name"] == UNKNOWN
+    assert obs["vitals"][0] == 32
+    assert info["field_refusals"] == {"SuperQuickLookField": b"You wake up!\nYour stamina is \x1b[33m32\x1b[37m.\n"}
+    assert "You wake up!\nYour stamina is 32." in obs["text"]
+    assert terminated is False
+    assert truncated is False
 
 
 def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_factory):

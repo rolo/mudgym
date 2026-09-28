@@ -35,9 +35,11 @@ class ObservationField(ABC):
     # Messages the game emits in place of a command's real output when the persona cannot act
     # (unconscious, asleep, ...). A refusal claims the field's slot but carries no data.
     # Unknown responses keep failing loudly in MudEnv's observation parser.
-    PLAYER_STATE_REFUSALS: tuple[bytes, ...] = (
-        b"You can't wake yourself up yet!",
-        b"You can't see a thing, you're blind.",
+    PLAYER_STATE_REFUSALS: tuple[re.Pattern[bytes], ...] = (
+        re.compile(rb"You can't wake yourself up yet!"),
+        re.compile(rb"You can't see a thing, you're blind\."),
+        # Waking up spends the command, so its output is only the wake-up and stamina lines.
+        re.compile(rb"You wake up!\r?\nYour stamina is [0-9]+\."),
     )
 
     def __init__(self, include_keys: Sequence[str] | None = None):
@@ -106,7 +108,8 @@ class ObservationField(ABC):
 
     def is_refusal(self, chunk: bytes) -> bool:
         """Whether ``chunk`` is a player-state refusal instead of this command's real output."""
-        return strip_ansi(chunk).strip() in self.PLAYER_STATE_REFUSALS
+        response = strip_ansi(chunk).strip()
+        return any(refusal.fullmatch(response) for refusal in self.PLAYER_STATE_REFUSALS)
 
     def lines(self, raw_bytes: bytes) -> list[str]:
         """The chunk's text lines: ANSI stripped, decoded, split on line breaks and stripped of whitespace."""

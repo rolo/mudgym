@@ -1,7 +1,7 @@
 import pytest
 
 from mudgym.envs.fields import FEScoreField
-from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES
+from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES, VAMPIRE_WAKE_BLIND_BYTES
 from mudgym.featurizers.responses import split_on_echo_lines, split_on_prompt
 
 
@@ -9,6 +9,7 @@ from mudgym.featurizers.responses import split_on_echo_lines, split_on_prompt
     params=[
         pytest.param(FORD_COLLAPSE_BYTES, id="unconscious"),
         pytest.param(VAMPIRE_BLIND_BYTES, id="blind"),
+        pytest.param(VAMPIRE_WAKE_BLIND_BYTES, id="waking-blind"),
     ]
 )
 def observation_response(request):
@@ -31,3 +32,7 @@ def test_other_field_responses_are_not_refusals(observation_response):
 
     for response in responses:
         assert not FEScoreField().is_refusal(response)
+
+
+def test_recognises_a_wake_up_with_crlf_line_endings():
+    assert FEScoreField().is_refusal(b"You wake up!\r\nYour stamina is 32.\r\n")
