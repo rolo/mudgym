@@ -30,11 +30,11 @@ SECONDARY = "var(--notebook-secondary,#244c44)"
 ACCENT = "var(--notebook-accent,#b58a2a)"
 PAGE = "var(--notebook-background,#ffffff)"
 
-PANEL_STYLE = f"border:1px solid {RULE};border-radius:12px;background:{PAGE};"
+PANEL_STYLE = f"border:1px solid {RULE};border-radius:8px;background:{PAGE};"
 
 CODE_SPAN_STYLE = (
     f"font-family:{MONO};background:{TINT};color:{SECONDARY};"
-    "border-radius:0.45rem;padding:0.12em 0.38em;font-size:0.92em;font-weight:560;"
+    "border-radius:0.3rem;padding:0.12em 0.38em;font-size:0.92em;font-weight:560;"
 )
 
 LABEL_STYLE = (

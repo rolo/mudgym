@@ -40,7 +40,7 @@ FRAME_STYLE = (
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
     "border:1px solid var(--notebook-primary,#18352f);"
-    "border-radius:12px;"
+    "border-radius:8px;"
     "box-shadow:0 12px 28px rgba(24,53,47,0.12);"
 )
 
@@ -82,7 +82,7 @@ COLLAPSE_STYLE = f"""<style>
     left: 0;
     right: 0;
     height: 5em;
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 8px 8px;
     background: linear-gradient(to bottom, transparent, var(--notebook-code-background,#0b0d0c));
     pointer-events: none;
 }}
@@ -123,7 +123,7 @@ ACCORDION_SUMMARY_STYLE = (
     "font-size:0.85rem;"
     "font-weight:600;"
     "padding:0.45rem 0.8rem;"
-    "border-radius:8px;"
+    "border-radius:6px;"
     "background:var(--notebook-primary,#18352f);"
     "color:#ffffff;"
 )

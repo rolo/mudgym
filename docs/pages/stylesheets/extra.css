@@ -60,6 +60,12 @@ body {
   background: none;
 }
 
+/* Small chrome rounds a step below the 0.4rem content surfaces. */
+.md-nav__link,
+.md-search__button {
+  border-radius: 0.3rem;
+}
+
 /* --- Header ----------------------------------------------------------------- */
 
 /* Same treatment as the notebook nav brand: small mono caps. */
@@ -108,7 +114,7 @@ body {
 }
 
 .md-typeset :not(pre) > code {
-  border-radius: 0.36rem;
+  border-radius: 0.24rem;
   background: var(--notebook-tint);
   color: var(--notebook-secondary);
   padding: 0.12em 0.38em;
@@ -154,14 +160,14 @@ body {
 }
 
 .md-typeset pre > code {
-  border-radius: 0.48rem;
+  border-radius: 0.4rem;
   padding: 0.9em 1.1em;
   box-shadow: 0 10px 24px color-mix(in srgb, var(--notebook-primary) 10%, transparent);
 }
 
 .md-typeset table:not([class]) {
   border: 1px solid var(--notebook-rule);
-  border-radius: 0.6rem;
+  border-radius: 0.4rem;
   box-shadow: 0 8px 22px color-mix(in srgb, var(--notebook-primary) 4%, transparent);
   overflow: hidden;
 }
@@ -176,7 +182,7 @@ body {
 /* Zensical colours admonitions with a flat tinted box plus an icon mask; pull
  * note onto the secondary green and tip onto the brass accent. */
 .md-typeset .admonition {
-  border-radius: 0.6rem;
+  border-radius: 0.4rem;
 }
 
 .md-typeset .admonition.note,
@@ -231,7 +237,7 @@ body {
  * instead of floating on the page background. */
 .md-typeset .tabbed-labels {
   background: var(--notebook-tint);
-  border-radius: 0.48rem 0.48rem 0 0;
+  border-radius: 0.4rem 0.4rem 0 0;
   padding-inline: 0.3rem;
 }
 
@@ -256,7 +262,7 @@ body {
   background: var(--notebook-code-background);
   color: #dde0ed;
   border: 1px solid var(--notebook-primary);
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
   padding: 1.1em 1.2em;
 }
