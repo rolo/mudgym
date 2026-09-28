@@ -45,9 +45,12 @@
   --md-code-fg-color: var(--notebook-secondary);
 }
 
+/* The glow is sized and painted once: the theme sets html { height: 100% }, so
+ * a repeating page background tiles every viewport height with a hard seam. */
 body {
   background:
-    radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--notebook-secondary) 7%, transparent), transparent 24rem),
+    radial-gradient(circle at 92% 0.5rem, color-mix(in srgb, var(--notebook-secondary) 7%, transparent), transparent 24rem)
+      0 0 / 100% 25rem no-repeat,
     var(--notebook-background);
 }
 
