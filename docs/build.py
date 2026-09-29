@@ -38,6 +38,9 @@ def main() -> None:
         raise SystemExit(build.returncode)
 
     pages = sorted(SITE_DIR.rglob("*.html"))
+    # zensical can also succeed without writing a page, e.g. when a `watch` path lies outside docs/.
+    if not pages:
+        raise SystemExit("zensical reported success but built no pages. Check zensical.toml.")
     offending = pages_with_rendered_errors(pages)
     if offending:
         listing = ", ".join(str(path.relative_to(REPOSITORY_ROOT)) for path in offending)
