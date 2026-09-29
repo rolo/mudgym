@@ -1,0 +1,21 @@
+/* MudGym's design tokens: the one place each colour, font, radius and shadow is
+ * set. The docs load this file, and mudgym.notebooks.style reads it for the
+ * fallbacks its inline styles carry into notebooks that never load it. */
+:root {
+  --notebook-primary: #18352f;
+  --notebook-secondary: #244c44;
+  --notebook-accent: #b58a2a;
+  --notebook-highlight: #f6ff31;
+  --notebook-background: #ffffff;
+  --notebook-ink: #1b2825;
+  --notebook-code-background: #0b0d0c;
+  --notebook-body: color-mix(in srgb, var(--notebook-ink) 88%, var(--notebook-background));
+  --notebook-muted: color-mix(in srgb, var(--notebook-ink) 55%, var(--notebook-background));
+  --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
+  --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
+  --notebook-terminal-ink: #dde0ed;
+  --notebook-sans: 'Notebook Inter', Inter, 'Segoe UI', sans-serif;
+  --notebook-mono: 'Notebook JetBrains Mono', 'JetBrains Mono', 'Fira Mono', monospace;
+  --notebook-radius: 5px;
+  --notebook-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
+}

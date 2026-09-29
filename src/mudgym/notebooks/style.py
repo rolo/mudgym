@@ -1,6 +1,8 @@
 """Visual tokens and value formatters shared by the notebook renderers."""
 
 import html as html_lib
+import re
+from importlib import resources
 from typing import Any
 
 
@@ -18,40 +20,39 @@ class HTML:
         return self.data
 
 
-MUDGYM_PALETTE = {
-    "primary": "#18352f",
-    "secondary": "#244c44",
-    "accent": "#b58a2a",
-    "highlight": "#f6ff31",
-    "background": "#ffffff",
-    "ink": "#1b2825",
-    "code_background": "#0b0d0c",
-}
+# Every value lives in theme.css, which the docs load directly. Notebooks never
+# load it, so each token carries its value from the file as the var() fallback.
+THEME_CSS = resources.files("mudgym.notebooks").joinpath("theme.css").read_text(encoding="utf-8")
+THEME = dict(re.findall(r"--notebook-([a-z-]+):\s*([^;]+);", THEME_CSS))
+
+PALETTE_COLOURS = ("primary", "secondary", "accent", "highlight", "background", "ink", "code_background")
+MUDGYM_PALETTE = {colour_name: THEME[colour_name.replace("_", "-")] for colour_name in PALETTE_COLOURS}
 
 
 def css_variable(colour_name: str) -> str:
     return "--notebook-" + colour_name.replace("_", "-")
 
 
-def palette_colour(colour_name: str) -> str:
-    return f"var({css_variable(colour_name)},{MUDGYM_PALETTE[colour_name]})"
+def token(name: str) -> str:
+    """Reference a theme token, falling back to its theme.css value with any nested references resolved too."""
+    fallback = re.sub(r"var\(--notebook-([a-z-]+)\)", lambda match: token(match.group(1)), THEME[name])
+    return f"var(--notebook-{name},{fallback})"
 
 
-# Literal fallbacks so a notebook still renders without MudGym's stylesheet.
-SANS = "var(--notebook-sans,'Notebook Inter',Inter,'Segoe UI',sans-serif)"
-MONO = "var(--notebook-mono,'Notebook JetBrains Mono','JetBrains Mono','Fira Mono',monospace)"
-RULE = "var(--notebook-rule,#e3e7e5)"
-TINT = "var(--notebook-tint,#eef2f0)"
-MUTED = "var(--notebook-muted,#6c7a75)"
-INK = palette_colour("ink")
-PRIMARY = palette_colour("primary")
-SECONDARY = palette_colour("secondary")
-ACCENT = palette_colour("accent")
-PAGE = palette_colour("background")
-# One radius for every rounded corner. SVG drawings take the bare number.
-CORNER_RADIUS = 5
-RADIUS = f"var(--notebook-radius,{CORNER_RADIUS}px)"
-SHADOW = f"var(--notebook-shadow,0 12px 28px color-mix(in srgb,{PRIMARY} 12%,transparent))"
+SANS = token("sans")
+MONO = token("mono")
+RULE = token("rule")
+TINT = token("tint")
+MUTED = token("muted")
+INK = token("ink")
+PRIMARY = token("primary")
+SECONDARY = token("secondary")
+ACCENT = token("accent")
+PAGE = token("background")
+RADIUS = token("radius")
+SHADOW = token("shadow")
+# SVG drawings take the radius as a bare number.
+CORNER_RADIUS = float(THEME["radius"].removesuffix("px"))
 
 PANEL_STYLE = f"border:1px solid {RULE};border-radius:{RADIUS};background:{PAGE};"
 

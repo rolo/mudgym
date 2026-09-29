@@ -4,13 +4,13 @@ import html
 import re
 from dataclasses import dataclass
 
-from mudgym.notebooks.style import palette_colour
+from mudgym.notebooks.style import token
 
 ANSI_NORMAL = ("#0f1f26", "#e05a48", "#3cb884", "#f2b43c", "#315fba", "#b478d0", "#3fb9c4", "#dde0ed")
 ANSI_BRIGHT = ("#5f7885", "#ff7a5c", "#43d9a3", "#ffcc63", "#315fba", "#d09ae8", "#5ee0e8", "#dde0ed")
 # The game frame's surface and ink.
-TERMINAL_SURFACE = palette_colour("code_background")
-TERMINAL_INK = "var(--notebook-terminal-ink,#dde0ed)"
+TERMINAL_SURFACE = token("code-background")
+TERMINAL_INK = token("terminal-ink")
 
 CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;]*)([ -/]*[@-~])")
 

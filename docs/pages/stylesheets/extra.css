@@ -1,5 +1,6 @@
 /* Zensical skin ported from the marimo example-notebook theme ("mudgym"
- * palette).
+ * palette). The --notebook-* values it uses come from theme.css, a link to
+ * src/mudgym/notebooks/theme.css that the notebooks read too.
  *
  * Wired in via extra_css in zensical.toml; activates through
  * palette.primary/accent = "custom". Zensical sets html { font-size: 125% },
@@ -11,23 +12,6 @@
 }
 
 /* --- Palette ---------------------------------------------------------------- */
-
-:root {
-  --notebook-primary: #18352f;
-  --notebook-secondary: #244c44;
-  --notebook-accent: #b58a2a;
-  --notebook-highlight: #f6ff31;
-  --notebook-background: #ffffff;
-  --notebook-ink: #1b2825;
-  --notebook-code-background: #0b0d0c;
-  --notebook-body: color-mix(in srgb, var(--notebook-ink) 88%, var(--notebook-background));
-  --notebook-muted: color-mix(in srgb, var(--notebook-ink) 55%, var(--notebook-background));
-  --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
-  --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
-  --notebook-terminal-ink: #dde0ed;
-  --notebook-radius: 5px;
-  --notebook-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
-}
 
 [data-md-color-primary="custom"] {
   --md-primary-fg-color: var(--notebook-primary);
