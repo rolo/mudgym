@@ -15,6 +15,7 @@ from mudgym.notebooks.style import (
     MONO,
     PAGE,
     PRIMARY,
+    RADIUS,
     RULE,
     SANS,
     SECONDARY,
@@ -41,7 +42,7 @@ FRAME_STYLE = (
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
     f"border:1px solid {PRIMARY};"
-    "border-radius:8px;"
+    f"border-radius:{RADIUS};"
     f"box-shadow:{SHADOW};"
 )
 
@@ -83,7 +84,7 @@ COLLAPSE_STYLE = f"""<style>
     left: 0;
     right: 0;
     height: 5em;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 {RADIUS} {RADIUS};
     background: linear-gradient(to bottom, transparent, {TERMINAL_SURFACE});
     pointer-events: none;
 }}
@@ -105,7 +106,7 @@ TAB_STYLE = f"""<style>
     font-weight: 600;
     letter-spacing: 0.04em;
     padding: 0.25rem 0.75rem;
-    border-radius: 999px;
+    border-radius: {RADIUS};
     border: 1px solid {PRIMARY};
     color: {PRIMARY};
     opacity: 0.65;
@@ -124,7 +125,7 @@ ACCORDION_SUMMARY_STYLE = (
     "font-size:0.85rem;"
     "font-weight:600;"
     "padding:0.45rem 0.8rem;"
-    "border-radius:6px;"
+    f"border-radius:{RADIUS};"
     f"background:{PRIMARY};"
     f"color:{PAGE};"
 )
@@ -287,7 +288,7 @@ def show_frames(frames: Mapping[str, Any], *, label: str = "", selected: int = -
         f".{group} .frame-panels > * {{ display: none; }}\n"
         f".{group} .frame-chips {{ display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; "
         "margin: 0 0 0.6rem; }\n"
-        f".{group} .frame-chips label {{ cursor: pointer; border: 1px solid {RULE}; border-radius: 999px; "
+        f".{group} .frame-chips label {{ cursor: pointer; border: 1px solid {RULE}; border-radius: {RADIUS}; "
         f"padding: 0.16rem 0.6rem; font-family: {MONO}; font-size: 0.76rem; font-weight: 600; "
         f"color: {SECONDARY}; }}\n"
         f".{group} .frame-chips label:hover {{ background: {TINT}; }}\n{rules}</style>"

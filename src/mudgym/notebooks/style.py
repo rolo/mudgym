@@ -48,16 +48,19 @@ PRIMARY = palette_colour("primary")
 SECONDARY = palette_colour("secondary")
 ACCENT = palette_colour("accent")
 PAGE = palette_colour("background")
+# One radius for every rounded corner. SVG drawings take the bare number.
+CORNER_RADIUS = 5
+RADIUS = f"var(--notebook-radius,{CORNER_RADIUS}px)"
 SHADOW = f"var(--notebook-shadow,0 12px 28px color-mix(in srgb,{PRIMARY} 12%,transparent))"
 
-PANEL_STYLE = f"border:1px solid {RULE};border-radius:8px;background:{PAGE};"
+PANEL_STYLE = f"border:1px solid {RULE};border-radius:{RADIUS};background:{PAGE};"
 
 # The vertical rhythm between stacked widgets.
 BLOCK_MARGIN = "margin:0.3rem 0 0.5rem;"
 
 CODE_SPAN_STYLE = (
     f"font-family:{MONO};background:{TINT};color:{SECONDARY};"
-    "border-radius:0.3rem;padding:0.12em 0.38em;font-size:0.92em;font-weight:560;"
+    f"border-radius:{RADIUS};padding:0.12em 0.38em;font-size:0.92em;font-weight:560;"
 )
 
 LABEL_STYLE = (

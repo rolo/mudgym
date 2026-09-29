@@ -9,6 +9,7 @@ from mudgym.db.directions import DIRECTION_INDEX_BY_NAME
 from mudgym.notebooks.style import (
     ACCENT,
     BLOCK_MARGIN,
+    CORNER_RADIUS,
     HTML,
     INK,
     MONO,
@@ -183,7 +184,6 @@ def show_room_map(
     room_height = round(78 - 20 * density)
     room_font = 13 - 3 * density
     small_font = 10.5 - 1.5 * density
-    corner = round(12 - 4 * density)
     # The gap between rooms is where the edge labels sit, so it has to hold the
     # longest direction word rather than just separate two boxes.
     column_pitch = room_width + round(64 - 16 * density)
@@ -307,7 +307,7 @@ def show_room_map(
         # reaches into and read as a truncated word.
         edge_captions.append(
             f'<rect class="edge-label-plate" x="{plate[0]:.1f}" y="{plate[1]:.1f}" '
-            f'width="{plate[2]:.1f}" height="{plate[3]:.1f}" rx="4" style="fill:{PAGE};" />'
+            f'width="{plate[2]:.1f}" height="{plate[3]:.1f}" rx="{CORNER_RADIUS}" style="fill:{PAGE};" />'
             f'<text class="edge-label" x="{plate[0] + plate_width / 2:.1f}" '
             f'y="{plate[1] + label_height / 2 + 0.36 * small_font:.1f}" '
             f'text-anchor="middle" font-size="{small_font:.1f}" style="{label_style}">'
@@ -342,7 +342,7 @@ def show_room_map(
             )
         room_elements.append(
             f"<g><title>{html_lib.escape(room)}</title>"
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{room_width}" height="{room_height}" rx="{corner}" '
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{room_width}" height="{room_height}" rx="{CORNER_RADIUS}" '
             f'style="fill:{fill};stroke:{stroke};stroke-width:{stroke_width};" />'
             f"{''.join(texts)}</g>"
         )
@@ -363,10 +363,10 @@ def show_room_map(
     # a gap instead of printing one legend on top of the other.
     second_entry_x = side_padding + 24 + max(70, round(6.4 * len(occupants_label))) + 24
     legend = (
-        f'<rect x="{side_padding}" y="{legend_y - 13}" width="16" height="16" rx="4" '
+        f'<rect x="{side_padding}" y="{legend_y - 13}" width="16" height="16" rx="{CORNER_RADIUS}" '
         f'style="fill:{MAP_LIVE_FILL};stroke:{PRIMARY};stroke-width:1.5;" />'
         f'<text x="{side_padding + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">{html_lib.escape(occupants_label)}</text>'
-        f'<rect x="{second_entry_x}" y="{legend_y - 13}" width="16" height="16" rx="4" '
+        f'<rect x="{second_entry_x}" y="{legend_y - 13}" width="16" height="16" rx="{CORNER_RADIUS}" '
         f'style="fill:{MAP_ROOM_FILL};stroke:{ACCENT};stroke-width:3;" />'
         f'<text x="{second_entry_x + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">{html_lib.escape(new_rooms_label)}</text>'
     )

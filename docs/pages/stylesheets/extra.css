@@ -25,6 +25,7 @@
   --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
   --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
   --notebook-terminal-ink: #dde0ed;
+  --notebook-radius: 5px;
   --notebook-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
 }
 
@@ -62,10 +63,19 @@ body {
   background: none;
 }
 
-/* Small chrome rounds a step below the 0.4rem content surfaces. */
+/* The theme's own rounded parts take the one radius too. */
 .md-nav__link,
-.md-search__button {
-  border-radius: 0.3rem;
+.md-search__button,
+.md-clipboard,
+.md-code__nav,
+.md-tooltip,
+.md-tooltip2__inner,
+.md-dialog,
+.md-top,
+.md-sidebar--primary,
+.md-sidebar--secondary .md-sidebar__inner,
+.md-sidebar--secondary .md-sidebar-button {
+  border-radius: var(--notebook-radius);
 }
 
 /* --- Header ----------------------------------------------------------------- */
@@ -116,7 +126,7 @@ body {
 }
 
 .md-typeset :not(pre) > code {
-  border-radius: 0.24rem;
+  border-radius: var(--notebook-radius);
   background: var(--notebook-tint);
   color: var(--notebook-secondary);
   padding: 0.12em 0.38em;
@@ -162,14 +172,14 @@ body {
 }
 
 .md-typeset pre > code {
-  border-radius: 0.4rem;
+  border-radius: var(--notebook-radius);
   padding: 0.9em 1.1em;
   box-shadow: var(--notebook-shadow);
 }
 
 .md-typeset table:not([class]) {
   border: 1px solid var(--notebook-rule);
-  border-radius: 0.4rem;
+  border-radius: var(--notebook-radius);
   box-shadow: 0 8px 22px color-mix(in srgb, var(--notebook-primary) 4%, transparent);
   overflow: hidden;
 }
@@ -183,8 +193,9 @@ body {
 
 /* Zensical colours admonitions with a flat tinted box plus an icon mask; pull
  * note onto the secondary green and tip onto the brass accent. */
-.md-typeset .admonition {
-  border-radius: 0.4rem;
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--notebook-radius);
 }
 
 .md-typeset .admonition.note,
@@ -233,7 +244,7 @@ body {
  * instead of floating on the page background. */
 .md-typeset .tabbed-labels {
   background: var(--notebook-tint);
-  border-radius: 0.4rem 0.4rem 0 0;
+  border-radius: var(--notebook-radius) var(--notebook-radius) 0 0;
   padding-inline: 0.3rem;
 }
 
@@ -258,7 +269,7 @@ body {
   background: var(--notebook-code-background);
   color: var(--notebook-terminal-ink);
   border: 1px solid var(--notebook-primary);
-  border-radius: 8px;
+  border-radius: var(--notebook-radius);
   box-shadow: var(--notebook-shadow);
   padding: 1.1em 1.2em;
 }
