@@ -18,6 +18,7 @@ from mudgym.notebooks.style import (
     RULE,
     SANS,
     SECONDARY,
+    SHADOW,
     TINT,
     caption_html,
     cell_text,
@@ -41,7 +42,7 @@ FRAME_STYLE = (
     "overflow-wrap:anywhere;"
     f"border:1px solid {PRIMARY};"
     "border-radius:8px;"
-    "box-shadow:0 12px 28px rgba(24,53,47,0.12);"
+    f"box-shadow:{SHADOW};"
 )
 
 # Long output collapses rather than scrolling: a frame with its own scrollbar

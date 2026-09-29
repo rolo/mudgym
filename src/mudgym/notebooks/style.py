@@ -48,6 +48,7 @@ PRIMARY = palette_colour("primary")
 SECONDARY = palette_colour("secondary")
 ACCENT = palette_colour("accent")
 PAGE = palette_colour("background")
+SHADOW = f"var(--notebook-shadow,0 12px 28px color-mix(in srgb,{PRIMARY} 12%,transparent))"
 
 PANEL_STYLE = f"border:1px solid {RULE};border-radius:8px;background:{PAGE};"
 

@@ -24,6 +24,8 @@
   --notebook-muted: color-mix(in srgb, var(--notebook-ink) 55%, var(--notebook-background));
   --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
   --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
+  --notebook-terminal-ink: #dde0ed;
+  --notebook-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
 }
 
 [data-md-color-primary="custom"] {
@@ -162,7 +164,7 @@ body {
 .md-typeset pre > code {
   border-radius: 0.4rem;
   padding: 0.9em 1.1em;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--notebook-primary) 10%, transparent);
+  box-shadow: var(--notebook-shadow);
 }
 
 .md-typeset table:not([class]) {
@@ -254,10 +256,10 @@ body {
  * terminal text on near-black. */
 .md-typeset .language-text pre > code {
   background: var(--notebook-code-background);
-  color: #dde0ed;
+  color: var(--notebook-terminal-ink);
   border: 1px solid var(--notebook-primary);
   border-radius: 8px;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--notebook-primary) 12%, transparent);
+  box-shadow: var(--notebook-shadow);
   padding: 1.1em 1.2em;
 }
 

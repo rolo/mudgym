@@ -1,6 +1,6 @@
 from mudgym.featurizers.ansi import INPUT_STYLE
 from mudgym.notebooks import show_ansi
-from mudgym.notebooks.ansi import ANSI_BRIGHT, ANSI_NORMAL, TERMINAL_SURFACE, ansi_html
+from mudgym.notebooks.ansi import ANSI_BRIGHT, ANSI_NORMAL, TERMINAL_INK, TERMINAL_SURFACE, ansi_html
 
 # The start of a move response, as the engine sends it after a prompt.
 MOVE_RESPONSE = "\x1b[32mBeaten track\x1b[37m.\r\n\x1b[0;32;40mYou're on a rough east-west track."
@@ -29,7 +29,9 @@ def test_text_is_escaped_and_other_control_sequences_are_dropped():
 
 
 def test_inverse_and_extended_colours():
-    assert ansi_html("\x1b[7mx") == f'<span style="color: {TERMINAL_SURFACE}; background-color: #dde0ed">x</span>'
+    assert (
+        ansi_html("\x1b[7mx") == f'<span style="color: {TERMINAL_SURFACE}; background-color: {TERMINAL_INK}">x</span>'
+    )
     assert ansi_html("\x1b[38;5;196mx") == '<span style="color: rgb(255, 0, 0)">x</span>'
     assert ansi_html("\x1b[48;2;1;2;3mx") == '<span style="background-color: rgb(1, 2, 3)">x</span>'
     assert ansi_html("\x1b[1;32mx\x1b[22my") == (
