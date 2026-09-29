@@ -18,19 +18,41 @@ class HTML:
         return self.data
 
 
+MUDGYM_PALETTE = {
+    "primary": "#18352f",
+    "secondary": "#244c44",
+    "accent": "#b58a2a",
+    "highlight": "#f6ff31",
+    "background": "#ffffff",
+    "ink": "#1b2825",
+    "code_background": "#0b0d0c",
+}
+
+
+def css_variable(colour_name: str) -> str:
+    return "--notebook-" + colour_name.replace("_", "-")
+
+
+def palette_colour(colour_name: str) -> str:
+    return f"var({css_variable(colour_name)},{MUDGYM_PALETTE[colour_name]})"
+
+
 # Literal fallbacks so a notebook still renders without MudGym's stylesheet.
 SANS = "var(--notebook-sans,'Notebook Inter',Inter,'Segoe UI',sans-serif)"
 MONO = "var(--notebook-mono,'Notebook JetBrains Mono','JetBrains Mono','Fira Mono',monospace)"
 RULE = "var(--notebook-rule,#e3e7e5)"
 TINT = "var(--notebook-tint,#eef2f0)"
 MUTED = "var(--notebook-muted,#6c7a75)"
-INK = "var(--notebook-ink,#1b2825)"
-PRIMARY = "var(--notebook-primary,#18352f)"
-SECONDARY = "var(--notebook-secondary,#244c44)"
-ACCENT = "var(--notebook-accent,#b58a2a)"
-PAGE = "var(--notebook-background,#ffffff)"
+INK = palette_colour("ink")
+PRIMARY = palette_colour("primary")
+SECONDARY = palette_colour("secondary")
+ACCENT = palette_colour("accent")
+PAGE = palette_colour("background")
 
 PANEL_STYLE = f"border:1px solid {RULE};border-radius:8px;background:{PAGE};"
+
+# The vertical rhythm between stacked widgets.
+BLOCK_MARGIN = "margin:0.3rem 0 0.5rem;"
 
 CODE_SPAN_STYLE = (
     f"font-family:{MONO};background:{TINT};color:{SECONDARY};"
@@ -40,6 +62,11 @@ CODE_SPAN_STYLE = (
 LABEL_STYLE = (
     f"font-family:{MONO};font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:{MUTED};"
 )
+
+
+def empty_html(message: str) -> HTML:
+    """Render the muted line a widget shows when it has nothing to draw."""
+    return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">{html_lib.escape(message)}</p>')
 
 
 def caption_html(text: str) -> str:

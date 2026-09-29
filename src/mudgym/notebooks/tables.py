@@ -5,19 +5,26 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from mudgym.notebooks.style import (
+    BLOCK_MARGIN,
     HTML,
     INK,
     LABEL_STYLE,
     MONO,
     MUTED,
-    PAGE,
     PANEL_STYLE,
     RULE,
     SANS,
     SECONDARY,
     TINT,
     cell_text,
+    empty_html,
 )
+
+
+def grid_style(minimum_width: str) -> str:
+    # auto-fit, not auto-fill, so a single item fills the width instead of
+    # sitting in a narrow column beside empty ones.
+    return f"display:grid;gap:0.6rem;{BLOCK_MARGIN}grid-template-columns:repeat(auto-fit,minmax({minimum_width},1fr));"
 
 
 def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str] = ()) -> HTML:
@@ -30,7 +37,7 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
     """
     rows = list(rows)
     if not rows:
-        return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">No rows.</p>')
+        return empty_html("No rows.")
 
     columns = list(rows[0])
     numeric_columns = {
@@ -66,7 +73,7 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
         body_rows.append(f'<tr style="{stripe}">{"".join(cells)}</tr>')
 
     return HTML(
-        f'<div class="notebook-table" style="{PANEL_STYLE}overflow-x:auto;margin:0.3rem 0 0.5rem;">'
+        f'<div class="notebook-table" style="{PANEL_STYLE}overflow-x:auto;{BLOCK_MARGIN}">'
         f'<table style="border-collapse:collapse;width:100%;font-family:{SANS};font-size:0.92rem;color:{INK};">'
         f"<thead><tr>{header_cells}</tr></thead>"
         f"<tbody>{''.join(body_rows)}</tbody>"
@@ -89,12 +96,11 @@ def show_turn_bars(
     """
     values = [int(row[value_key]) for row in rows]
     if not values:
-        return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">No turns.</p>')
+        return empty_html("No turns.")
 
     top = max([*values, max_value or 1, 1])
     peak = max(values)
     peak_turn = values.index(peak) + 1
-    bar_fill = "var(--notebook-secondary,#244c44)"
 
     bar_width = min(40, max(2, 640 // len(values) - 2))
     stride = bar_width + 2
@@ -107,7 +113,7 @@ def show_turn_bars(
         bar_height = round(plot_height * value / top)
         visible_bar = (
             f'<rect x="{x}" y="{plot_height - bar_height}" width="{bar_width}" height="{bar_height}" rx="1.5" fill="'
-            f'{bar_fill}"/>'
+            f'{SECONDARY}"/>'
             if bar_height
             else ""
         )
@@ -119,7 +125,7 @@ def show_turn_bars(
 
     caption = f"peak {peak} on turn {peak_turn} · {len(values)} turn{'s' if len(values) != 1 else ''}"
     return HTML(
-        f'<div style="font-family:{SANS};margin:0.3rem 0 0.5rem;">'
+        f'<div style="font-family:{SANS};{BLOCK_MARGIN}">'
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;">'
         f'<span style="{LABEL_STYLE}">{html_lib.escape(label)}</span>'
         f'<span style="font-family:{MONO};font-size:0.78rem;color:{MUTED};">{caption}</span>'
@@ -153,25 +159,17 @@ def show_cards(cards: Mapping[str, Mapping[str, Any]], *, minimum_width: str = "
             f"{field_rows}</dl></section>"
         )
 
-    # auto-fit, not auto-fill, so a single card fills the width instead of
-    # sitting in a narrow column beside empty ones.
-    return HTML(
-        f'<div class="notebook-cards" style="display:grid;gap:0.6rem;margin:0.3rem 0 0.5rem;'
-        f'grid-template-columns:repeat(auto-fit,minmax({minimum_width},1fr));">{"".join(panels)}</div>'
-    )
+    return HTML(f'<div class="notebook-cards" style="{grid_style(minimum_width)}">{"".join(panels)}</div>')
 
 
 def show_stats(stats: Mapping[str, Any]) -> HTML:
     """Render a row of headline numbers, one tile per entry."""
     tiles = "".join(
-        f'<div style="border:1px solid {RULE};background:{PAGE};padding:0.6rem 0.85rem;">'
+        f'<div style="{PANEL_STYLE}padding:0.6rem 0.85rem;">'
         f'<div style="{LABEL_STYLE}">{html_lib.escape(str(label))}</div>'
         f'<div style="font-family:{SANS};font-size:1.5rem;font-weight:740;letter-spacing:-0.02em;'
         f'color:{INK};font-variant-numeric:tabular-nums;">{html_lib.escape(cell_text(value))}</div>'
         f"</div>"
         for label, value in stats.items()
     )
-    return HTML(
-        f'<div class="notebook-stats" style="display:grid;gap:0.6rem;margin:0.3rem 0 0.5rem;'
-        f'grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));">{tiles}</div>'
-    )
+    return HTML(f'<div class="notebook-stats" style="{grid_style("9rem")}">{tiles}</div>')

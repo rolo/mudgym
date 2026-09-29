@@ -8,6 +8,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from mudgym.db.directions import DIRECTION_INDEX_BY_NAME
 from mudgym.notebooks.style import (
     ACCENT,
+    BLOCK_MARGIN,
     HTML,
     INK,
     MONO,
@@ -17,6 +18,7 @@ from mudgym.notebooks.style import (
     PRIMARY,
     SANS,
     SECONDARY,
+    empty_html,
 )
 
 # Every drawn map needs its own arrowhead marker id.
@@ -173,7 +175,7 @@ def show_room_map(
         )
     )
     if not ordered_rooms:
-        return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">No rooms discovered yet.</p>')
+        return empty_html("No rooms discovered yet.")
 
     # Everything shrinks as the map fills up, so a long mission still fits.
     density = min(1.0, max(0.0, (len(ordered_rooms) - 4) / 28))
@@ -379,7 +381,7 @@ def show_room_map(
     # nothing, and a small one stays at its drawn size.
     return HTML(
         f'<div class="notebook-map" style="{PANEL_STYLE}padding:0.5rem 0.6rem 0.35rem;overflow-x:auto;'
-        f'margin:0.3rem 0 0.5rem;">'
+        f'{BLOCK_MARGIN}">'
         f'<svg viewBox="0 0 {svg_width:.0f} {svg_height:.0f}" role="img" aria-label="Discovered room map" '
         f'style="display:block;height:auto;margin-inline:auto;width:100%;max-width:{svg_width:.0f}px;'
         f'min-width:{min(svg_width, 980):.0f}px;">'

@@ -13,7 +13,6 @@ from mudgym.notebooks.style import (
     HTML,
     LABEL_STYLE,
     MONO,
-    MUTED,
     PAGE,
     PRIMARY,
     RULE,
@@ -22,6 +21,7 @@ from mudgym.notebooks.style import (
     TINT,
     caption_html,
     cell_text,
+    empty_html,
 )
 from mudgym.notebooks.tables import show_table
 
@@ -32,14 +32,14 @@ from mudgym.notebooks.tables import show_table
 FRAME_STYLE = (
     f"background:{TERMINAL_SURFACE};"
     f"color:{TERMINAL_INK};"
-    "font-family:'Notebook JetBrains Mono','JetBrains Mono','Fira Code','Consolas','Monaco',monospace;"
+    f"font-family:{MONO};"
     "font-size:14px;"
     "line-height:1.5;"
     "padding:1.1em 1.2em;"
     "margin:0;"
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
-    "border:1px solid var(--notebook-primary,#18352f);"
+    f"border:1px solid {PRIMARY};"
     "border-radius:8px;"
     "box-shadow:0 12px 28px rgba(24,53,47,0.12);"
 )
@@ -83,7 +83,7 @@ COLLAPSE_STYLE = f"""<style>
     right: 0;
     height: 5em;
     border-radius: 0 0 8px 8px;
-    background: linear-gradient(to bottom, transparent, var(--notebook-code-background,#0b0d0c));
+    background: linear-gradient(to bottom, transparent, {TERMINAL_SURFACE});
     pointer-events: none;
 }}
 .game-frame-collapsible > .game-frame-more::after {{ content: "show more"; }}
@@ -91,31 +91,31 @@ COLLAPSE_STYLE = f"""<style>
 .game-frame-collapsible > input:checked ~ .game-frame-more::after {{ content: "show less"; }}
 </style>"""
 
-TAB_STYLE = """<style>
-.game-tabs > input { position: absolute; opacity: 0; pointer-events: none; }
-.game-tabs .game-tab-panel { display: none; }
-.game-tabs > input:nth-of-type(1):checked ~ .game-tab-panel-display { display: block; }
-.game-tabs > input:nth-of-type(2):checked ~ .game-tab-panel-raw { display: block; }
-.game-tabs > input:nth-of-type(3):checked ~ .game-tab-panel-observation { display: block; }
-.game-tabs .game-tab-labels { display: flex; gap: 0.4rem; margin: 0 0 0.5rem; }
-.game-tabs .game-tab-labels label {
+TAB_STYLE = f"""<style>
+.game-tabs > input {{ position: absolute; opacity: 0; pointer-events: none; }}
+.game-tabs .game-tab-panel {{ display: none; }}
+.game-tabs > input:nth-of-type(1):checked ~ .game-tab-panel-display {{ display: block; }}
+.game-tabs > input:nth-of-type(2):checked ~ .game-tab-panel-raw {{ display: block; }}
+.game-tabs > input:nth-of-type(3):checked ~ .game-tab-panel-observation {{ display: block; }}
+.game-tabs .game-tab-labels {{ display: flex; gap: 0.4rem; margin: 0 0 0.5rem; }}
+.game-tabs .game-tab-labels label {{
     cursor: pointer;
     font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     padding: 0.25rem 0.75rem;
     border-radius: 999px;
-    border: 1px solid var(--notebook-primary, #18352f);
-    color: var(--notebook-primary, #18352f);
+    border: 1px solid {PRIMARY};
+    color: {PRIMARY};
     opacity: 0.65;
-}
+}}
 .game-tabs > input:nth-of-type(1):checked ~ .game-tab-labels label:nth-of-type(1),
 .game-tabs > input:nth-of-type(2):checked ~ .game-tab-labels label:nth-of-type(2),
-.game-tabs > input:nth-of-type(3):checked ~ .game-tab-labels label:nth-of-type(3) {
-    background: var(--notebook-primary, #18352f);
-    color: #ffffff;
+.game-tabs > input:nth-of-type(3):checked ~ .game-tab-labels label:nth-of-type(3) {{
+    background: {PRIMARY};
+    color: {PAGE};
     opacity: 1;
-}
+}}
 </style>"""
 
 ACCORDION_SUMMARY_STYLE = (
@@ -124,8 +124,8 @@ ACCORDION_SUMMARY_STYLE = (
     "font-weight:600;"
     "padding:0.45rem 0.8rem;"
     "border-radius:6px;"
-    "background:var(--notebook-primary,#18352f);"
-    "color:#ffffff;"
+    f"background:{PRIMARY};"
+    f"color:{PAGE};"
 )
 
 # Episode captions read as the h3 headings the notebooks write by hand, so a
@@ -268,7 +268,7 @@ def show_frames(frames: Mapping[str, Any], *, label: str = "", selected: int = -
     """
     frames = dict(frames)
     if not frames:
-        return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">No frames.</p>')
+        return empty_html("No frames.")
 
     group = f"frames-{next(FRAME_SET_IDS)}"
     count = len(frames)
@@ -368,7 +368,7 @@ def show_episode(
     """
     transitions = list(transitions)
     if not transitions:
-        return HTML(f'<p style="font-family:{SANS};color:{MUTED};margin:0.4rem 0;">No transitions.</p>')
+        return empty_html("No transitions.")
 
     blocks = []
     for position, transition in enumerate(transitions, start=1):

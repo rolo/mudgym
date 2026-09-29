@@ -4,29 +4,9 @@ import html as html_lib
 from collections.abc import Sequence
 from typing import Any
 
-from mudgym.notebooks.style import HTML
+from mudgym.notebooks.style import HTML, MUDGYM_PALETTE, css_variable
 
-NOTEBOOK_PALETTES = {
-    "mudgym": {
-        "primary": "#18352f",
-        "secondary": "#244c44",
-        "accent": "#b58a2a",
-        "highlight": "#f6ff31",
-        "background": "#ffffff",
-        "ink": "#1b2825",
-        "code_background": "#0b0d0c",
-    },
-}
-
-CSS_VARIABLE_BY_COLOUR = {
-    "primary": "--notebook-primary",
-    "secondary": "--notebook-secondary",
-    "accent": "--notebook-accent",
-    "highlight": "--notebook-highlight",
-    "background": "--notebook-background",
-    "ink": "--notebook-ink",
-    "code_background": "--notebook-code-background",
-}
+NOTEBOOK_PALETTES = {"mudgym": MUDGYM_PALETTE}
 
 
 def notebook_palette(
@@ -59,7 +39,7 @@ def notebook_palette(
         for colour_name, default_colour in NOTEBOOK_PALETTES[palette].items()
     }
     css_declarations = "\n".join(
-        f"        {CSS_VARIABLE_BY_COLOUR[colour_name]}: {colour};" for colour_name, colour in selected_colours.items()
+        f"        {css_variable(colour_name)}: {colour};" for colour_name, colour in selected_colours.items()
     )
     escaped_palette = html_lib.escape(palette, quote=True)
     return HTML(
