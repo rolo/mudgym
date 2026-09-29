@@ -131,24 +131,24 @@ body {
 .md-typeset .highlighttable {
   --md-code-bg-color: var(--notebook-code-background);
   --md-code-fg-color: #ffffff;
-  --md-code-bg-color--light: color-mix(in srgb, #ffffff 10%, var(--notebook-code-background));
-  --md-code-bg-color--lighter: color-mix(in srgb, #ffffff 5%, var(--notebook-code-background));
+  --md-code-bg-color--light: color-mix(in srgb, var(--md-code-fg-color) 10%, var(--notebook-code-background));
+  --md-code-bg-color--lighter: color-mix(in srgb, var(--md-code-fg-color) 5%, var(--notebook-code-background));
   --md-code-hl-color: color-mix(in srgb, var(--notebook-accent) 24%, transparent);
   --md-code-hl-keyword-color: #e0b455;
   --md-code-hl-string-color: #a6d5a8;
   --md-code-hl-number-color: #8fcfc0;
-  --md-code-hl-constant-color: #8fcfc0;
-  --md-code-hl-function-color: #ffffff;
-  --md-code-hl-name-color: #ffffff;
+  --md-code-hl-constant-color: var(--md-code-hl-number-color);
+  --md-code-hl-function-color: var(--md-code-fg-color);
+  --md-code-hl-name-color: var(--md-code-fg-color);
   --md-code-hl-operator-color: #c2cbc6;
-  --md-code-hl-punctuation-color: #c2cbc6;
+  --md-code-hl-punctuation-color: var(--md-code-hl-operator-color);
   --md-code-hl-comment-color: #849089;
   --md-code-hl-special-color: #e8d5a0;
-  --md-code-hl-variable-color: #e8d5a0;
-  --md-code-hl-generic-color: #ffffff;
+  --md-code-hl-variable-color: var(--md-code-hl-special-color);
+  --md-code-hl-generic-color: var(--md-code-fg-color);
   /* The copy button and its .md-code__nav backing pick these up. */
-  --md-default-fg-color--lightest: color-mix(in srgb, #ffffff 45%, transparent);
-  --md-default-fg-color--light: color-mix(in srgb, #ffffff 85%, transparent);
+  --md-default-fg-color--lightest: color-mix(in srgb, var(--md-code-fg-color) 45%, transparent);
+  --md-default-fg-color--light: color-mix(in srgb, var(--md-code-fg-color) 85%, transparent);
 }
 
 .md-typeset div.highlight .c,
@@ -205,27 +205,21 @@ body {
   background-color: color-mix(in srgb, var(--notebook-accent) 10%, transparent);
 }
 
-.md-typeset .tip > .admonition-title::before,
-.md-typeset .tip > summary::before {
-  background-color: var(--notebook-accent);
-}
-
-.md-typeset .tip > .admonition-title::after,
-.md-typeset .tip > summary::after {
-  color: var(--notebook-accent);
-}
-
 /* Pull warning off Material's default orange and onto the brass accent. */
 .md-typeset .admonition.warning,
 .md-typeset details.warning {
   background-color: color-mix(in srgb, var(--notebook-accent) 12%, transparent);
 }
 
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before,
 .md-typeset .warning > .admonition-title::before,
 .md-typeset .warning > summary::before {
   background-color: var(--notebook-accent);
 }
 
+.md-typeset .tip > .admonition-title::after,
+.md-typeset .tip > summary::after,
 .md-typeset .warning > .admonition-title::after,
 .md-typeset .warning > summary::after {
   color: var(--notebook-accent);
