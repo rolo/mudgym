@@ -57,11 +57,12 @@ def test_output_before_a_compound_player_command_rejection_survives_observation(
     env = scripted_env_factory(observation="parsed", connection=connection)
     env.reset()
 
-    obs, _, terminated, truncated, _ = env.step(action)
+    obs, _, terminated, truncated, info = env.step(action)
 
     assert "dances" in obs["text"]
     assert "don't know the word" in obs["text"].lower()
     assert obs["room_name"] == "dally lane"
+    assert info["action_rejected"] is True
     assert terminated is False
     assert truncated is False
 

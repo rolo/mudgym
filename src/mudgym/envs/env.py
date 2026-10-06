@@ -6,7 +6,7 @@ from typing import Any
 import gymnasium as gym
 
 from mudgym.connections.connection import MudConnection
-from mudgym.connections.prompts import INVALID_COMMAND_PROMPTS
+from mudgym.connections.prompts import COMMAND_REJECTION_LINES
 from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.envs.fields import FieldSpec, ObservationField, instantiate_field
@@ -39,10 +39,11 @@ def command_rejected(raw_bytes: bytes, sent_lines: Sequence[str]) -> bool:
     """Whether the game's parser rejected any sent line, judged from the game output alone.
 
     The echoes are removed first because they repeat whatever the player typed, so an action spelling out a
-    rejection line would otherwise report itself.
+    rejection line would otherwise report itself. Each prompt-delimited chunk is then one reply, so a rejection
+    starts a line within its chunk whether or not the prompt that follows it has arrived yet.
     """
     game_bytes = b"".join(split_on_echo_lines(raw_bytes, sent_lines) or [raw_bytes])
-    return any(pattern.search(game_bytes) for pattern in INVALID_COMMAND_PROMPTS)
+    return any(pattern.search(chunk) for chunk in split_on_prompt(game_bytes) for pattern in COMMAND_REJECTION_LINES)
 
 
 class MudEnv(gym.Env[dict[str, Any], str]):

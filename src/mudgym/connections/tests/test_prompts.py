@@ -1,16 +1,13 @@
 import pytest
 
 from mudgym.connections.prompts import (
-    INVALID_COMMAND_PROMPTS,
+    COMMAND_REJECTION_LINES,
     Prompt,
     regex_up_to_next_prompt,
 )
 
 # the game prompt as captured from the wire: blue star, then the colour the input echo will use
 GAME_PROMPT = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-# captured while conversing and while invisible, each decoration in its own colour
-CONVERSING_PROMPT = b"\x1b[0;34;40m>\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-INVISIBLE_PROMPT = b"\x1b[0;34;40m(\x1b[1;34;40m*\x1b[0;34;40m)\x1b[1;37;40m"
 
 
 class TestUpToNextPromptStopsAtAMidStreamPrompt:
@@ -71,15 +68,12 @@ class TestUpToNextPromptStopsAtAMidStreamPrompt:
         b"Your command is too long for me, sorry!",
     ],
 )
-@pytest.mark.parametrize(
-    "prompt", [GAME_PROMPT, CONVERSING_PROMPT, INVISIBLE_PROMPT], ids=["plain", "conversing", "invisible"]
-)
-def test_invalid_command_prompts_match_system_lines_but_not_spoken_copies(message, prompt):
-    genuine_response = b"\x1b[0;37;40m" + message + b"\r\n" + prompt
-    spoken_copy = b'Raymond the protector says "' + message + b'".\r\n' + prompt
+def test_command_rejection_lines_match_system_lines_but_not_spoken_copies(message):
+    genuine_response = b"\x1b[0;37;40m" + message + b"\r\n"
+    spoken_copy = b'Raymond the protector says "' + message + b'".\r\n'
 
-    assert any(pattern.search(genuine_response) for pattern in INVALID_COMMAND_PROMPTS)
-    assert not any(pattern.search(spoken_copy) for pattern in INVALID_COMMAND_PROMPTS)
+    assert any(pattern.search(genuine_response) for pattern in COMMAND_REJECTION_LINES)
+    assert not any(pattern.search(spoken_copy) for pattern in COMMAND_REJECTION_LINES)
 
 
 class TestGameOverPromptsRejectPlayerAuthoredText:

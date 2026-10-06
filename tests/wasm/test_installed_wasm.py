@@ -225,6 +225,8 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     ("command", "rejected"),
     [
         ("xyzzyfrobnicate", True),
+        ("dance,xyzzyfrobnicate", True),
+        ("dance,get the", True),
         ("say I don't know the word frobnicate.", False),
         ("say Not updating persona.", False),
         ("Not updating persona.", True),

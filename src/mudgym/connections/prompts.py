@@ -68,15 +68,6 @@ def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
     )
 
 
-def system_line_up_to_next_prompt(needle: bytes) -> re.Pattern:
-    """Match a game-generated response line through its following input prompt.
-
-    The line anchor and optional colour prefix keep player speech and incidental copies of the
-    response text from being mistaken for front-end protocol output.
-    """
-    return regex_up_to_next_prompt(rb"^" + SGR + needle)
-
-
 class Prompt(enum.Enum):
     # Prompts which explicitly mark the end of an episode. Each is anchored to a whole wire line
     # (optionally colour-wrapped) because the bare words are forgeable: a player speaking
@@ -103,13 +94,15 @@ GAME_OVER_PROMPTS = [
 ]
 
 
-COMMAND_REJECTION_LINE_PATTERNS = (
-    b"I made sense of some of that:",
-    b"I made no sense of that:",
-    rb'I don\'t know the word "(\w+)".',
-    rb"I don't know to what \"(\w+)\" you're referring.",
-    b"Your command is too long for me, sorry!",
-)
-INVALID_COMMAND_PROMPTS = [
-    system_line_up_to_next_prompt(line_pattern) for line_pattern in COMMAND_REJECTION_LINE_PATTERNS
+# The parser's replies to a line it cannot read. Each is the game's own line, so it starts a line
+# (optionally colour-wrapped), while a spoken copy sits mid-line behind the speech quoting.
+COMMAND_REJECTION_LINES = [
+    re.compile(rb"(?m)^" + SGR + message)
+    for message in (
+        b"I made sense of some of that:",
+        b"I made no sense of that:",
+        rb'I don\'t know the word "(\w+)".',
+        rb"I don't know to what \"(\w+)\" you're referring.",
+        b"Your command is too long for me, sorry!",
+    )
 ]
