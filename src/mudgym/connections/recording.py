@@ -98,7 +98,6 @@ class RecordingConnection(MudConnection):
             raw_text=raw_bytes.decode("latin-1"),
             terminated=bool(terminated),
             incomplete=bool(incomplete),
-            rejected=bool(debug_info.get("rejected", False)),
             sent_lines=debug_info["sent_lines"],
             persona=debug_info.get("persona"),
             world_seed=debug_info.get("world_seed"),
@@ -156,7 +155,6 @@ class ReplayConnection(MudConnection):
             call["terminated"],
             call["incomplete"],
             {
-                "rejected": call["rejected"],
                 "replayed": True,
                 "capture": str(self.path),
                 "sent_lines": call["sent_lines"],

@@ -1,7 +1,7 @@
 import pytest
 
 from mudgym.connections.registry import connections
-from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END
+from mudgym.envs.env import TEAROOM_EXIT_NARRATION_END, command_rejected
 from mudgym.session import MudSession
 
 
@@ -89,7 +89,7 @@ def test_rejection_before_final_line_echo_is_reported_after_batch_completes(conn
 
         assert b"xyzzyfrobnicate" in raw_bytes
         assert b"========" in raw_bytes
-        assert debug_info["rejected"] is True
+        assert command_rejected(raw_bytes, debug_info["sent_lines"]) is True
         assert terminated is False
         assert incomplete is False
     finally:
@@ -108,7 +108,7 @@ def test_spoken_rejection_text_is_not_reported_as_a_rejected_command(connection_
 
         assert b"says" in raw_bytes
         assert b"========" in raw_bytes
-        assert debug_info["rejected"] is False
+        assert command_rejected(raw_bytes, debug_info["sent_lines"]) is False
         assert terminated is False
         assert incomplete is False
     finally:
@@ -126,7 +126,7 @@ def test_player_command_with_too_many_parts_does_not_prevent_the_observation_lin
 
         assert b"Your command is too long for me, sorry!" in raw_bytes
         assert b"========" in raw_bytes
-        assert debug_info["rejected"] is True
+        assert command_rejected(raw_bytes, debug_info["sent_lines"]) is True
         assert terminated is False
         assert incomplete is False
     finally:

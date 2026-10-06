@@ -37,7 +37,7 @@ def drive_conversation(connection):
 
 def test_connection_capture_round_trips_every_byte_value(tmp_path):
     path = tmp_path / "bytes.jsonl"
-    response = (bytes(range(256)), False, False, {"rejected": False})
+    response = (bytes(range(256)), False, False, {})
     recording = RecordingConnection(ScriptedConnection(responses={"look": response}), path, {"purpose": "test"})
 
     recording.reset()
@@ -114,23 +114,6 @@ def test_recorded_connection_transcript_replays_identically(tmp_path):
     ]
 
 
-def test_replay_preserves_rejected_outcome_and_response_completion(tmp_path):
-    path = tmp_path / "capture.jsonl"
-    response = (b"rejected\r\n", False, False, {"rejected": True})
-    recording = RecordingConnection(ScriptedConnection(responses={"xyzzyfrobnicate": response}), path)
-    recording.reset()
-    send_and_read(recording, ["xyzzyfrobnicate"])
-    recording.close()
-
-    replay = ReplayConnection(path)
-    replay.reset()
-    _, terminated, incomplete, debug_info = send_and_read(replay, ["xyzzyfrobnicate"])
-    replay.assert_exhausted()
-
-    assert debug_info["rejected"] is True
-    assert not terminated and not incomplete
-
-
 def test_replay_verifies_each_sent_line_immediately(tmp_path):
     path = tmp_path / "calls.jsonl"
     recording = RecordingConnection(ScriptedConnection(), path)
@@ -186,7 +169,7 @@ def test_recorded_connection_closed_send_replays_before_action_response_is_drain
         b"buffered death output",
         True,
         False,
-        {"rejected": False},
+        {},
     )
     live_connection = ScriptedConnection(
         responses={"quit": response},

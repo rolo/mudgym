@@ -21,7 +21,6 @@ from mudgym.connections.persona import (
     resolve_personas,
     validate_persona_pool,
 )
-from mudgym.connections.prompts import INVALID_COMMAND_PROMPTS
 from mudgym.connections.termination import has_game_over_prompt
 from mudgym.featurizers.strings import encode_command_bytes
 
@@ -214,7 +213,6 @@ class WasmtimeConnection(MudConnection):
                     "sex": session.persona.sex,
                 },
                 "bytes_length": len(raw_bytes),
-                "rejected": any(pattern.search(game_bytes) for pattern in INVALID_COMMAND_PROMPTS),
                 "sent_lines": [response.echoed_line for response in responses if response.echoed_line is not None],
             },
         )
