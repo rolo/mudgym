@@ -62,8 +62,9 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
             fixed = column in numeric_columns or column in mono_columns
             alignment = "right" if column in numeric_columns else "left"
             face = f"font-family:{MONO};font-size:0.82rem;" if fixed else ""
-            # Names, commands, and numbers keep one line. Prose columns wrap.
-            wrap = "white-space:nowrap;" if fixed else "overflow-wrap:anywhere;"
+            # Names, commands, and numbers keep one line. Prose wraps between words, because "anywhere" lets column
+            # sizing split every word on a narrow screen rather than letting the table scroll in its wrapper.
+            wrap = "white-space:nowrap;" if fixed else "overflow-wrap:break-word;"
             weight = "font-weight:600;" if position == 0 else ""
             cells.append(
                 f'<td style="padding:0.42rem 0.8rem;text-align:{alignment};{face}{weight}{wrap}'
