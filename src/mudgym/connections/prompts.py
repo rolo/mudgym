@@ -37,35 +37,6 @@ DECORATIONS_BEFORE = rb"(?:&" + SGR + rb")?(?:>" + SGR + rb")?(?:\(" + SGR + rb"
 DECORATIONS_AFTER = rb"(?:" + SGR + rb"\])?(?:" + SGR + rb"\)){0,3}"
 
 STARLINE = DECORATIONS_BEFORE + rb"(?:" + DASHES + rb")?\*" + DECORATIONS_AFTER
-PROMPT_CORE = rb"(?:" + STARLINE + rb"|" + DASHES + rb")"
-
-# Possessive so a trailing colour code cannot be given back to sneak the boundary's
-# not-a-complete-line lookahead past a \r\n
-SGR_POSSESSIVE = rb"(?:\x1b\[[0-9;]*m)*+"
-
-# the game can drop one of these in at any moment, including right behind a prompt, where its
-# leading break would otherwise make the prompt look like a complete line
-DATABASE_BROADCAST_LINE = rb"(?:\r?\n)+\+- (?:Database \d+|The database) has finished initialising"
-
-# A genuine input prompt on the wire starts a physical line and is never a complete line: it
-# dangles awaiting input, or continues with the echo of whatever the player types next. Spoken
-# copies sit mid-line behind the speech quoting and narrative copies end in \r\n, so the two
-# anchors together reject both. A broadcast behind a prompt does not make it a complete line.
-DANGLES = rb"(?:(?![\r\n])|(?=" + DATABASE_BROADCAST_LINE + rb"))"
-
-NEXT_PROMPT_BOUNDARY = rb"(?m:^)" + SGR + PROMPT_CORE + SGR_POSSESSIVE + DANGLES
-
-
-def regex_up_to_next_prompt(needle: bytes, extra_flags: int = 0) -> re.Pattern:
-    """
-    Return a regex that matches up to the next game prompt beyond the given match.
-
-    The terminator stops at the first genuine prompt, so responses that ran ahead of the reader don't swallow the following command's response.
-    """
-    return re.compile(
-        needle + rb".*?" + NEXT_PROMPT_BOUNDARY,
-        re.MULTILINE | re.DOTALL | extra_flags,
-    )
 
 
 class Prompt(enum.Enum):
