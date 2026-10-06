@@ -10,8 +10,8 @@ authors:
     given-names: "Rolo"
     email: "rolo@kingrolo.com"
 
-version: "0.5.1"
-date-released: "2026-09-19"
+version: "0.6.0"
+date-released: "2026-10-06"
 
 license: MIT
 url: "https://rolo.github.io/mudgym/"
