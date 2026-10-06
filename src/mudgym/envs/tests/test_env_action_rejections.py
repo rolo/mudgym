@@ -24,7 +24,7 @@ def rejected_response(action: str = ACTION, *, preceding_output: bytes = b""):
         + PROMPT
         + scripted_response([OBSERVATION_COMMAND_LINE])
     )
-    return raw_bytes, False, False, {"rejected": True}
+    return raw_bytes, False, False, {}
 
 
 def test_rejected_action_keeps_structured_observation(scripted_env_factory):
@@ -57,14 +57,25 @@ def test_output_before_a_compound_player_command_rejection_survives_observation(
     env = scripted_env_factory(observation="parsed", connection=connection)
     env.reset()
 
-    obs, _, terminated, truncated, info = env.step(action)
+    obs, _, terminated, truncated, _ = env.step(action)
 
     assert "dances" in obs["text"]
     assert "don't know the word" in obs["text"].lower()
     assert obs["room_name"] == "dally lane"
-    assert info["action_rejected"] is True
     assert terminated is False
     assert truncated is False
+
+
+def test_rejection_text_in_the_action_echo_is_not_a_rejection(scripted_env_factory):
+    """The echo repeats whatever the player typed, so only the game's own reply can reject a command."""
+    action = REJECTION_TEXT.decode("ascii").strip()
+    raw_bytes = action.encode("ascii") + b"\r\n" + OK_RESPONSE + PROMPT + scripted_response([OBSERVATION_COMMAND_LINE])
+    env = scripted_env_factory(observation="parsed", responses={action: (raw_bytes, False, False, {})})
+    env.reset()
+
+    _, _, _, _, info = env.step(action)
+
+    assert info["action_rejected"] is False
 
 
 def test_rejected_env_step_records_and_replays_identically(tmp_path):

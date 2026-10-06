@@ -39,7 +39,7 @@ def reset_players[Player](
         phase = "observation"
         results = {}
         for player, child in players.items():
-            results[player] = child._finish_reset(*entries[player])
+            results[player] = child._finish_reset(entries[player])
         return results
     except BaseException as error:
         error.add_note(f"player reset failed during {phase} for player {player!r}")

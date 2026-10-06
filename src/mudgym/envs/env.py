@@ -6,6 +6,7 @@ from typing import Any
 import gymnasium as gym
 
 from mudgym.connections.connection import MudConnection
+from mudgym.connections.prompts import INVALID_COMMAND_PROMPTS
 from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.envs.fields import FieldSpec, ObservationField, instantiate_field
@@ -32,6 +33,16 @@ TEAROOM_EXIT_NARRATION_END = re.compile(rb"(?:disperse away to nothingness|sudde
 DATABASE_BROADCAST_RE = re.compile(
     rb"(?m)^\+- (?:Database \d+|The database) has (?:started|finished) initialising -\+\r?\n?"
 )
+
+
+def command_rejected(raw_bytes: bytes, sent_lines: Sequence[str]) -> bool:
+    """Whether the game's parser rejected any sent line, judged from the game output alone.
+
+    The echoes are removed first because they repeat whatever the player typed, so an action spelling out a
+    rejection line would otherwise report itself.
+    """
+    game_bytes = b"".join(split_on_echo_lines(raw_bytes, sent_lines) or [raw_bytes])
+    return any(pattern.search(game_bytes) for pattern in INVALID_COMMAND_PROMPTS)
 
 
 class MudEnv(gym.Env[dict[str, Any], str]):
@@ -199,7 +210,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             "render_bytes": render_bytes,
             "step": self.step_count,
             "persona": self.persona,
-            "action_rejected": bool(transport.get("rejected", False)),
+            "action_rejected": command_rejected(raw_bytes, transport["sent_lines"]),
         }
         if field_refusals:
             info["field_refusals"] = field_refusals
@@ -235,8 +246,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                     f"raw_bytes={raw_bytes!r}, transport={transport!r}"
                 )
 
-    def _enter_world(self) -> tuple[bytes, bool]:
-        """Complete entry and return retained room bytes and the entry's rejection flag."""
+    def _enter_world(self) -> bytes:
+        """Complete entry and return the retained room bytes."""
         self.session.send("move north")
         raw_bytes, terminated, incomplete, transport = self.session.read_pending_response()
         self.update_points(raw_bytes, terminated=terminated)
@@ -247,12 +258,12 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                 f"raw_bytes={raw_bytes!r}, transport={transport!r}"
             )
         try:
-            return self.clean_tearoom_exit(raw_bytes), bool(transport.get("rejected", False))
+            return self.clean_tearoom_exit(raw_bytes)
         except ValueError as error:
             error.add_note(f"entry transport={transport!r}")
             raise
 
-    def _finish_reset(self, entry_bytes: bytes, entry_rejected: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+    def _finish_reset(self, entry_bytes: bytes) -> tuple[dict[str, Any], dict[str, Any]]:
         """Collect final fields and assemble the initial observation once all selected players have entered."""
         observation_bytes, terminated, incomplete, transport = self.session.receive()
         self.update_points(observation_bytes, terminated=terminated)
@@ -263,11 +274,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                 f"(terminated={terminated}, incomplete={incomplete}, points={self.points}) "
                 f"raw_bytes={raw_bytes!r}, transport={transport!r}"
             )
-        transport = {
-            **transport,
-            "bytes_length": len(raw_bytes),
-            "rejected": entry_rejected or bool(transport.get("rejected", False)),
-        }
+        transport = {**transport, "bytes_length": len(raw_bytes)}
         try:
             observation, render_bytes, field_refusals = self.bytes_to_observation(
                 raw_bytes,
@@ -307,9 +314,9 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         try:
             self._prepare_reset(seed=seed, options=options)
             phase = "entry"
-            entry_bytes, entry_rejected = self._enter_world()
+            entry_bytes = self._enter_world()
             phase = "observation"
-            observation, info = self._finish_reset(entry_bytes, entry_rejected)
+            observation, info = self._finish_reset(entry_bytes)
         except BaseException as error:
             error.add_note(f"reset failed during {phase} for persona {self.persona!r}")
             self._invalidate_episode(error)

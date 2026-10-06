@@ -34,12 +34,12 @@ def test_exit_points_events_establish_the_reset_score(scripted_env_factory, befo
     assert reward == 10
 
 
-def test_final_reset_points_and_rejections_are_in_the_initial_baseline(scripted_env_factory):
+def test_final_reset_points_are_in_the_initial_baseline(scripted_env_factory):
     entry = scripted_response(["move north"], reset_step=True)
     fields = b"(+50 = \x1b[0;32;40m250\x1b[1;37;40m).\r\n" + scripted_response(["sql,fes,fex,fei"])
     env = scripted_env_factory(
         responses={
-            "move north": (entry, False, False, {"rejected": True}),
+            "move north": entry,
             "sql,fes,fex,fei": fields,
         }
     )
@@ -47,7 +47,6 @@ def test_final_reset_points_and_rejections_are_in_the_initial_baseline(scripted_
     obs, info = env.reset()
     assert obs["points"] == 250
     assert info["step"] == 0
-    assert info["action_rejected"] and info["transport"]["rejected"]
     assert info["transport"]["bytes_length"] == len(info["raw_bytes"])
     _, reward, terminated, truncated, _ = env.step("look")
     assert reward == 0
