@@ -31,11 +31,16 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "gymnasium>=1.3.0",
+    "gymnasium>=1.3.0; sys_platform != 'emscripten'",
+    # Gymnasium 1.4 imports multiprocessing.synchronize, which Pyodide cannot provide.
+    "gymnasium>=1.3.0,<1.4; sys_platform == 'emscripten'",
     "structlog>=26.1.0",
-    "numpy>=2.5.3",
+    # Pyodide ships numpy 2.4.3.
+    "numpy>=2.4.3",
     "pettingzoo>=1.27.0",
-    "wasmtime>=48.0.0,<49",
+    # The engine module runs under wasmtime natively. Wasmtime cannot load in Pyodide, where the same module runs on
+    # the browser's own WebAssembly instead.
+    "wasmtime>=48.0.0,<49; sys_platform != 'emscripten'",
     "mudgym-wasm-engine~=0.1.4",
 ]
 
