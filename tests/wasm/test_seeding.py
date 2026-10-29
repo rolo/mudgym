@@ -3,7 +3,7 @@ from contextlib import closing
 import pytest
 
 from mudgym import make_env
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 from mudgym.connections.wasm.engine_contract import MAX_SAFE_INTEGER
 
 
@@ -31,7 +31,7 @@ def test_omitted_seed_varies_between_envs_and_can_be_replayed(wasm_runtime, seed
 
 @pytest.mark.parametrize("seed", [None, 0, MAX_SAFE_INTEGER - 1])
 def test_provider_offsets_each_world_from_its_resolved_seed(wasm_runtime, seed):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=2, seed=seed)) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=2, seed=seed)) as provider:
         connections = provider.create_connections(2)
         if seed is not None:
             assert provider.seed == seed
@@ -48,4 +48,4 @@ def test_provider_offsets_each_world_from_its_resolved_seed(wasm_runtime, seed):
 @pytest.mark.parametrize("seed", [-1, True, 1.5, MAX_SAFE_INTEGER + 1])
 def test_provider_rejects_invalid_explicit_seeds(wasm_runtime, seed):
     with pytest.raises(ValueError, match="safe integer range"):
-        WasmtimeProvider(runtime=wasm_runtime, seed=seed)
+        WasmProvider(runtime=wasm_runtime, seed=seed)

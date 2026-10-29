@@ -11,9 +11,10 @@ from contextlib import ExitStack, closing
 import pytest
 
 from mudgym import make_env
-from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
-from mudgym.connections.wasm.wasmtime_provider import WorldAdvancementFailed
-from mudgym.connections.wasm.wasmtime_runtime import WasmtimeTerminalTick, WasmtimeWorld
+from mudgym.connections.wasm import WasmProvider, WasmtimeRuntime
+from mudgym.connections.wasm.provider import WorldAdvancementFailed
+from mudgym.connections.wasm.wasmtime_runtime import WasmtimeInstance
+from mudgym.connections.wasm.world import TerminalTick, WasmWorld
 
 
 class InstrumentedRuntime(WasmtimeRuntime):
@@ -23,13 +24,13 @@ class InstrumentedRuntime(WasmtimeRuntime):
         self.created_worlds = []
 
     def create_world(self, **options):
-        world = self.world_class(self, **options)
+        world = self.world_class(WasmtimeInstance(self), **options)
         self.created_worlds.append(world)
         return world
 
 
 def test_provider_allows_one_valid_batch_after_rejecting_an_invalid_topology(wasm_runtime):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=2)) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=2)) as provider:
         with pytest.raises(ValueError, match="worlds cannot exceed connections"):
             provider.create_connections(1)
         first, independent, peer = provider.create_connections(3)
@@ -50,7 +51,7 @@ def test_provider_allows_one_valid_batch_after_rejecting_an_invalid_topology(was
 def test_provider_timeout_reaches_native_ticks_and_session_admission():
     calls = []
 
-    class TracedWorld(WasmtimeWorld):
+    class TracedWorld(WasmWorld):
         def _call(self, name, *arguments):
             if name in {
                 "mud2_shared_tick",
@@ -61,7 +62,7 @@ def test_provider_timeout_reaches_native_ticks_and_session_admission():
                 calls.append((name, arguments[-1]))
             return super()._call(name, *arguments)
 
-    with closing(WasmtimeProvider(runtime=InstrumentedRuntime(TracedWorld), worlds=1, timeout_ms=123)) as provider:
+    with closing(WasmProvider(runtime=InstrumentedRuntime(TracedWorld), worlds=1, timeout_ms=123)) as provider:
         connection, _ = provider.create_connections(2)
         connection.reset()
         provider.advance_worlds(1)
@@ -80,11 +81,11 @@ def test_failed_reset_cleans_every_new_world_and_keeps_the_build_failure():
     construction_error = OSError("world construction failed")
     shutdown_error = RuntimeError("world shutdown failed")
 
-    class FailingWorld(WasmtimeWorld):
-        def __init__(self, runtime, *, seed, **options):
+    class FailingWorld(WasmWorld):
+        def __init__(self, instance, *, seed, **options):
             if seed == 32:
                 raise construction_error
-            super().__init__(runtime, seed=seed, **options)
+            super().__init__(instance, seed=seed, **options)
             self.fail_shutdown = seed == 30
 
         def shutdown(self):
@@ -93,7 +94,7 @@ def test_failed_reset_cleans_every_new_world_and_keeps_the_build_failure():
                 raise shutdown_error
 
     runtime = InstrumentedRuntime(FailingWorld)
-    provider = WasmtimeProvider(runtime=runtime)
+    provider = WasmProvider(runtime=runtime)
     try:
         connections = provider.create_connections(3)
         provider.reset(seed=10)
@@ -113,13 +114,13 @@ def test_failed_reset_cleans_every_new_world_and_keeps_the_build_failure():
     finally:
         provider.close()
         for world in runtime.created_worlds:
-            WasmtimeWorld.shutdown(world)
+            WasmWorld.shutdown(world)
 
 
 def test_failed_admission_preserves_the_native_error_when_shutdown_also_fails():
     shutdown_error = RuntimeError("world shutdown failed")
 
-    class OverfilledWorld(WasmtimeWorld):
+    class OverfilledWorld(WasmWorld):
         def add_session(self, persona, *arguments, **options):
             super().add_session(persona, *arguments, **options)
             return super().add_session(persona, *arguments, **options)
@@ -129,7 +130,7 @@ def test_failed_admission_preserves_the_native_error_when_shutdown_also_fails():
             raise shutdown_error
 
     runtime = InstrumentedRuntime(OverfilledWorld)
-    with closing(WasmtimeProvider(runtime=runtime)) as provider:
+    with closing(WasmProvider(runtime=runtime)) as provider:
         provider.create_connections(1)
         with pytest.raises(ExceptionGroup) as raised:
             provider.reset()
@@ -143,7 +144,7 @@ def test_failed_admission_preserves_the_native_error_when_shutdown_also_fails():
 def interrupted_tick():
     started, release, completed, returned = (threading.Event() for _ in range(4))
 
-    class PausedWorld(WasmtimeWorld):
+    class PausedWorld(WasmWorld):
         def tick(self, *arguments, **options):
             started.set()
             assert release.wait(5), "tick was never released"
@@ -157,7 +158,7 @@ def interrupted_tick():
         returned.wait(0.2)
         release.set()
 
-    with closing(WasmtimeProvider(runtime=InstrumentedRuntime(PausedWorld))) as provider:
+    with closing(WasmProvider(runtime=InstrumentedRuntime(PausedWorld))) as provider:
         provider.create_connections(1)
         provider.reset()
         interrupter = threading.Thread(target=interrupt)
@@ -206,8 +207,8 @@ def test_interrupted_submission_settles_started_work_and_rolls_back_reset(operat
         returned.wait(0.2)
         release.set()
 
-    runtime = InstrumentedRuntime(WasmtimeWorld)
-    provider = WasmtimeProvider(runtime=runtime)
+    runtime = InstrumentedRuntime(WasmWorld)
+    provider = WasmProvider(runtime=runtime)
     try:
         provider.create_connections(2)
         provider.reset(seed=10)
@@ -245,7 +246,7 @@ def test_interrupted_submission_settles_started_work_and_rolls_back_reset(operat
 
 
 def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runtime):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=1)) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=1)) as provider:
         player, peer = provider.create_connections(2)
         player.reset()
         peer.reset()
@@ -267,7 +268,7 @@ def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runt
 @pytest.mark.parametrize("advance_directly", [False, True])
 def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm_runtime, advance_directly):
     with ExitStack() as stack:
-        provider = stack.enter_context(closing(WasmtimeProvider(runtime=wasm_runtime, worlds=2)))
+        provider = stack.enter_context(closing(WasmProvider(runtime=wasm_runtime, worlds=2)))
         first, second = [
             stack.enter_context(make_env(connection=connection, observation="text"))
             for connection in provider.create_connections(2)
@@ -282,7 +283,7 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
             assert raised.value.successes == {1: 1}
             assert set(raised.value.failures) == {0}
             terminal = raised.value.failures[0]
-            assert isinstance(terminal, WasmtimeTerminalTick)
+            assert isinstance(terminal, TerminalTick)
             assert terminal.tick_failure["requested_ticks"] == 1
             assert terminal.tick_failure["completed_ticks"] == 0
         first.act("look")
@@ -300,7 +301,7 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
 
 @pytest.mark.parametrize("advance_connection", [False, True])
 def test_step_clock_does_not_suppress_runtime_errors(wasm_runtime, advance_connection):
-    with closing(WasmtimeProvider(runtime=wasm_runtime)) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime)) as provider:
         (connection,) = provider.create_connections(1)
         provider.reset(seed=123)
         provider._ordered_worlds[0].shutdown()

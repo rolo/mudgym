@@ -12,13 +12,13 @@ import pytest
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.persona import DEFAULT_PERSONA_POOL, Persona
 from mudgym.connections.recording import RecordingProvider
-from mudgym.connections.wasm import WasmtimeProvider, WasmtimeRuntime
+from mudgym.connections.wasm import WasmProvider, WasmtimeRuntime
 from mudgym.envs.factory import create_players
 
 
 @pytest.mark.parametrize("recording", [False, True])
 def test_parallel_env_rejects_multiple_wasm_worlds_and_closes_provider(wasm_runtime, tmp_path, recording):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
+    provider = WasmProvider(runtime=wasm_runtime, worlds=2)
     wrapped = provider
     if recording:
         wrapped = RecordingProvider(provider, lambda index: tmp_path / f"player{index}.jsonl")
@@ -32,7 +32,7 @@ def test_parallel_env_rejects_multiple_wasm_worlds_and_closes_provider(wasm_runt
 
 
 def test_parallel_env_accepts_connections_in_one_wasm_world(wasm_runtime):
-    environment = make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))
+    environment = make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1))
     try:
         environment.reset(seed=123)
     finally:
@@ -40,7 +40,7 @@ def test_parallel_env_accepts_connections_in_one_wasm_world(wasm_runtime):
 
 
 def test_create_players_allows_independent_wasm_worlds(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=2)
+    provider = WasmProvider(runtime=wasm_runtime, worlds=2)
     children = create_players(2, provider, (), None, None)
     try:
         assert [provider.world_for_connection(index) for index in range(2)] == [0, 1]
@@ -86,7 +86,7 @@ def test_default_civil_clock_starts_at_midnight_on_every_scalar_reset(wasm_runti
 
 
 def test_pending_peer_output_precedes_the_observation_command_echo(wasm_runtime):
-    provider = WasmtimeProvider(
+    provider = WasmProvider(
         runtime=wasm_runtime,
         worlds=1,
         personas=(("Aaron", "male"), ("Abbie", "male")),
@@ -138,7 +138,7 @@ def test_civil_anchor_offset_and_ticks_are_retained_across_resets(wasm_runtime, 
         env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime, "civil_time_anchor": anchor})
         action = "time"
     else:
-        env = make_parallel_env(1, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor))
+        env = make_parallel_env(1, provider=WasmProvider(runtime=wasm_runtime, worlds=1, civil_time_anchor=anchor))
         action = {"player_0": "time"}
     try:
         runs = []
@@ -201,7 +201,7 @@ def test_existing_observation_presets_reset_and_step_with_real_engine_bytes(wasm
 
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
+    provider = WasmProvider(runtime=wasm_runtime, worlds=1)
 
     def ticker():
         provider.advance_worlds(3)
@@ -219,6 +219,31 @@ def test_explicit_world_ticker_overrides_the_backend_clock(wasm_runtime, mode):
     finally:
         env.close()
         provider.close()
+
+
+@pytest.mark.parametrize("mode", ["scalar", "parallel"])
+def test_each_step_runs_the_provider_s_ticks_per_step(wasm_runtime, mode):
+    if mode == "scalar":
+        env = make_env(connection_kwargs={"runtime": wasm_runtime, "ticks_per_step": 4})
+        provider = env.unwrapped.session.connection.provider
+        action = "look"
+    else:
+        provider = WasmProvider(runtime=wasm_runtime, worlds=1, ticks_per_step=4)
+        env = make_parallel_env(2, provider=provider)
+        action = {"player_0": "look", "player_1": "look"}
+    try:
+        env.reset(seed=123)
+        env.step(action)
+        env.step(action)
+        assert provider.advance_worlds(0) == {0: 8}
+    finally:
+        env.close()
+
+
+@pytest.mark.parametrize("ticks_per_step", [0, -1, True, 1.5])
+def test_ticks_per_step_must_be_a_positive_integer(wasm_runtime, ticks_per_step):
+    with pytest.raises(ValueError, match="ticks_per_step must be a positive integer"):
+        WasmProvider(runtime=wasm_runtime, ticks_per_step=ticks_per_step)
 
 
 @pytest.mark.parametrize(
@@ -248,7 +273,7 @@ def test_closing_the_wasm_envs_releases_their_workers(wasm_runtime):
     before = set(threading.enumerate())
     for env in (
         make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}),
-        make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1)),
+        make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1)),
     ):
         try:
             env.reset(seed=211)
@@ -264,7 +289,7 @@ def test_a_copied_module_needs_no_neighbouring_game_data(tmp_path):
     module = tmp_path / "mud2-wasi.wasm"
     shutil.copyfile(str(files("mudgym_wasm_engine").joinpath("wasi/mud2-wasi.wasm")), module)
     runtime = WasmtimeRuntime(wasm_path=module)
-    provider = WasmtimeProvider(runtime=runtime, worlds=1)
+    provider = WasmProvider(runtime=runtime, worlds=1)
     env = make_parallel_env(1, provider=provider)
     try:
         env.reset(seed=123)
@@ -278,7 +303,7 @@ def test_a_copied_module_needs_no_neighbouring_game_data(tmp_path):
 
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
 def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runtime, mode):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
+    provider = WasmProvider(runtime=wasm_runtime, worlds=1)
     if mode == "scalar":
         connection = provider.create_connections(1)[0]
         env = make_env(connection=connection)
@@ -301,7 +326,7 @@ def test_each_joint_step_advances_worlds_once_and_observation_does_not(wasm_runt
 
 
 def test_bytes_observation_retains_peer_output(wasm_runtime):
-    provider = WasmtimeProvider(
+    provider = WasmProvider(
         runtime=wasm_runtime,
         worlds=1,
         personas=(("Aaron", "male"), ("Abbie", "male")),

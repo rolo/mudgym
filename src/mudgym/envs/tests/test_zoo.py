@@ -4,7 +4,7 @@ import pytest
 from pettingzoo.test import parallel_api_test
 
 from mudgym import make_parallel_env
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.specs import ACTION_MAX_LENGTH
 from tests.scripted import ScriptedProvider
 
@@ -49,7 +49,7 @@ def test_same_step_messages_reach_every_shared_world_observation(wasm_runtime, p
     with closing(
         make_parallel_env(
             2,
-            provider=WasmtimeProvider(
+            provider=WasmProvider(
                 runtime=wasm_runtime,
                 worlds=1,
                 personas=(("Aaron", "male"), ("Abbie", "male")),
@@ -127,7 +127,7 @@ def test_parallel_step_uses_only_live_agent_keys():
 
 
 def test_step_removes_terminated_and_truncated_agents(wasm_runtime):
-    with closing(make_parallel_env(3, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+    with closing(make_parallel_env(3, provider=WasmProvider(runtime=wasm_runtime, worlds=1))) as env:
         initial_obs, _ = env.reset(seed=10)
 
         # /t asks for terminal width, leaving an unanswered input request that truncates the step.
@@ -155,7 +155,7 @@ def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces(
 
 
 def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
-    provider = WasmtimeProvider(runtime=wasm_runtime, worlds=1)
+    provider = WasmProvider(runtime=wasm_runtime, worlds=1)
     with closing(make_parallel_env(2, provider=provider)) as env:
         initial_obs, _ = env.reset(seed=17)
         env.step({"player_0": "look", "player_1": "look"})
@@ -171,7 +171,7 @@ def test_parallel_reset_restarts_the_shared_world(wasm_runtime):
 
 
 def test_parallel_reset_observations_include_every_player(wasm_runtime):
-    provider = WasmtimeProvider(
+    provider = WasmProvider(
         runtime=wasm_runtime,
         worlds=1,
         personas=(("Aaron", "male"), ("Abbie", "male")),
@@ -221,7 +221,7 @@ def test_failed_provider_reset_after_all_agents_finish_blocks_the_step_clock(mon
 
 
 def test_parallel_api_contract(wasm_runtime):
-    with closing(make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1))) as env:
+    with closing(make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1))) as env:
         parallel_api_test(env, num_cycles=10)
 
 

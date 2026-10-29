@@ -4,7 +4,7 @@ import pytest
 
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.persona import Persona
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 from mudgym.featurizers.ansi import strip_ansi
 
 
@@ -116,9 +116,7 @@ def test_parallel_factory_accepts_name_and_sex_shorthand():
 
 
 def test_replacement_keeps_female_identity_in_existing_world(wasm_runtime):
-    with closing(
-        WasmtimeProvider(runtime=wasm_runtime, worlds=1, personas=[("Freya", "f"), ("Aaron", "m")])
-    ) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=1, personas=[("Freya", "f"), ("Aaron", "m")])) as provider:
         connection, peer = provider.create_connections(2)
         provider.reset(seed=123)
         connection.reset()
@@ -136,14 +134,14 @@ def test_replacement_keeps_female_identity_in_existing_world(wasm_runtime):
 
 
 def test_persona_count_must_match_connection_count(wasm_runtime):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, personas=[("Dave",)])) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, personas=[("Dave",)])) as provider:
         with pytest.raises(ValueError, match="personas"):
             provider.create_connections(2)
         assert provider._ordered_worlds == []
 
 
 def test_insufficient_pool_fails_before_admission(wasm_runtime):
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=1, persona_pool=[("Freya", "f")])) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=1, persona_pool=[("Freya", "f")])) as provider:
         provider.create_connections(2)
         with pytest.raises(ValueError, match="pool"):
             provider.reset(seed=42)
@@ -152,7 +150,7 @@ def test_insufficient_pool_fails_before_admission(wasm_runtime):
 
 def test_interleaved_worlds_keep_overrides_local_and_reseed_independently(wasm_runtime):
     requested = [("Ash", "m"), ("Ash", "f"), ("f",), ("m",)]
-    with closing(WasmtimeProvider(runtime=wasm_runtime, worlds=2, personas=requested)) as provider:
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=2, personas=requested)) as provider:
         connections = provider.create_connections(4)
         provider.reset(seed=42)
         for connection in connections:

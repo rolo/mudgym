@@ -5,7 +5,7 @@ from contextlib import closing
 import gymnasium as gym
 import pytest
 
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.factory import make_env, make_parallel_env
 from mudgym.envs.lifecycle import step_players
 
@@ -39,7 +39,7 @@ def test_parallel_close_attempts_every_player_then_provider_and_preserves_errors
     player_error = RuntimeError("player close failed")
     provider_error = OSError("provider close failed")
 
-    class ClosingProvider(WasmtimeProvider):
+    class ClosingProvider(WasmProvider):
         def close(self):
             closed.append(self)
             super().close()
@@ -65,7 +65,7 @@ def test_parallel_close_attempts_every_player_then_provider_and_preserves_errors
         assert closed == [*children, provider]
         assert raised.value.exceptions == (player_error, provider_error)
     finally:
-        WasmtimeProvider.close(provider)
+        WasmProvider.close(provider)
 
 
 def test_failed_reset_requires_a_clean_reset_before_normal_use(wasm_runtime):

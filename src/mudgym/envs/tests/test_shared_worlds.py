@@ -3,7 +3,7 @@ from contextlib import ExitStack, closing
 import pytest
 
 from mudgym import make_env
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 
 
 def test_parallel_players_hear_each_other_and_continue_after_one_quits(live_parallel_env_factory):
@@ -24,7 +24,7 @@ def test_parallel_players_hear_each_other_and_continue_after_one_quits(live_para
 @pytest.mark.parametrize("worlds", [1, 2])
 def test_players_only_hear_shouts_from_their_own_world(wasm_runtime, worlds):
     with ExitStack() as stack:
-        provider = stack.enter_context(closing(WasmtimeProvider(worlds=worlds, runtime=wasm_runtime)))
+        provider = stack.enter_context(closing(WasmProvider(worlds=worlds, runtime=wasm_runtime)))
         first, second = [
             stack.enter_context(make_env(connection=connection)) for connection in provider.create_connections(2)
         ]

@@ -7,8 +7,8 @@ import pytest
 
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.recording import RecordingConnection, RecordingProvider, ReplayConnection
-from mudgym.connections.wasm import WasmtimeProvider
-from mudgym.connections.wasm.wasmtime_provider import create_connection
+from mudgym.connections.wasm import WasmProvider
+from mudgym.connections.wasm.provider import create_connection
 
 
 def make_episode(runtime, mode, preset, capture_directory=None):
@@ -18,7 +18,7 @@ def make_episode(runtime, mode, preset, capture_directory=None):
         if capture_directory is not None:
             connection = RecordingConnection(connection, capture_directory / "scalar.jsonl")
         return make_env(connection=connection, observation=preset), provider
-    provider = WasmtimeProvider(runtime=runtime, worlds=1, seed=123)
+    provider = WasmProvider(runtime=runtime, worlds=1, seed=123)
     wrapped = provider
     if capture_directory is not None:
         wrapped = RecordingProvider(provider, lambda index: capture_directory / f"player{index}.jsonl")

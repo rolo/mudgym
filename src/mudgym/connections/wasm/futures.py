@@ -1,6 +1,6 @@
 """Collect concurrent WASM work without losing failures or interruptions."""
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future, wait
 
 
@@ -33,3 +33,18 @@ def ordered_future_results[Result](
         if additional_errors:
             raise BaseExceptionGroup(operation, [first_error, *additional_errors]) from first_error
         raise
+
+
+class InlineExecutor:
+    """Runs each piece of work as it is submitted, for a Python that cannot start threads, such as Pyodide's."""
+
+    def submit[Result](self, work: Callable[..., Result], /, *arguments: object) -> Future[Result]:
+        future: Future[Result] = Future()
+        try:
+            future.set_result(work(*arguments))
+        except BaseException as error:  # noqa: BLE001 - the caller reads every failure back through the future
+            future.set_exception(error)
+        return future
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        """Nothing is ever left running, so there is nothing to wait for or cancel."""

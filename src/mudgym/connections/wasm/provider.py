@@ -1,16 +1,17 @@
-"""Connections, world ownership and transitions over the Wasmtime WASI runtime."""
+"""Connections, world ownership and transitions over the MUD2 WASI engine, in native Python or a browser."""
 
 from __future__ import annotations
 
-import os
 import secrets
+import sys
 import threading
 from collections.abc import Iterable, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Executor
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from functools import cache
+from typing import Any, Protocol
 
 from mudgym.connections.connection import MudConnection
 from mudgym.connections.errors import ConnectionClosedError
@@ -31,15 +32,33 @@ from .engine_contract import (
     validate_session_count,
 )
 from .futures import ordered_future_results
-from .wasmtime_runtime import (
-    WasmtimeRuntime,
-    WasmtimeSession,
-    WasmtimeTerminalTick,
-    WasmtimeWorld,
-)
+from .world import TerminalTick, WasmSession, WasmWorld
 
 
-def _shutdown_worlds(worlds: Iterable[WasmtimeWorld]) -> list[BaseException]:
+class EngineRuntime(Protocol):
+    """Compiles the engine module once, then starts each world in an instance of its own."""
+
+    backend: str
+
+    def create_world(self, *, max_players: int, seed: int, civil_time_anchor: datetime) -> WasmWorld: ...
+
+    def executor(self, worlds: int) -> Executor: ...
+
+
+@cache
+def default_runtime() -> EngineRuntime:
+    """The engine compiled once per Python: under wasmtime natively, and on the browser's WebAssembly in Pyodide."""
+    # Imported here because each runtime loads what only its own platform has.
+    if sys.platform == "emscripten":
+        from .browser_runtime import BrowserRuntime  # noqa: PLC0415
+
+        return BrowserRuntime()
+    from .wasmtime_runtime import WasmtimeRuntime  # noqa: PLC0415
+
+    return WasmtimeRuntime()
+
+
+def _shutdown_worlds(worlds: Iterable[WasmWorld]) -> list[BaseException]:
     """Attempt every shutdown and retain failures for the caller's error report."""
     errors = []
     for world in worlds:
@@ -62,7 +81,7 @@ class WorldAdvancementFailed(RuntimeError):
         message: str,
         *,
         successes: dict[int, int],
-        failures: dict[int, WasmtimeTerminalTick],
+        failures: dict[int, TerminalTick],
     ):
         super().__init__(message)
         self.successes = successes
@@ -70,7 +89,7 @@ class WorldAdvancementFailed(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
-class WasmtimeResponse:
+class WasmResponse:
     raw_bytes: bytes
     game_bytes: bytes
     echoed_line: str | None
@@ -78,21 +97,21 @@ class WasmtimeResponse:
     incomplete: bool
 
 
-class WasmtimeConnection(MudConnection):
+class WasmConnection(MudConnection):
     """One stable MudGym connection rebound to each fresh WASI session."""
 
-    def __init__(self, *, provider: WasmtimeProvider, connection_index: int, timeout_ms: int) -> None:
+    def __init__(self, *, provider: WasmProvider, connection_index: int, timeout_ms: int) -> None:
         self.provider = provider
         self.connection_index = connection_index
         self.timeout_ms = timeout_ms
         self.owns_provider = False
-        self._session: WasmtimeSession | None = None
+        self._session: WasmSession | None = None
         self._started = False
         self._closed = False
         self._invalidated = False
-        self._pending_responses: list[WasmtimeResponse] = []
+        self._pending_responses: list[WasmResponse] = []
 
-    def _bind(self, session: WasmtimeSession) -> None:
+    def _bind(self, session: WasmSession) -> None:
         if self._pending_responses:
             raise RuntimeError(f"cannot replace connection {self.connection_index} with unread responses")
         self._session = session
@@ -101,7 +120,7 @@ class WasmtimeConnection(MudConnection):
 
     def reset(self, *, seed: int | None = None) -> None:
         if self._closed:
-            raise RuntimeError("Wasmtime connection is closed")
+            raise RuntimeError("WASM connection is closed")
         if self.owns_provider:
             self.provider.reset(seed=seed)
         else:
@@ -116,19 +135,19 @@ class WasmtimeConnection(MudConnection):
         self._started = True
         self._invalidated = False
 
-    def _require_session(self) -> WasmtimeSession:
+    def _require_session(self) -> WasmSession:
         if self._session is None:
-            raise RuntimeError("Wasmtime connection has no live session; call reset() first")
+            raise RuntimeError("WASM connection has no live session; call reset() first")
         return self._session
 
-    def _execute_line(self, command: str) -> WasmtimeResponse:
+    def _execute_line(self, command: str) -> WasmResponse:
         command_bytes = encode_command_bytes(command)
         session = self._require_session()
         with session.world.lock:
             pending_output = session.receive()
             if session.departed:
                 # The final receive retires the native handle. No command was sent.
-                return WasmtimeResponse(
+                return WasmResponse(
                     raw_bytes=pending_output,
                     game_bytes=pending_output,
                     echoed_line=None,
@@ -160,7 +179,7 @@ class WasmtimeConnection(MudConnection):
             raise RuntimeError(f"WASI command {command!r} returned FAILED")
         if not terminated and not incomplete and not session.world.is_alive():
             incomplete = True
-        return WasmtimeResponse(
+        return WasmResponse(
             raw_bytes=raw_bytes,
             game_bytes=game_bytes,
             echoed_line=command,
@@ -172,16 +191,16 @@ class WasmtimeConnection(MudConnection):
         if not self._started:
             raise RuntimeError("Connection has not been reset, call reset() first.")
         if self._invalidated:
-            raise ConnectionClosedError("Wasmtime connection was invalidated; call reset() before sending")
+            raise ConnectionClosedError("WASM connection was invalidated; call reset() before sending")
         if self._pending_responses:
             previous = self._pending_responses[-1]
             if previous.terminated or previous.incomplete:
-                raise ConnectionClosedError("Wasmtime connection closed after the previous command line")
+                raise ConnectionClosedError("WASM connection closed after the previous command line")
         self._pending_responses.append(self._execute_line(line))
 
     def read_response(self) -> tuple[bytes, bool, bool, dict[str, Any]]:
         if self._closed or not self._started:
-            raise ConnectionClosedError("Wasmtime connection is not open. Call reset() before receiving.")
+            raise ConnectionClosedError("WASM connection is not open. Call reset() before receiving.")
         responses = self._pending_responses
         self._pending_responses = []
         raw_bytes = b"".join(response.raw_bytes for response in responses)
@@ -204,7 +223,7 @@ class WasmtimeConnection(MudConnection):
             terminated,
             incomplete,
             {
-                "backend": "wasmtime",
+                "backend": self.provider.runtime.backend,
                 "connection_index": self.connection_index,
                 "world_index": self.provider.world_for_connection(self.connection_index),
                 "world_seed": session.world.seed,
@@ -220,11 +239,11 @@ class WasmtimeConnection(MudConnection):
     def advance_world_ticks(self, ticks: int) -> int:
         with self.provider._lock:
             if self._closed:
-                raise RuntimeError("Wasmtime connection is closed")
+                raise RuntimeError("WASM connection is closed")
             session = self._require_session()
             try:
                 return session.world.tick(ticks, self.timeout_ms)
-            except WasmtimeTerminalTick as terminal:
+            except TerminalTick as terminal:
                 world_index = self.provider.world_for_connection(self.connection_index)
                 raise WorldAdvancementFailed(
                     f"world advancement failed for world {world_index}",
@@ -235,14 +254,14 @@ class WasmtimeConnection(MudConnection):
     def tick_for_step(self) -> None:
         # Observation delivers the final transition when a world ends during this tick.
         with suppress(WorldAdvancementFailed):
-            self.advance_world_ticks(1)
+            self.advance_world_ticks(self.provider.ticks_per_step)
 
     def invalidate(self) -> None:
         self._pending_responses = []
         self._invalidated = True
 
     def _mark_closed(self) -> None:
-        """Release Store-owning references after the provider is shut down."""
+        """Release the references that hold engine instances after the provider is shut down."""
         self._pending_responses = []
         self._session = None
         self._closed = True
@@ -262,17 +281,23 @@ class WasmtimeConnection(MudConnection):
         self._mark_closed()
 
 
-class WasmtimeProvider:
-    """MudGym provider spreading stable connections over fresh isolated WASI worlds."""
+class WasmProvider:
+    """MudGym provider spreading stable connections over fresh isolated WASI worlds.
+
+    ``runtime`` hosts the worlds, and defaults to the engine compiled once for this Python: under wasmtime natively,
+    and on the browser's WebAssembly in Pyodide. ``ticks_per_step`` is how many passive cycles the step hook runs
+    between the actions and the observations, which is how far fights, weather and wandering mobiles move on.
+    """
 
     def __init__(
         self,
         *,
-        runtime: WasmtimeRuntime | None = None,
+        runtime: EngineRuntime | None = None,
         worlds: int | None = None,
         seed: int | None = None,
         civil_time_anchor: datetime = datetime(2026, 1, 1, tzinfo=UTC),
         timeout_ms: int = 5_000,
+        ticks_per_step: int = 1,
         personas: Sequence[tuple[str] | tuple[str | None, str | None]] | None = None,
         persona_pool: Sequence[tuple[str, str | None]] | None = None,
     ) -> None:
@@ -282,6 +307,8 @@ class WasmtimeProvider:
             raise ValueError("worlds must be a positive integer or None")
         if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms < 1:
             raise ValueError("timeout_ms must be a positive integer")
+        if isinstance(ticks_per_step, bool) or not isinstance(ticks_per_step, int) or ticks_per_step < 1:
+            raise ValueError("ticks_per_step must be a positive integer")
         if seed is None:
             # Leave room for world-index offsets within the engine's 53-bit seed range.
             seed = secrets.randbits(32)
@@ -294,16 +321,17 @@ class WasmtimeProvider:
             if persona_pool is None
             else validate_persona_pool(tuple(Persona(name, sex) for name, sex in persona_pool))
         )
-        self.runtime = WasmtimeRuntime() if runtime is None else runtime
+        self.runtime = default_runtime() if runtime is None else runtime
         self.worlds = worlds
         self.seed = seed
         self.civil_time_anchor = civil_time_anchor
         self.timeout_ms = timeout_ms
+        self.ticks_per_step = ticks_per_step
         self._lock = threading.RLock()
-        self._executor: ThreadPoolExecutor | None = None
-        self._connections: list[WasmtimeConnection] = []
+        self._executor: Executor | None = None
+        self._connections: list[WasmConnection] = []
         self._world_slots: list[list[int]] = []
-        self._ordered_worlds: list[WasmtimeWorld] = []
+        self._ordered_worlds: list[WasmWorld] = []
         self._world_seeds: tuple[int, ...] = ()
         self._closed = False
 
@@ -314,7 +342,7 @@ class WasmtimeProvider:
             raise IndexError(f"connection index {connection_index} is outside {len(self._connections)} connections")
         return connection_index % self.worlds
 
-    def create_connections(self, count: int) -> list[WasmtimeConnection]:
+    def create_connections(self, count: int) -> list[WasmConnection]:
         with self._lock:
             if self._closed:
                 raise RuntimeError("provider is closed")
@@ -337,13 +365,10 @@ class WasmtimeProvider:
             self._world_seeds = tuple(self.seed + world_index for world_index in range(resolved_worlds))
             self._world_slots = [list(range(index, count, resolved_worlds)) for index in range(resolved_worlds)]
             self._connections = [
-                WasmtimeConnection(provider=self, connection_index=index, timeout_ms=self.timeout_ms)
+                WasmConnection(provider=self, connection_index=index, timeout_ms=self.timeout_ms)
                 for index in range(count)
             ]
-            self._executor = ThreadPoolExecutor(
-                max_workers=min(resolved_worlds, os.process_cpu_count() or 1),
-                thread_name_prefix="wasmtime-world",
-            )
+            self._executor = self.runtime.executor(resolved_worlds)
             return list(self._connections)
 
     def _seeds_for_reset(self, seed: int | list[int | None] | None) -> tuple[int, ...]:
@@ -371,9 +396,7 @@ class WasmtimeProvider:
             world_seeds.append(self._world_seeds[world_index] if candidate is None else candidate)
         return tuple(world_seeds)
 
-    def _build_world_with_sessions(
-        self, slots: Sequence[int], seed: int
-    ) -> tuple[WasmtimeWorld, list[WasmtimeSession]]:
+    def _build_world_with_sessions(self, slots: Sequence[int], seed: int) -> tuple[WasmWorld, list[WasmSession]]:
         personas = resolve_personas([self.personas[index] for index in slots], pool=self.persona_pool, seed=seed)
         world = self.runtime.create_world(max_players=len(slots), seed=seed, civil_time_anchor=self.civil_time_anchor)
         try:
@@ -397,7 +420,7 @@ class WasmtimeProvider:
 
     def _replace_connection_session(
         self,
-        connection: WasmtimeConnection,
+        connection: WasmConnection,
         world_index: int,
     ) -> None:
         """Replace one departed player without changing its active world."""
@@ -410,7 +433,7 @@ class WasmtimeProvider:
         connection._bind(new_session)
 
     def _replace_world(self, world_index: int, *, seed: int | None = None) -> None:
-        """Replace one Store and Instance without rebinding any other world."""
+        """Replace one engine instance without rebinding any other world."""
         self._require_world_connections_quiescent(world_index)
         slots = self._world_slots[world_index]
         seed = self._world_seeds[world_index] if seed is None else validate_seed(seed, label="world seed")
@@ -425,14 +448,14 @@ class WasmtimeProvider:
         old_world.shutdown()
 
     def reset(self, *, seed: int | list[int | None] | None = None) -> None:
-        """Replace every Store and Instance, then rebind the stable connections."""
+        """Replace every engine instance, then rebind the stable connections."""
         with self._lock:
             if self._closed:
                 raise RuntimeError("provider is closed")
             if self._executor is None:
                 raise RuntimeError("cannot reset before creating connections")
             if any(connection._pending_responses for connection in self._connections):
-                raise RuntimeError("cannot reset Wasmtime worlds while a connection has unread responses")
+                raise RuntimeError("cannot reset WASI worlds while a connection has unread responses")
             world_seeds = self._seeds_for_reset(seed)
             futures = []
             try:
@@ -464,7 +487,7 @@ class WasmtimeProvider:
             if shutdown_errors := _shutdown_worlds(old_worlds):
                 raise BaseExceptionGroup("previous WASI world shutdown failed after reset", shutdown_errors)
 
-    def _prepare_connection(self, connection: WasmtimeConnection, *, seed: int | None = None) -> None:
+    def _prepare_connection(self, connection: WasmConnection, *, seed: int | None = None) -> None:
         with self._lock:
             if connection not in self._connections:
                 raise RuntimeError("connection does not belong to this provider")
@@ -496,10 +519,10 @@ class WasmtimeProvider:
         ``WorldAdvancementFailed`` so the step hook can leave their final transitions for observation.
         """
 
-        def tick(world: WasmtimeWorld) -> int | WasmtimeTerminalTick:
+        def tick(world: WasmWorld) -> int | TerminalTick:
             try:
                 return world.tick(ticks, self.timeout_ms)
-            except WasmtimeTerminalTick as terminal:
+            except TerminalTick as terminal:
                 return terminal
 
         with self._lock:
@@ -510,9 +533,9 @@ class WasmtimeProvider:
             futures = (self._executor.submit(tick, world) for world in self._ordered_worlds)
             results = ordered_future_results(futures, "WASI world advancement failed")
             successes: dict[int, int] = {}
-            failures: dict[int, WasmtimeTerminalTick] = {}
+            failures: dict[int, TerminalTick] = {}
             for world_index, result in enumerate(results):
-                if isinstance(result, WasmtimeTerminalTick):
+                if isinstance(result, TerminalTick):
                     failures[world_index] = result
                 else:
                     successes[world_index] = result
@@ -528,7 +551,7 @@ class WasmtimeProvider:
     def tick_for_step(self) -> None:
         # Terminal worlds retain their observations while healthy siblings still advance.
         with suppress(WorldAdvancementFailed):
-            self.advance_worlds(1)
+            self.advance_worlds(self.ticks_per_step)
 
     def close(self) -> None:
         with self._lock:
@@ -548,11 +571,9 @@ class WasmtimeProvider:
                 raise BaseExceptionGroup("WASI provider close failed", errors)
 
 
-def create_connection(
-    *, persona: str | None = None, sex: str | None = None, **provider_options: Any
-) -> WasmtimeConnection:
+def create_connection(*, persona: str | None = None, sex: str | None = None, **provider_options: Any) -> WasmConnection:
     """Create a standalone connection that owns and closes its entire provider."""
-    provider = WasmtimeProvider(personas=((persona, sex),), **provider_options)
+    provider = WasmProvider(personas=((persona, sex),), **provider_options)
     try:
         connection = provider.create_connections(1)[0]
         connection.owns_provider = True

@@ -4,7 +4,7 @@ A reinforcement learning environment for MUD2.
 
 ## Setup
 
-The game runs locally through WASM.
+The game runs locally through WASM. Native Python runs the engine module under wasmtime, and Python in a browser, through Pyodide, runs the same module on the browser's own WebAssembly, with the same environments and connections. The module needs WebAssembly exception handling, so Chrome 137, Firefox 131, Safari 18.4 or later, and an older browser is refused with a message that says so.
 
 Install the `mudgym` package with your Python package manager of choice.
 

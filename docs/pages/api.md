@@ -50,10 +50,10 @@
 
 ::: mudgym.connections.connection.MudConnection
 
-::: mudgym.connections.wasm.wasmtime_provider.WasmtimeConnection
+::: mudgym.connections.wasm.provider.WasmConnection
 
-::: mudgym.connections.wasm.create_connection
+::: mudgym.connections.wasm.provider.create_connection
 
 ::: mudgym.connections.provider.ConnectionProvider
 
-::: mudgym.connections.wasm.WasmtimeProvider
+::: mudgym.connections.wasm.provider.WasmProvider

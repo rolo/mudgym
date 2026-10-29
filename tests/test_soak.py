@@ -9,7 +9,7 @@ from functools import partial
 
 import pytest
 
-from mudgym.connections.wasm import WasmtimeProvider, create_connection
+from mudgym.connections.wasm import WasmProvider, create_connection
 
 pytestmark = pytest.mark.soak
 
@@ -57,7 +57,7 @@ def test_soak_post_death_resets_survive_live(connection_factory, live_env_factor
 
 
 def test_soak_parallel_post_death_resets_survive_live(wasm_runtime, live_parallel_env_factory, subtests):
-    provider = WasmtimeProvider(worlds=1, runtime=wasm_runtime)
+    provider = WasmProvider(worlds=1, runtime=wasm_runtime)
     env = live_parallel_env_factory(agents=3, provider=provider)
     rounds = max(SOAK_ITERATIONS // 2, 5)
     env.reset(seed=0)

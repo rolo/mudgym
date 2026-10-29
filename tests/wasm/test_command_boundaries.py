@@ -5,14 +5,14 @@ from contextlib import closing
 import pytest
 
 from mudgym import make_env, make_parallel_env
-from mudgym.connections.wasm import WasmtimeProvider
+from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
 
 
 @pytest.mark.parametrize("command", ["say café", "say €100"])
 def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runtime, command):
     with closing(
-        WasmtimeProvider(
+        WasmProvider(
             runtime=wasm_runtime,
             worlds=1,
             seed=123,
@@ -44,7 +44,7 @@ def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, 
         env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
         action = "look"
     else:
-        env = make_parallel_env(2, provider=WasmtimeProvider(runtime=wasm_runtime, worlds=1), observation=preset)
+        env = make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1), observation=preset)
         action = {"player_0": "look", "player_1": "look"}
     try:
         env.reset(seed=123)
@@ -89,7 +89,7 @@ def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
     ids=["text", "bytes", "no-fields", "inventory-only"],
 )
 def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wasm_runtime, observation_options):
-    provider = WasmtimeProvider(
+    provider = WasmProvider(
         runtime=wasm_runtime,
         worlds=1,
         seed=123,

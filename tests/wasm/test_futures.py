@@ -4,7 +4,7 @@ from concurrent.futures import Future
 
 import pytest
 
-from mudgym.connections.wasm.futures import ordered_future_results
+from mudgym.connections.wasm.futures import InlineExecutor, ordered_future_results
 
 
 @pytest.mark.parametrize("first_error", [KeyboardInterrupt(), SystemExit(17), ValueError("first")])
@@ -35,3 +35,26 @@ def test_submission_interruption_preserves_a_submitted_worker_failure():
     assert isinstance(raised.value, BaseExceptionGroup)
     assert raised.value.exceptions == (interruption, worker_error)
     assert raised.value.__cause__ is interruption
+
+
+def test_inline_work_settles_its_future_before_submit_returns():
+    executor = InlineExecutor()
+    order = []
+
+    done = executor.submit(lambda value: order.append(value) or value * 2, 21)
+    order.append("submitted")
+
+    assert order == [21, "submitted"]
+    assert done.result() == 42
+
+
+@pytest.mark.parametrize("error", [ValueError("work failed"), KeyboardInterrupt()])
+def test_inline_work_that_raises_reaches_the_collector_through_its_future(error):
+    def fail():
+        raise error
+
+    failed = InlineExecutor().submit(fail)
+
+    assert failed.done()
+    with pytest.raises(type(error)):
+        ordered_future_results([failed], "inline operation")
