@@ -4,6 +4,7 @@ from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.tests.payloads import (
     DRUNKEN_WAKE_BYTES,
     FORD_COLLAPSE_BYTES,
+    SMALL_ROOM_WAKE_BYTES,
     VAMPIRE_BLIND_BYTES,
     VAMPIRE_WAKE_BLIND_BYTES,
 )
@@ -100,6 +101,23 @@ def test_bytes_to_observation_defaults_sql_when_it_wakes_a_drunk_player(scripted
     assert obs["vitals"][0] == 100
     assert field_refusals == {
         "SuperQuickLookField": b"You wake up from your drunken stupor...\nYour stamina is \x1b[32m100\x1b[37m.\n"
+    }
+
+
+def test_bytes_to_observation_defaults_sql_when_it_wakes_a_player_in_a_small_room(scripted_env_factory):
+    env = scripted_env_factory(observation="parsed")
+    obs, _, field_refusals = env.bytes_to_observation(
+        SMALL_ROOM_WAKE_BYTES,
+        sent_lines=["kill winerack", "sql,fes,fex,fei,mgcheats"],
+        response_complete=True,
+    )
+
+    assert obs["room_name"] == UNKNOWN
+    assert obs["vitals"][0] == 1
+    assert field_refusals == {
+        "SuperQuickLookField": (
+            b"You wake up!\nYour stamina is \x1b[31m1\x1b[37m.\nThe room was too small for you to rest properly.\n"
+        )
     }
 
 
