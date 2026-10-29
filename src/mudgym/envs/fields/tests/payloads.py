@@ -60,6 +60,21 @@ VAMPIRE_WAKE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
+# Captured from WASM seed 10028 when sql wakes a player who fell asleep drunk in a four-player combat match.
+DRUNKEN_WAKE_BYTES = (
+    b"move north\r\nYou can't wake yourself up yet!\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
+    b"You wake up from your drunken stupor...\nYour stamina is \x1b[32m100\x1b[37m.\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+    b"\x1b[1;32;40m100\x1b[0;37;40m \x1b[1;32;40m100\x1b[0;37;40m 100 100 38 100 71 100 12850 N N N N 58 F\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40moo\n========\nslipper\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"[mgcheats]room_id=towrm2; room_name=landing in tower; fighting=0; dark=1; glowing=0; asleep=0; gifted=0; "
+    b"here=[wall]; inventory=[slipper][/mgcheats]\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+)
+
 DALLY_LANE_BYTES = (
     b"move north,fes,fex,fei\r\nAs you step through the opening, you become swathed in a fine, gossamer mist. "
     b"The Elizabethan tearoom fades hazily away, and vague, new shapes begin to form around you. Their outlines "

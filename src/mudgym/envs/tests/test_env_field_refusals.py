@@ -1,7 +1,12 @@
 import pytest
 
 from mudgym.db.index import UNKNOWN
-from mudgym.envs.fields.tests.payloads import FORD_COLLAPSE_BYTES, VAMPIRE_BLIND_BYTES, VAMPIRE_WAKE_BLIND_BYTES
+from mudgym.envs.fields.tests.payloads import (
+    DRUNKEN_WAKE_BYTES,
+    FORD_COLLAPSE_BYTES,
+    VAMPIRE_BLIND_BYTES,
+    VAMPIRE_WAKE_BLIND_BYTES,
+)
 from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 
 
@@ -81,6 +86,21 @@ def test_step_continues_when_sql_wakes_a_blind_player(scripted_env_factory):
     assert "You wake up!\nYour stamina is 32." in obs["text"]
     assert terminated is False
     assert truncated is False
+
+
+def test_bytes_to_observation_defaults_sql_when_it_wakes_a_drunk_player(scripted_env_factory):
+    env = scripted_env_factory(observation="parsed")
+    obs, _, field_refusals = env.bytes_to_observation(
+        DRUNKEN_WAKE_BYTES,
+        sent_lines=["move north", "sql,fes,fex,fei,mgcheats"],
+        response_complete=True,
+    )
+
+    assert obs["room_name"] == UNKNOWN
+    assert obs["vitals"][0] == 100
+    assert field_refusals == {
+        "SuperQuickLookField": b"You wake up from your drunken stupor...\nYour stamina is \x1b[32m100\x1b[37m.\n"
+    }
 
 
 def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_factory):

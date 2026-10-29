@@ -39,7 +39,7 @@ class ObservationField(ABC):
         re.compile(rb"You can't wake yourself up yet!"),
         re.compile(rb"You can't see a thing, you're blind\."),
         # Waking up spends the command, so its output is only the wake-up and stamina lines.
-        re.compile(rb"You wake up!\r?\nYour stamina is [0-9]+\."),
+        re.compile(rb"You wake up(?:!| from your drunken stupor\.\.\.)\r?\nYour stamina is [0-9]+\."),
     )
 
     def __init__(self, include_keys: Sequence[str] | None = None):
