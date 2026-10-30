@@ -62,6 +62,19 @@ REVERSED_TITLES_CHUNK = (
     b"        nothing.\r\n"
 )
 
+# Captured inside vehicles on mud2-embedded's development engine, whose mggo verb reaches them directly.
+OPEN_SARCOPHAGUS_CHUNK = (
+    b'\x1b[0;37;40mInside the sarcophagus in the place known as "\x1b[1;32;40mwest tomb\x1b[0;37;40m".\n'
+    b"The following are also inside the sarcophagus:\n"
+    b"        nothing.\n"
+    b'\x1b[1;37;40mThe following are also in the place known as "\x1b[32mwest tomb\x1b[37m":\n'
+    b"        nothing.\n"
+)
+
+CLOSED_COFFIN_CHUNK = (
+    b"\x1b[0;37;40mInside the coffin1. The following are also inside the coffin1:\n        nothing.\n\x1b[1;37;40m"
+)
+
 
 # Captured from the WASM game with seed 123 and persona Aaron.
 @pytest.mark.parametrize(
@@ -256,6 +269,23 @@ def test_missing_room_view_returns_empty_defaults(raw):
 
     np.testing.assert_equal(field.empty(), expected)
     np.testing.assert_equal(field.extract([raw]), expected)
+
+
+@pytest.mark.parametrize(
+    ("raw", "room_name", "room_name_index"),
+    [
+        pytest.param(OPEN_SARCOPHAGUS_CHUNK, "west tomb", room_name_to_index("west tomb"), id="open"),
+        pytest.param(CLOSED_COFFIN_CHUNK, UNKNOWN, 0, id="closed"),
+    ],
+)
+def test_vehicle_view_names_the_room_only_while_the_vehicle_is_open(raw, room_name, room_name_index):
+    field = SuperQuickLookField()
+
+    assert field.matches(raw)
+    np.testing.assert_equal(
+        field.extract([raw]),
+        {**field.empty(), "room_name": room_name, "room_name_index": room_name_index},
+    )
 
 
 def test_last_room_name_uses_the_last_index_in_its_space():

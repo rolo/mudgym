@@ -21,6 +21,12 @@ ROOM_LINE_RE = re.compile(
     rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
 )
+# Inside a vehicle, sql describes the vehicle and names the room around it only while the vehicle is open.
+VEHICLE_VIEW_RE = re.compile(
+    rb"Inside the (?P<vehicle>[^\r\n]+?)"
+    rb'(?: in the place known as (?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)"\.\r?\n|\. )'
+    rb"The following are also inside the (?P=vehicle):"
+)
 INVENTORY_RE = re.compile(
     r"^You are carrying the following:\s*$",
     re.MULTILINE,
@@ -153,7 +159,7 @@ class SuperQuickLookField(ObservationField):
     """
     Parses room contents and inventory from the superquicklook command.
 
-    Missing views use index 0. Supplied room names must be recognised.
+    Missing views use index 0. Supplied room names must be recognised. Inside a vehicle only the room name is read.
     """
 
     command = "sql"
@@ -183,13 +189,30 @@ class SuperQuickLookField(ObservationField):
         }
 
     def matches(self, chunk: bytes) -> bool:
-        return ROOM_MARKER_BYTES in chunk or b"It's too dark for you to see anything." in chunk
+        return (
+            ROOM_MARKER_BYTES in chunk
+            or b"It's too dark for you to see anything." in chunk
+            or VEHICLE_VIEW_RE.search(chunk) is not None
+        )
+
+    def vehicle_view(self, raw_bytes: bytes) -> dict[str, Any]:
+        """Name the room around an open vehicle, or return the empty default."""
+        vehicle_match = VEHICLE_VIEW_RE.search(raw_bytes)
+        if vehicle_match is None or vehicle_match["place"] is None:
+            return self.full_empty()
+        _, room_name = parse_token(decode_text_bytes(vehicle_match["place"]))
+        room_name = room_name.lower()
+        return {
+            **self.full_empty(),
+            "room_name": room_name,
+            "room_name_index": INDEX_DTYPE(room_name_to_index(room_name)),
+        }
 
     def full_extract(self, chunks: Sequence[bytes], *, persona: str | None = None, **context: Any) -> dict[str, Any]:
         """Parse the latest superquicklook room view, or the empty default if none is present."""
         raw_bytes = b"".join(chunks)
         if ROOM_MARKER_BYTES not in raw_bytes:
-            return self.full_empty()
+            return self.vehicle_view(raw_bytes)
 
         text = decode_text_bytes(raw_bytes)
         room_match = find_last_room_line(text)
