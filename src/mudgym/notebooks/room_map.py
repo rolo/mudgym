@@ -6,6 +6,7 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 
 from mudgym.db.directions import DIRECTION_INDEX_BY_NAME
+from mudgym.notebooks.map_layout import layout_world_from_edges
 from mudgym.notebooks.style import (
     ACCENT,
     BLOCK_MARGIN,
@@ -25,28 +26,26 @@ from mudgym.notebooks.style import (
 # Every drawn map needs its own arrowhead marker id.
 MAP_IDS = itertools.count(1)
 
-# Where each direction pushes the next room on the drawing grid. The vertical
-# moves and the two named MUD2 exits borrow the nearest compass square.
-MAP_OFFSET_BY_DIRECTION = {
-    "north": (0, -1),
-    "east": (1, 0),
-    "south": (0, 1),
-    "west": (-1, 0),
-    "northeast": (1, -1),
-    "southeast": (1, 1),
-    "southwest": (-1, 1),
-    "northwest": (-1, -1),
-    "up": (0, -1),
-    "down": (0, 1),
-    "in": (-1, 0),
-    "out": (1, 0),
-    "over": (1, -1),
-    "swampward": (-1, 1),
-}
-MAP_FALLBACK_OFFSET = (1, 0)
-
 MAP_LIVE_FILL = f"color-mix(in srgb, {ACCENT} 40%, {PAGE})"
 MAP_ROOM_FILL = f"color-mix(in srgb, {SECONDARY} 8%, {PAGE})"
+
+# Where an edge label may sit along its edge, from the middle outwards, and how far it may step to either side at
+# each, in label heights.
+LABEL_ANCHORS = (0.5, 0.38, 0.62, 0.26, 0.74, 0.14, 0.86)
+LABEL_STRIDES = (0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3)
+# Where a label may go when nothing beside its edge is clear: points round the middle of the edge, nearest first,
+# out to about two rooms either way.
+NEARBY_OFFSETS = sorted(
+    ((column * 10, row * 10) for column in range(-30, 31) for row in range(-20, 21)),
+    key=lambda offset: math.hypot(*offset),
+)
+
+
+def overlap_area(first: Sequence[float], second: Sequence[float]) -> float:
+    """How much two ``(x, y, width, height)`` boxes overlap."""
+    width = min(first[0] + first[2], second[0] + second[2]) - max(first[0], second[0])
+    height = min(first[1] + first[3], second[1] + second[3]) - max(first[1], second[1])
+    return max(0.0, width) * max(0.0, height)
 
 
 def wrap_room_name(room: str, line_length: int) -> list[str]:
@@ -67,81 +66,10 @@ def wrap_room_name(room: str, line_length: int) -> list[str]:
     return lines or ["unknown"]
 
 
-def free_grid_cell(anchor, offset, occupied, search_limit):
-    """Return the cell one step along ``offset``, or the closest free one to it."""
-    preferred = (anchor[0] + offset[0], anchor[1] + offset[1])
-    if preferred not in occupied:
-        return preferred
-    for radius in range(1, search_limit + 2):
-        ring = [
-            (delta_x, delta_y)
-            for delta_x in range(-radius, radius + 1)
-            for delta_y in range(-radius, radius + 1)
-            if max(abs(delta_x), abs(delta_y)) == radius
-        ]
-        # Prefer cells that keep going the way the exit pointed, and that stay
-        # close to its line, so a corridor of rooms still reads as a corridor.
-        ring.sort(
-            key=lambda cell: (
-                (cell[0] * offset[0] + cell[1] * offset[1]) < 0,
-                abs(cell[0] * offset[1] - cell[1] * offset[0]),
-                -(cell[0] * offset[0] + cell[1] * offset[1]),
-                abs(cell[0]) + abs(cell[1]),
-                cell[1],
-                cell[0],
-            )
-        )
-        for delta_x, delta_y in ring:
-            candidate = (preferred[0] + delta_x, preferred[1] + delta_y)
-            if candidate not in occupied:
-                return candidate
-    raise RuntimeError("Could not place a room on the map grid")
-
-
-def place_rooms(ordered_rooms: Sequence[str], edges: Sequence[tuple[str, str, str]]) -> dict[str, tuple[int, int]]:
-    """Lay the rooms out on a compass grid, following the moves that linked them."""
-    rank = {room: index for index, room in enumerate(ordered_rooms)}
-    placement_order = sorted(
-        edges,
-        key=lambda edge: (
-            rank[edge[0]],
-            DIRECTION_INDEX_BY_NAME.get(edge[1], len(DIRECTION_INDEX_BY_NAME)),
-            rank[edge[2]],
-        ),
-    )
-
-    positions = {ordered_rooms[0]: (0, 0)}
-    occupied = {(0, 0)}
-    unplaced = set(ordered_rooms[1:])
-    while unplaced:
-        progressed = False
-        for source, direction, destination in placement_order:
-            offset = MAP_OFFSET_BY_DIRECTION.get(direction, MAP_FALLBACK_OFFSET)
-            if source in positions and destination in unplaced:
-                anchor, step = positions[source], offset
-            elif destination in positions and source in unplaced:
-                anchor, step = positions[destination], (-offset[0], -offset[1])
-            else:
-                continue
-            room = destination if destination in unplaced else source
-            positions[room] = free_grid_cell(anchor, step, occupied, len(ordered_rooms))
-            occupied.add(positions[room])
-            unplaced.remove(room)
-            progressed = True
-        if not progressed:
-            # Rooms nothing links to yet: park them around the anchor.
-            room = min(unplaced, key=rank.get)
-            offsets = tuple(MAP_OFFSET_BY_DIRECTION.values())
-            positions[room] = free_grid_cell((0, 0), offsets[rank[room] % len(offsets)], occupied, len(ordered_rooms))
-            occupied.add(positions[room])
-            unplaced.remove(room)
-
-    return positions
-
-
 def show_room_map(
-    edges: Iterable[Sequence[str]],
+    edges: Iterable[Sequence[str]] = (),
     *,
+    graph: Mapping[str, Mapping] | None = None,
     occupants: Mapping[str, Sequence[str]] | None = None,
     occupants_label: str = "Agents here",
     new_rooms: Iterable[str] = (),
@@ -149,18 +77,25 @@ def show_room_map(
     edge_labels: Mapping[tuple[str, str, str], str] | None = None,
     caption: str | None = None,
 ) -> HTML:
-    """Draw discovered rooms, and the moves that linked them, as an SVG map.
+    """Draw rooms and directed moves as a static SVG map.
 
-    ``edges`` are ``(source, direction, destination)`` triples from moves that
-    actually changed room. ``occupants`` marks rooms currently holding agents,
-    named in the legend by ``occupants_label``; ``new_rooms`` outlines a set
-    worth picking out, named by ``new_rooms_label``. An arrow is captioned with
-    its direction unless ``edge_labels`` gives that exact triple different text,
-    which is how a map annotates a move with what it paid or what it is worth.
+    ``edges`` contains ``(source, direction, destination)`` triples. Without ``graph``, the room strings are both identifiers and display names. With ``graph``, keys identify rooms and each node's ``name`` supplies its label, matching the interactive notebook maps. If no route is supplied, show every graph room and exit.
 
-    Parsed observations expose room names rather than ids, so rooms sharing a
-    displayed name are one node here.
+    ``occupants`` marks rooms containing agents and ``new_rooms`` highlights discoveries. ``edge_labels`` can replace each direction caption with a reward or action value. Labels and highlights never change room identity.
     """
+    graph = graph or {}
+    room_labels = {room_id: str(room.get("name", room_id)) for room_id, room in graph.items()}
+    for room in graph.values():
+        for destination in room.get("exits", {}).values():
+            room_labels.setdefault(destination["id"], str(destination.get("name", destination["id"])))
+    edges = list(edges)
+    whole_graph = not edges
+    if whole_graph:
+        edges = [
+            (room_id, direction, destination["id"])
+            for room_id, room in graph.items()
+            for direction, destination in room.get("exits", {}).items()
+        ]
     occupants = {room: list(names) for room, names in (occupants or {}).items() if room}
     edge_labels = dict(edge_labels or {})
     new_rooms = {room for room in new_rooms if room}
@@ -172,7 +107,10 @@ def show_room_map(
 
     ordered_rooms = list(
         dict.fromkeys(
-            [room for edge in clean_edges for room in (edge[0], edge[2])] + list(occupants) + sorted(new_rooms)
+            [room for edge in clean_edges for room in (edge[0], edge[2])]
+            + (list(graph) if whole_graph else [])
+            + list(occupants)
+            + sorted(new_rooms)
         )
     )
     if not ordered_rooms:
@@ -184,26 +122,26 @@ def show_room_map(
     room_height = round(78 - 20 * density)
     room_font = 13 - 3 * density
     small_font = 10.5 - 1.5 * density
-    # The gap between rooms is where the edge labels sit, so it has to hold the
-    # longest direction word rather than just separate two boxes.
-    column_pitch = room_width + round(64 - 16 * density)
-    row_pitch = room_height + round(66 - 16 * density)
     side_padding = 40
     top_padding = 78
 
-    grid = place_rooms(ordered_rooms, clean_edges)
+    # The layout puts a compass step two grid units away. Up, down and a crowded room's exits can land one unit
+    # away, so a unit clears a room box both ways.
+    grid = layout_world_from_edges(ordered_rooms, clean_edges)
+    column_unit = room_width + 8
+    row_unit = room_height + 8
     minimum_column = min(cell[0] for cell in grid.values())
     minimum_row = min(cell[1] for cell in grid.values())
-    content_width = room_width + (max(cell[0] for cell in grid.values()) - minimum_column) * column_pitch
-    content_height = room_height + (max(cell[1] for cell in grid.values()) - minimum_row) * row_pitch
+    content_width = room_width + (max(cell[0] for cell in grid.values()) - minimum_column) * column_unit
+    content_height = room_height + (max(cell[1] for cell in grid.values()) - minimum_row) * row_unit
     svg_width = max(560, 2 * side_padding + content_width)
     svg_height = max(240, top_padding + content_height + 66)
     left_origin = (svg_width - content_width) / 2
 
     positions = {
         room: (
-            left_origin + (column - minimum_column) * column_pitch,
-            top_padding + (row - minimum_row) * row_pitch,
+            left_origin + (column - minimum_column) * column_unit,
+            top_padding + (row - minimum_row) * row_unit,
         )
         for room, (column, row) in grid.items()
     }
@@ -235,20 +173,41 @@ def show_room_map(
     label_height = small_font + 2 * label_padding_y
     label_separation = label_height + 3
 
-    # Labels collide when a pair is walked both ways, and again when two
-    # unrelated edges cross near the same point. Both are answered by stepping
-    # the label off its line until it finds clear space; the rooms count as
-    # taken, so a label prefers a gap to a room it would otherwise sit on.
-    taken = [(x, y, room_width, room_height) for x, y in positions.values()]
+    # Labels collide when a pair is walked both ways, when two unrelated edges cross near the same point, and when an
+    # edge passes a room on its way. The rooms, the compass and every label already placed count as taken, and a label
+    # has to stay inside the drawing, above the legend.
+    compass_x, compass_y = svg_width - 52, 40
+    legend_y = svg_height - 24
+    # Taken boxes are filed by the cells of a coarse grid they touch, so a spot is tested only against boxes near it
+    # and a map of the whole Land stays quick to draw.
+    grid_cell = 100
+    taken_by_cell: dict[tuple[int, int], list[tuple[float, float, float, float]]] = {}
 
-    def clear_of_taken(box) -> bool:
-        return not any(
-            box[0] < other[0] + other[2]
-            and other[0] < box[0] + box[2]
-            and box[1] < other[1] + other[3]
-            and other[1] < box[1] + box[3]
-            for other in taken
+    def cells_of(box):
+        return itertools.product(
+            range(math.floor(box[0] / grid_cell), math.floor((box[0] + box[2]) / grid_cell) + 1),
+            range(math.floor(box[1] / grid_cell), math.floor((box[1] + box[3]) / grid_cell) + 1),
         )
+
+    def take(box) -> None:
+        for cell in cells_of(box):
+            taken_by_cell.setdefault(cell, []).append(box)
+
+    def inside(box) -> bool:
+        return box[0] >= 0 and box[1] >= 0 and box[0] + box[2] <= svg_width and box[1] + box[3] <= legend_y - 16
+
+    def near(box):
+        return {other for cell in cells_of(box) for other in taken_by_cell.get(cell, ())}
+
+    def clear(box) -> bool:
+        return inside(box) and not any(overlap_area(box, other) for other in near(box))
+
+    def cover_of(box) -> float:
+        return sum(overlap_area(box, other) for other in near(box)) if inside(box) else math.inf
+
+    for x, y in positions.values():
+        take((x, y, room_width, room_height))
+    take((compass_x - 30, compass_y - 30, 60, 62))
 
     edge_elements = []
     edge_captions = []
@@ -272,35 +231,38 @@ def show_room_map(
             f'style="{line_style}" marker-end="url(#{map_id}-arrow)" />'
         )
 
-        # Step off the line perpendicularly until the plate lands clear, then
-        # give up and take the midpoint rather than push the label somewhere it
-        # no longer reads as belonging to this arrow.
+        # The first clear spot beside the edge, trying the middle of the edge before points further along it, then
+        # the nearest clear spot round the middle. A label never sits on a room's name just to stay by its arrow, and
+        # only where nothing nearby is clear does it take the spot that covers least.
         plate_width = 0.62 * small_font * len(label) + 2 * label_padding_x
         span = math.hypot(end[0] - start[0], end[1] - start[1]) or 1.0
         step_x = -(end[1] - start[1]) / span * label_separation
         step_y = (end[0] - start[0]) / span * label_separation
         midpoint = ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
-        plate = None
-        for stride in (0, 1, -1, 2, -2, 3, -3):
-            centre_x = midpoint[0] + step_x * stride
-            centre_y = midpoint[1] + step_y * stride
-            candidate = (
-                centre_x - plate_width / 2,
-                centre_y - label_height / 2,
+        beside_edge = [
+            (
+                start[0] + (end[0] - start[0]) * along + step_x * stride - plate_width / 2,
+                start[1] + (end[1] - start[1]) * along + step_y * stride - label_height / 2,
                 plate_width,
                 label_height,
             )
-            if clear_of_taken(candidate):
-                plate = candidate
-                break
-        if plate is None:
-            plate = (
-                midpoint[0] - plate_width / 2,
-                midpoint[1] - label_height / 2,
+            for along in LABEL_ANCHORS
+            for stride in LABEL_STRIDES
+        ]
+        round_the_middle = (
+            (
+                midpoint[0] + offset_x - plate_width / 2,
+                midpoint[1] + offset_y - label_height / 2,
                 plate_width,
                 label_height,
             )
-        taken.append(plate)
+            for offset_x, offset_y in NEARBY_OFFSETS
+        )
+        plate = next(
+            (candidate for candidate in itertools.chain(beside_edge, round_the_middle) if clear(candidate)),
+            None,
+        ) or min(beside_edge, key=cover_of)
+        take(plate)
 
         # Captions are drawn after the rooms: a label longer than the gap
         # between two rooms would otherwise be painted over by the room it
@@ -321,7 +283,8 @@ def show_room_map(
         fill = MAP_LIVE_FILL if here else MAP_ROOM_FILL
         stroke = ACCENT if room in new_rooms else PRIMARY
         stroke_width = 3 if room in new_rooms else 1.5
-        lines = wrap_room_name(room, max(12, round(room_width / 7.2)))
+        room_name = room_labels.get(room, room)
+        lines = wrap_room_name(room_name, max(12, round(room_width / 7.2)))
         line_height = room_font + 2
         centre_y = y + room_height * (0.38 if here else 0.5)
         first_line_y = centre_y - (len(lines) - 1) * line_height / 2 + room_font / 3
@@ -341,13 +304,12 @@ def show_room_map(
                 f"{html_lib.escape(shown)}</text>"
             )
         room_elements.append(
-            f"<g><title>{html_lib.escape(room)}</title>"
+            f'<g data-room-id="{html_lib.escape(room, quote=True)}"><title>{html_lib.escape(room_name)}</title>'
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{room_width}" height="{room_height}" rx="{CORNER_RADIUS}" '
             f'style="fill:{fill};stroke:{stroke};stroke-width:{stroke_width};" />'
             f"{''.join(texts)}</g>"
         )
 
-    compass_x, compass_y = svg_width - 52, 40
     compass = (
         f'<g font-size="11" text-anchor="middle" style="font-family:{MONO};font-weight:700;fill:{MUTED};">'
         f'<line x1="{compass_x}" y1="{compass_y - 12}" x2="{compass_x}" y2="{compass_y + 12}" style="{line_style}" />'
@@ -357,7 +319,6 @@ def show_room_map(
         f'<text x="{compass_x}" y="{compass_y + 26}">S</text>'
         f'<text x="{compass_x - 20}" y="{compass_y + 4}">W</text></g>'
     )
-    legend_y = svg_height - 24
     legend_text_style = f"font-family:{SANS};fill:{MUTED};"
     # Start the second entry past the first one's text, so renaming either keeps
     # a gap instead of printing one legend on top of the other.
