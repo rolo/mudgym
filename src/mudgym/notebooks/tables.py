@@ -4,6 +4,8 @@ import html as html_lib
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from gymnasium import spaces
+
 from mudgym.notebooks.style import (
     BLOCK_MARGIN,
     HTML,
@@ -48,7 +50,7 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
     mono_columns = set(mono_columns)
 
     header_cells = "".join(
-        f'<th style="{LABEL_STYLE}padding:0.5rem 0.8rem;border-bottom:1px solid {RULE};'
+        f'<th style="{LABEL_STYLE}font-weight:400;padding:0.5rem 0.8rem;border-bottom:1px solid {RULE};'
         f'text-align:{"right" if column in numeric_columns else "left"};white-space:nowrap;">'
         f"{html_lib.escape(str(column))}</th>"
         for column in columns
@@ -58,16 +60,15 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
     for index, row in enumerate(rows):
         stripe = f"background:{TINT};" if index % 2 else ""
         cells = []
-        for position, column in enumerate(columns):
+        for column in columns:
             fixed = column in numeric_columns or column in mono_columns
             alignment = "right" if column in numeric_columns else "left"
             face = f"font-family:{MONO};font-size:0.82rem;" if fixed else ""
             # Names, commands, and numbers keep one line. Prose wraps between words, because "anywhere" lets column
             # sizing split every word on a narrow screen rather than letting the table scroll in its wrapper.
             wrap = "white-space:nowrap;" if fixed else "overflow-wrap:break-word;"
-            weight = "font-weight:600;" if position == 0 else ""
             cells.append(
-                f'<td style="padding:0.42rem 0.8rem;text-align:{alignment};{face}{weight}{wrap}'
+                f'<td style="padding:0.42rem 0.8rem;text-align:{alignment};{face}{wrap}font-weight:400;'
                 f'font-variant-numeric:tabular-nums;">'
                 f"{html_lib.escape(cell_text(row.get(column)))}</td>"
             )
@@ -80,6 +81,23 @@ def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str]
         f"<tbody>{''.join(body_rows)}</tbody>"
         f"</table></div>"
     )
+
+
+def space_text(space: spaces.Space) -> str:
+    """A space's repr, without the long list of characters a Text space allows."""
+    if isinstance(space, spaces.Text):
+        return f"Text(max_length={space.max_length})"
+    if isinstance(space, spaces.Sequence):
+        return f"Sequence({space_text(space.feature_space)})"
+    return repr(space)
+
+
+def show_space(space: spaces.Space) -> HTML:
+    """Show a space as a table, with a row for each key of a Dict space."""
+    if isinstance(space, spaces.Dict):
+        rows = [{"Key": key, "Space": space_text(value)} for key, value in space.items()]
+        return show_table(rows, mono_columns=("Key", "Space"))
+    return show_table([{"Space": space_text(space)}], mono_columns=("Space",))
 
 
 def show_turn_bars(

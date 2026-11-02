@@ -9,6 +9,7 @@ from mudgym.notebooks.frames import (
     game_accordion,
     show_ansi,
     show_episode,
+    show_episode_transcript,
     show_frames,
     show_game_tabs,
     show_text,
@@ -17,7 +18,7 @@ from mudgym.notebooks.frames import (
 from mudgym.notebooks.panels import env_setup_panel, notebook_palette
 from mudgym.notebooks.room_map import show_room_map
 from mudgym.notebooks.style import HTML
-from mudgym.notebooks.tables import show_cards, show_stats, show_table, show_turn_bars
+from mudgym.notebooks.tables import show_cards, show_space, show_stats, show_table, show_turn_bars
 
 __all__ = [
     "HTML",
@@ -27,9 +28,11 @@ __all__ = [
     "show_ansi",
     "show_cards",
     "show_episode",
+    "show_episode_transcript",
     "show_frames",
     "show_game_tabs",
     "show_room_map",
+    "show_space",
     "show_stats",
     "show_table",
     "show_text",

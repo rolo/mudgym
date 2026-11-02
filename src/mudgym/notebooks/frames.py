@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from mudgym.db.directions import DIRECTIONS
+from mudgym.featurizers.ansi import INPUT_STYLE
 from mudgym.featurizers.strings import decode_text_bytes
 from mudgym.notebooks.ansi import TERMINAL_INK, TERMINAL_SURFACE, ansi_html
 from mudgym.notebooks.style import (
@@ -19,7 +20,6 @@ from mudgym.notebooks.style import (
     RULE,
     SANS,
     SECONDARY,
-    SHADOW,
     TINT,
     caption_html,
     cell_text,
@@ -42,8 +42,6 @@ FRAME_STYLE = (
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
     f"border:1px solid {PRIMARY};"
-    f"border-radius:{RADIUS};"
-    f"box-shadow:{SHADOW};"
 )
 
 # Long output collapses rather than scrolling: a frame with its own scrollbar
@@ -84,7 +82,6 @@ COLLAPSE_STYLE = f"""<style>
     left: 0;
     right: 0;
     height: 5em;
-    border-radius: 0 0 {RADIUS} {RADIUS};
     background: linear-gradient(to bottom, transparent, {TERMINAL_SURFACE});
     pointer-events: none;
 }}
@@ -133,6 +130,14 @@ ACCORDION_SUMMARY_STYLE = (
 # Episode captions read as the h3 headings the notebooks write by hand, so a
 # rendered episode sits in the same register as the surrounding markdown.
 CAPTION_STYLE = f"font-family:{SANS};font-size:1.18rem;font-weight:720;color:{SECONDARY};margin:0 0 0.45rem;"
+
+# MUD2's prompt is a bright blue asterisk, and the player's command follows it in the input style.
+PROMPT = "\x1b[1;34;40m*" + INPUT_STYLE.decode("latin-1")
+
+# A transcript step's note sits at the end of its command's line, in a dimmer terminal ink.
+NOTE_STYLE = (
+    f"float:right;margin-left:1rem;font-size:0.78rem;color:color-mix(in srgb, {TERMINAL_INK} 60%, {TERMINAL_SURFACE});"
+)
 
 
 def display_bytes(value: Any) -> bytes:
@@ -382,3 +387,23 @@ def show_episode(
             f"{frame}</div>"
         )
     return HTML(f'<div class="episode-replay">{"".join(blocks)}</div>')
+
+
+def show_episode_transcript(steps: Sequence[Mapping[str, Any]], *, scroll: bool = True) -> HTML:
+    """Render an episode in one game frame, as the terminal shows it.
+
+    Each step holds the ``command`` typed, a ``note`` on it such as its step and
+    reward, and the game's ``reply`` as text or bytes. The command follows MUD2's
+    prompt with the note at the end of its line, and the reply comes under it.
+    """
+    steps = list(steps)
+    if not steps:
+        return empty_html("No steps.")
+
+    texts = [f"{PROMPT}{step['command']}\n{display_text(step['reply'])}" for step in steps]
+    rendered = "".join(
+        f'<div style="margin-top:{"0.6rem" if position else "0"};">'
+        f'<span style="{NOTE_STYLE}">{html_lib.escape(str(step["note"]))}</span>{ansi_html(text)}</div>'
+        for position, (step, text) in enumerate(zip(steps, texts, strict=True))
+    )
+    return frame_html(rendered, collapse=scroll and is_long_output("\n".join(texts)))

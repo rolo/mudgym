@@ -1,5 +1,5 @@
 from mudgym.featurizers.ansi import INPUT_STYLE
-from mudgym.notebooks import show_ansi
+from mudgym.notebooks import show_ansi, show_episode_transcript
 from mudgym.notebooks.ansi import ANSI_BRIGHT, ANSI_NORMAL, TERMINAL_INK, TERMINAL_SURFACE, ansi_html
 
 # The start of a move response, as the engine sends it after a prompt.
@@ -37,3 +37,17 @@ def test_inverse_and_extended_colours():
     assert ansi_html("\x1b[1;32mx\x1b[22my") == (
         f'<span style="color: {ANSI_BRIGHT[2]}; font-weight: 700">x</span><span style="color: {ANSI_NORMAL[2]}">y</span>'
     )
+
+
+def test_an_episode_transcript_echoes_each_command_after_the_prompt_with_its_note():
+    transcript = show_episode_transcript(
+        [{"command": "move north", "note": "step 1 & reward -0.01", "reply": MOVE_RESPONSE.encode("latin-1")}]
+    ).data
+
+    assert (
+        f'<span style="color: {ANSI_BRIGHT[4]}; background-color: {TERMINAL_SURFACE}; font-weight: 700">*</span>'
+        in transcript
+    )
+    assert ">move north\n</span>" in transcript
+    assert "step 1 &amp; reward -0.01</span>" in transcript
+    assert ">Beaten track</span>" in transcript

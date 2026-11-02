@@ -1,4 +1,4 @@
-"""Render MUD2's ANSI output as static HTML in the game frame's terminal palette."""
+"""Render MUD2's ANSI output as static HTML, so a game frame in a notebook reads as it does in a terminal."""
 
 import html
 import re
@@ -8,7 +8,6 @@ from mudgym.notebooks.style import token
 
 ANSI_NORMAL = ("#0f1f26", "#e05a48", "#3cb884", "#f2b43c", "#315fba", "#b478d0", "#3fb9c4", "#dde0ed")
 ANSI_BRIGHT = ("#5f7885", "#ff7a5c", "#43d9a3", "#ffcc63", "#315fba", "#d09ae8", "#5ee0e8", "#dde0ed")
-# The game frame's surface and ink.
 TERMINAL_SURFACE = token("code-background")
 TERMINAL_INK = token("terminal-ink")
 
