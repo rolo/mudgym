@@ -24,5 +24,4 @@ def register_envs():
                 id=env_id,
                 entry_point="mudgym.envs.factory:make_env",
                 kwargs=env_kwargs,
-                nondeterministic=True,
             )
