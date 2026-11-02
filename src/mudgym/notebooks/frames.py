@@ -331,6 +331,14 @@ def game_accordion(items: Mapping[str, Any], *, expanded: bool = True) -> HTML:
     return HTML(sections)
 
 
+def action_command(action: Any) -> str:
+    """The command an action sent: a direction index as its move, and anything else, such as text, as it is."""
+    # Gymnasium hands back numpy integers, so index by protocol rather than isinstance to name those as directions too.
+    if hasattr(action, "__index__") and not isinstance(action, bool) and 0 <= operator.index(action) < len(DIRECTIONS):
+        return f"move {DIRECTIONS[operator.index(action)]}"
+    return str(action)
+
+
 def transition_caption(transition: Mapping[str, Any], position: int) -> str:
     """Describe one transition by its step, the action taken, and the reward.
 
@@ -340,14 +348,8 @@ def transition_caption(transition: Mapping[str, Any], position: int) -> str:
 
     action = transition.get("action")
     if action is not None:
-        # Gymnasium hands back numpy integers, so index by protocol rather than isinstance to name those as directions
-        # too.
-        indexable = hasattr(action, "__index__") and not isinstance(action, bool)
-        action_index = operator.index(action) if indexable else None
-        if action_index is not None and 0 <= action_index < len(DIRECTIONS):
-            parts.append(f"action `{action_index}`, `move {DIRECTIONS[action_index]}`")
-        else:
-            parts.append(f"action `{action}`")
+        command = action_command(action)
+        parts.append(f"action `{action}`" if command == str(action) else f"action `{action}`, `{command}`")
 
     reward = transition.get("reward")
     if reward is not None:
@@ -384,20 +386,31 @@ def show_episode(
     return HTML(f'<div class="episode-replay">{"".join(blocks)}</div>')
 
 
-def show_episode_transcript(steps: Sequence[Mapping[str, Any]], *, scroll: bool = True) -> HTML:
+def transition_note(transition: Mapping[str, Any], position: int) -> str:
+    """A transition's step and reward, as a transcript shows them at the end of its command's line."""
+    note = f"step {transition.get('step', position)}"
+    reward = transition.get("reward")
+    return note if reward is None else f"{note} · reward {reward:+.2f}"
+
+
+def show_episode_transcript(transitions: Sequence[Mapping[str, Any]], *, scroll: bool = True) -> HTML:
     """Render an episode in one game frame, as the terminal shows it.
 
-    Each step holds the ``command`` typed, a ``note`` on it such as its step and reward, and the game's ``reply`` as
-    text or bytes. The command follows MUD2's prompt with the note at the end of its line, and the reply comes under it.
+    Takes the same transitions as ``show_episode``. Each command follows MUD2's prompt with its step and reward at the
+    end of the line, and the game's reply from ``info`` comes under it.
     """
-    steps = list(steps)
-    if not steps:
-        return empty_html("No steps.")
+    transitions = list(transitions)
+    if not transitions:
+        return empty_html("No transitions.")
 
-    texts = [f"{PROMPT}{step['command']}\n{display_text(step['reply'])}" for step in steps]
+    texts = [
+        f"{PROMPT}{action_command(transition['action'])}\n{display_text(transition['info']['render_bytes'])}"
+        for transition in transitions
+    ]
     rendered = "".join(
-        f'<div style="margin-top:{"0.6rem" if position else "0"};">'
-        f'<span style="{NOTE_STYLE}">{html_lib.escape(str(step["note"]))}</span>{ansi_html(text)}</div>'
-        for position, (step, text) in enumerate(zip(steps, texts, strict=True))
+        f'<div style="margin-top:{"0.6rem" if position > 1 else "0"};">'
+        f'<span style="{NOTE_STYLE}">{html_lib.escape(transition_note(transition, position))}</span>'
+        f"{ansi_html(text)}</div>"
+        for position, (transition, text) in enumerate(zip(transitions, texts, strict=True), start=1)
     )
     return frame_html(rendered, collapse=scroll and is_long_output("\n".join(texts)))

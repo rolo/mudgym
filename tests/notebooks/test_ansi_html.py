@@ -39,9 +39,12 @@ def test_inverse_and_extended_colours():
     )
 
 
-def test_an_episode_transcript_echoes_each_command_after_the_prompt_with_its_note():
+def test_an_episode_transcript_echoes_each_action_after_the_prompt_with_its_step_and_reward():
     transcript = show_episode_transcript(
-        [{"command": "move north", "note": "step 1 & reward -0.01", "reply": MOVE_RESPONSE.encode("latin-1")}]
+        [
+            {"step": 1, "action": 0, "reward": -0.01, "info": {"render_bytes": MOVE_RESPONSE.encode("latin-1")}},
+            {"step": 2, "action": "look", "reward": 1, "info": {"render_bytes": b"Hut.\n"}},
+        ]
     ).data
 
     assert (
@@ -49,5 +52,7 @@ def test_an_episode_transcript_echoes_each_command_after_the_prompt_with_its_not
         in transcript
     )
     assert ">move north\n</span>" in transcript
-    assert "step 1 &amp; reward -0.01</span>" in transcript
+    assert "step 1 · reward -0.01</span>" in transcript
     assert ">Beaten track</span>" in transcript
+    assert ">look\nHut.\n</span>" in transcript
+    assert "step 2 · reward +1.00</span>" in transcript
