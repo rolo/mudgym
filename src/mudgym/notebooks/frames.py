@@ -48,6 +48,12 @@ FRAME_STYLE = (
 # and hides how much output there is.
 COLLAPSED_LINE_COUNT = 24
 
+# A frame fixed at a height scrolls as a terminal does, opening on its newest output with the earlier output above it.
+# Reversing the column starts the scroll at the bottom, and the inner auto margin keeps output that fits at the top.
+FIXED_FRAME_STYLE = (
+    f"overflow-y:auto;display:flex;flex-direction:column-reverse;scrollbar-color:{TERMINAL_MUTED} {TERMINAL_SURFACE};"
+)
+
 # Each widget needs its own id or two of them on a page drive each other.
 FRAME_IDS = itertools.count(1)
 TAB_GROUP_IDS = itertools.count(1)
@@ -157,9 +163,19 @@ def is_long_output(text: str) -> bool:
     return text.count("\n") + 1 > COLLAPSED_LINE_COUNT
 
 
-def frame_html(inner_html: str, *, collapse: bool) -> HTML:
-    """Wrap rendered output in the game frame, collapsing it behind a toggle when long."""
-    frame = f'<div class="game-frame" style="{FRAME_STYLE}">{inner_html}</div>'
+def frame_html(inner_html: str, *, collapse: bool, lines: int | None = None) -> HTML:
+    """Wrap rendered output in the game frame, collapsing it behind a toggle when long, or fixing it ``lines`` tall."""
+    if lines is None:
+        frame = f'<div class="game-frame" style="{FRAME_STYLE}">{inner_html}</div>'
+    else:
+        frame_id = f"game-frame-fixed-{next(FRAME_IDS)}"
+        frame = (
+            f'<div class="game-frame" id="{frame_id}" style="{FRAME_STYLE}height:{lines * 1.5:g}em;{FIXED_FRAME_STYLE}">'
+            f'<div style="margin-bottom:auto;">{inner_html}</div></div>'
+            # Where scripts run, also scroll to the newest output, for browsers that open a reversed scroll at its top.
+            f"<script>(function () {{ var frame = document.getElementById({frame_id!r}); "
+            f"if (frame) frame.scrollTop = frame.scrollHeight; }})();</script>"
+        )
     if not collapse:
         return HTML(frame)
 
@@ -357,19 +373,25 @@ def transition_caption(transition: Mapping[str, Any], position: int) -> str:
     return " · ".join(parts)
 
 
+def episode_transitions(episode: Mapping[str, Any] | Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """An episode's transitions, given either the transitions themselves or a mapping holding them as ``transitions``."""
+    return list(episode["transitions"] if isinstance(episode, Mapping) else episode)
+
+
 def show_episode(
-    transitions: Sequence[Mapping[str, Any]],
+    episode: Mapping[str, Any] | Sequence[Mapping[str, Any]],
     *,
     caption: Callable[[Mapping[str, Any], int], str] = transition_caption,
     scroll: bool = True,
 ) -> HTML:
     """Render one episode as a captioned game frame per transition.
 
-    Each transition holds at least ``info``, the Gymnasium step info carrying the rendered bytes. The frame shows the
-    result of the action, so ``next_observation`` fills the observation tab, falling back to ``observation``.
-    ``caption`` receives the transition and its 1-based position and returns the line above each frame.
+    ``episode`` is its transitions, or a mapping holding them as ``transitions``. Each transition holds at least
+    ``info``, the Gymnasium step info carrying the rendered bytes. The frame shows the result of the action, so
+    ``next_observation`` fills the observation tab, falling back to ``observation``. ``caption`` receives the transition
+    and its 1-based position and returns the line above each frame.
     """
-    transitions = list(transitions)
+    transitions = episode_transitions(episode)
     if not transitions:
         return empty_html("No transitions.")
 
@@ -392,13 +414,21 @@ def transition_note(transition: Mapping[str, Any], position: int) -> str:
     return note if reward is None else f"{note} · reward {reward:+.2f}"
 
 
-def show_episode_transcript(transitions: Sequence[Mapping[str, Any]], *, scroll: bool = True) -> HTML:
+def show_episode_transcript(
+    episode: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+    *,
+    title: str | None = None,
+    scroll: bool = True,
+    lines: int | None = None,
+) -> HTML:
     """Render an episode in one game frame, as the terminal shows it.
 
-    Takes the same transitions as ``show_episode``. Each command follows MUD2's prompt with its step and reward at the
-    end of the line, and the game's reply from ``info`` comes under it.
+    Takes the same episode as ``show_episode``. Each command follows MUD2's prompt with its step and reward at the end
+    of the line, and the game's reply from ``info`` comes under it. ``title`` heads the frame as ``show_episode``
+    captions its steps. ``lines`` fixes the frame at that many lines tall, scrolling and opening on the latest output, so
+    a transcript redrawn while an episode plays holds still.
     """
-    transitions = list(transitions)
+    transitions = episode_transitions(episode)
     if not transitions:
         return empty_html("No transitions.")
 
@@ -412,4 +442,8 @@ def show_episode_transcript(transitions: Sequence[Mapping[str, Any]], *, scroll:
         f"{ansi_html(text)}</div>"
         for position, (transition, text) in enumerate(zip(transitions, texts, strict=True), start=1)
     )
-    return frame_html(rendered, collapse=scroll and is_long_output("\n".join(texts)))
+    collapse = scroll and lines is None and is_long_output("\n".join(texts))
+    frame = frame_html(rendered, collapse=collapse, lines=lines)
+    if title is None:
+        return frame
+    return HTML(f'<div style="{CAPTION_STYLE}">{caption_html(title)}</div>{frame.data}')

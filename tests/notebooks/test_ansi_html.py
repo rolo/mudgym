@@ -1,5 +1,5 @@
 from mudgym.featurizers.ansi import INPUT_STYLE
-from mudgym.notebooks import show_ansi, show_episode_transcript
+from mudgym.notebooks import show_ansi, show_episode, show_episode_transcript
 from mudgym.notebooks.ansi import ANSI_BRIGHT, ANSI_NORMAL, TERMINAL_INK, TERMINAL_SURFACE, ansi_html
 
 # The start of a move response, as the engine sends it after a prompt.
@@ -56,3 +56,30 @@ def test_an_episode_transcript_echoes_each_action_after_the_prompt_with_its_step
     assert ">Beaten track</span>" in transcript
     assert ">look\nHut.\n</span>" in transcript
     assert "step 2 · reward +1.00</span>" in transcript
+
+
+def test_episode_views_take_an_episode_holding_its_transitions():
+    transitions = [{"step": 1, "action": "look", "reward": 1, "info": {"render_bytes": b"Hut.\n", "raw_bytes": b""}}]
+
+    assert show_episode_transcript({"transitions": transitions}).data == show_episode_transcript(transitions).data
+    assert "Hut." in show_episode({"steps": 1, "transitions": transitions}).data
+
+
+def test_a_fixed_transcript_keeps_its_height_and_scrolls_from_its_latest_output():
+    transitions = [{"step": step, "action": "look", "info": {"render_bytes": b"Hut.\n" * 10}} for step in range(1, 5)]
+
+    transcript = show_episode_transcript(transitions, lines=12).data
+
+    assert "height:18em;overflow-y:auto;" in transcript
+    assert "flex-direction:column-reverse;" in transcript
+    assert "show more" not in transcript
+    frame_id = transcript.split('id="', 1)[1].split('"', 1)[0]
+    assert f"document.getElementById('{frame_id}'); if (frame) frame.scrollTop = frame.scrollHeight;" in transcript
+
+
+def test_a_titled_transcript_heads_its_frame_with_the_title():
+    transitions = [{"step": 1, "action": "look", "info": {"render_bytes": b"Hut.\n"}}]
+
+    transcript = show_episode_transcript(transitions, title="Eval episode `1`").data
+
+    assert transcript.index("Eval episode <code") < transcript.index('class="game-frame"')
