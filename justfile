@@ -48,17 +48,26 @@ release-retry version:
 docs-record *names:
     uv run python docs/record.py {{names}}
 
-# replay committed connection captures to generate the ignored fragments used by the docs
+# replay committed connection captures and convert the recorded notebooks into the ignored pages the docs use
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
+    uv run python docs/notebooks.py
 
-# Regenerate the displayed fragments from committed captures before previewing.
-docs: docs-derive
+# re-run the docs notebooks against the live game, recording their outputs, then derive their pages
+docs-notebooks *names:
+    uv run --group notebooks python docs/notebooks.py --execute {{names}}
+
+# build the browser workspace where the docs notebooks run in JupyterLite, which each notebook page links to
+docs-lite:
+    uv run python docs/jupyterlite.py
+
+# Regenerate the displayed fragments and the browser notebooks before previewing.
+docs: docs-derive docs-lite
     uv run zensical serve
 
 # serve the docs while watching docs/code/: saving an example re-derives its fragments (recording it
 # live first when its commands changed or it is new), and zensical reloads the browser with the result
-docs-watch: docs-derive
+docs-watch: docs-derive docs-lite
     #!/usr/bin/env bash
     set -euo pipefail
     # the watcher runs without the `uv run` wrapper (the docs-derive dependency already synced .venv)
@@ -72,3 +81,7 @@ docs-watch: docs-derive
 # block renders its traceback into the page instead of failing zensical, so the scan fails it loudly
 build-docs:
     uv run python docs/build.py
+
+# run every docs notebook in Chromium from the built site and fail on any cell error, as the docs workflow does
+check-docs-lite: build-docs
+    uv run --with playwright==1.58.0 python docs/check_lite.py

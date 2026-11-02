@@ -1,0 +1,8 @@
+{
+  "PyodideLockAddon": {
+    "enabled": true,
+    "specs": [
+      "-r requirements.txt"
+    ]
+  }
+}

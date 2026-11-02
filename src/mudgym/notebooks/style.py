@@ -19,6 +19,10 @@ class HTML:
     def _repr_html_(self) -> str:
         return self.data
 
+    def __repr__(self) -> str:
+        # Stable, unlike the default's memory address, so recorded notebooks only change when their output does.
+        return f"<HTML output, {len(self.data)} characters>"
+
 
 # Every value lives in theme.css, which the docs load directly. Notebooks never
 # load it, so each token carries its value from the file as the var() fallback.

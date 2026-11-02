@@ -29,9 +29,10 @@ def pages_with_rendered_errors(pages: list[Path]) -> list[Path]:
 
 
 def main() -> None:
-    derive = subprocess.run([sys.executable, "docs/record.py", "--derive-only"], cwd=REPOSITORY_ROOT, check=False)
-    if derive.returncode:
-        raise SystemExit(derive.returncode)
+    for derive_command in (["docs/record.py", "--derive-only"], ["docs/notebooks.py"], ["docs/jupyterlite.py"]):
+        derive = subprocess.run([sys.executable, *derive_command], cwd=REPOSITORY_ROOT, check=False)
+        if derive.returncode:
+            raise SystemExit(derive.returncode)
 
     build = subprocess.run([sys.executable, "-m", "zensical", "build", "--strict"], cwd=REPOSITORY_ROOT, check=False)
     if build.returncode:
