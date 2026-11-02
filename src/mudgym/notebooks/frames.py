@@ -9,7 +9,7 @@ from typing import Any
 from mudgym.db.directions import DIRECTIONS
 from mudgym.featurizers.ansi import INPUT_STYLE
 from mudgym.featurizers.strings import decode_text_bytes
-from mudgym.notebooks.ansi import TERMINAL_INK, TERMINAL_SURFACE, ansi_html
+from mudgym.notebooks.ansi import TERMINAL_FONT, TERMINAL_INK, TERMINAL_MUTED, TERMINAL_SURFACE, ansi_html
 from mudgym.notebooks.style import (
     HTML,
     LABEL_STYLE,
@@ -20,6 +20,7 @@ from mudgym.notebooks.style import (
     RULE,
     SANS,
     SECONDARY,
+    THEME,
     TINT,
     caption_html,
     cell_text,
@@ -33,14 +34,14 @@ from mudgym.notebooks.tables import show_table
 FRAME_STYLE = (
     f"background:{TERMINAL_SURFACE};"
     f"color:{TERMINAL_INK};"
-    f"font-family:{MONO};"
+    f"font-family:{TERMINAL_FONT};"
     "font-size:14px;"
     "line-height:1.5;"
     "padding:1.1em 1.2em;"
     "margin:0;"
     "white-space:pre-wrap;"
     "overflow-wrap:anywhere;"
-    f"border:1px solid {PRIMARY};"
+    f"border:1px solid {THEME['primary']};"
 )
 
 # Long output collapses rather than scrolling: a frame with its own scrollbar inside the notebook's is awkward to drive
@@ -134,9 +135,7 @@ CAPTION_STYLE = f"font-family:{SANS};font-size:1.18rem;font-weight:720;color:{SE
 PROMPT = "\x1b[1;34;40m*" + INPUT_STYLE.decode("latin-1")
 
 # A transcript step's note sits at the end of its command's line, in a dimmer terminal ink.
-NOTE_STYLE = (
-    f"float:right;margin-left:1rem;font-size:0.78rem;color:color-mix(in srgb, {TERMINAL_INK} 60%, {TERMINAL_SURFACE});"
-)
+NOTE_STYLE = f"float:right;margin-left:1rem;font-size:0.78rem;color:{TERMINAL_MUTED};"
 
 
 def display_bytes(value: Any) -> bytes:

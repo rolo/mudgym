@@ -4,12 +4,15 @@ import html
 import re
 from dataclasses import dataclass
 
-from mudgym.notebooks.style import token
+from mudgym.notebooks.style import THEME
 
 ANSI_NORMAL = ("#0f1f26", "#e05a48", "#3cb884", "#f2b43c", "#315fba", "#b478d0", "#3fb9c4", "#dde0ed")
 ANSI_BRIGHT = ("#5f7885", "#ff7a5c", "#43d9a3", "#ffcc63", "#315fba", "#d09ae8", "#5ee0e8", "#dde0ed")
-TERMINAL_SURFACE = token("code-background")
-TERMINAL_INK = token("terminal-ink")
+# Plain values, not var(), since JupyterLab strips var() from saved output until the notebook is trusted.
+TERMINAL_SURFACE = THEME["code-background"]
+TERMINAL_INK = THEME["terminal-ink"]
+TERMINAL_MUTED = THEME["terminal-muted"]
+TERMINAL_FONT = THEME["mono"]
 
 CONTROL_SEQUENCE = re.compile(r"\x1b\[([0-9;]*)([ -/]*[@-~])")
 

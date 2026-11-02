@@ -14,6 +14,7 @@
   --notebook-rule: color-mix(in srgb, var(--notebook-ink) 12%, var(--notebook-background));
   --notebook-tint: color-mix(in srgb, var(--notebook-secondary) 10%, var(--notebook-background));
   --notebook-terminal-ink: #dde0ed;
+  --notebook-terminal-muted: #898c93;
   --notebook-sans: 'Notebook Inter', Inter, 'Segoe UI', sans-serif;
   --notebook-mono: 'Notebook JetBrains Mono', 'JetBrains Mono', 'Fira Mono', monospace;
   --notebook-radius: 5px;
