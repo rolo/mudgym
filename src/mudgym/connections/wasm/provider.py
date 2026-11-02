@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import secrets
 import sys
 import threading
@@ -333,6 +334,8 @@ class WasmProvider:
         self._world_slots: list[list[int]] = []
         self._ordered_worlds: list[WasmWorld] = []
         self._world_seeds: tuple[int, ...] = ()
+        # Each world's unseeded resets draw from its own generator, reseeded whenever that world gets an explicit seed.
+        self._world_randoms: list[random.Random] = []
         self._closed = False
 
     def world_for_connection(self, connection_index: int) -> int:
@@ -363,6 +366,7 @@ class WasmProvider:
                 self.personas = (Persona(),) * count
             self.worlds = resolved_worlds
             self._world_seeds = tuple(self.seed + world_index for world_index in range(resolved_worlds))
+            self._world_randoms = [random.Random(world_seed) for world_seed in self._world_seeds]
             self._world_slots = [list(range(index, count, resolved_worlds)) for index in range(resolved_worlds)]
             self._connections = [
                 WasmConnection(provider=self, connection_index=index, timeout_ms=self.timeout_ms)
@@ -371,14 +375,22 @@ class WasmProvider:
             self._executor = self.runtime.executor(resolved_worlds)
             return list(self._connections)
 
+    def _unseeded_world_seed(self, world_index: int) -> int:
+        """The construction seed's world on the first reset, then a new world from that world's generator."""
+        if not self._ordered_worlds:
+            return self._world_seeds[world_index]
+        return self._world_randoms[world_index].getrandbits(32)
+
     def _seeds_for_reset(self, seed: int | list[int | None] | None) -> tuple[int, ...]:
         if seed is None:
-            return self._world_seeds
+            return tuple(self._unseeded_world_seed(world_index) for world_index in range(self.worlds))
         if isinstance(seed, int) and not isinstance(seed, bool):
-            return tuple(
+            world_seeds = tuple(
                 validate_seed(seed + world_index, label=f"seed for world {world_index}")
                 for world_index in range(self.worlds)
             )
+            self._world_randoms = [random.Random(world_seed) for world_seed in world_seeds]
+            return world_seeds
         if not isinstance(seed, list):
             raise TypeError("provider reset seed must be an integer, a list of integers/None, or None")
         if len(seed) != len(self._connections):
@@ -393,7 +405,11 @@ class WasmProvider:
         world_seeds = []
         for world_index in range(self.worlds):
             candidate = seed[world_index]
-            world_seeds.append(self._world_seeds[world_index] if candidate is None else candidate)
+            if candidate is None:
+                world_seeds.append(self._unseeded_world_seed(world_index))
+            else:
+                self._world_randoms[world_index] = random.Random(candidate)
+                world_seeds.append(candidate)
         return tuple(world_seeds)
 
     def _build_world_with_sessions(self, slots: Sequence[int], seed: int) -> tuple[WasmWorld, list[WasmSession]]:
@@ -436,7 +452,11 @@ class WasmProvider:
         """Replace one engine instance without rebinding any other world."""
         self._require_world_connections_quiescent(world_index)
         slots = self._world_slots[world_index]
-        seed = self._world_seeds[world_index] if seed is None else validate_seed(seed, label="world seed")
+        if seed is None:
+            seed = self._unseeded_world_seed(world_index)
+        else:
+            seed = validate_seed(seed, label="world seed")
+            self._world_randoms[world_index] = random.Random(seed)
         new_world, sessions = self._build_world_with_sessions(slots, seed)
         old_world = self._ordered_worlds[world_index]
         for connection_index, session in zip(slots, sessions, strict=True):

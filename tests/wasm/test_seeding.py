@@ -8,7 +8,7 @@ from mudgym.connections.wasm.engine_contract import MAX_SAFE_INTEGER
 
 
 @pytest.mark.parametrize("seed_options", [{}, {"seed": None}])
-def test_omitted_seed_varies_between_envs_and_can_be_replayed(wasm_runtime, seed_options):
+def test_omitted_seed_varies_between_envs_and_its_first_world_can_be_replayed(wasm_runtime, seed_options):
     seeds = set()
     for attempt in range(4):
         with closing(make_env(connection_kwargs={"runtime": wasm_runtime, **seed_options})) as env:
@@ -16,10 +16,7 @@ def test_omitted_seed_varies_between_envs_and_can_be_replayed(wasm_runtime, seed
             seed = info["transport"]["world_seed"]
             assert 0 <= seed <= MAX_SAFE_INTEGER
             seeds.add(seed)
-            repeated_obs, repeated_info = env.reset()
-            assert repeated_info["transport"]["world_seed"] == seed
-            assert repeated_info["transport"]["persona"] == info["transport"]["persona"]
-            assert repeated_obs["text"] == obs["text"]
+            assert env.reset()[1]["transport"]["world_seed"] != seed
     assert len(seeds) > 1
 
     with closing(make_env(connection_kwargs={"runtime": wasm_runtime, "seed": seed})) as replay:
@@ -49,3 +46,15 @@ def test_provider_offsets_each_world_from_its_resolved_seed(wasm_runtime, seed):
 def test_provider_rejects_invalid_explicit_seeds(wasm_runtime, seed):
     with pytest.raises(ValueError, match="safe integer range"):
         WasmProvider(runtime=wasm_runtime, seed=seed)
+
+
+def test_unseeded_resets_move_to_new_worlds_that_the_first_seed_reproduces(wasm_runtime):
+    runs = []
+    for attempt in range(2):
+        with closing(make_env(connection_kwargs={"runtime": wasm_runtime})) as env:
+            seeds = [env.reset(seed=123)[1]["transport"]["world_seed"]]
+            seeds += [env.reset()[1]["transport"]["world_seed"] for reset in range(2)]
+            runs.append(seeds)
+    assert runs[0][0] == 123
+    assert len(set(runs[0])) == 3
+    assert runs[0] == runs[1]

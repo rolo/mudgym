@@ -63,16 +63,16 @@ def test_scalar_factory_passes_persona_options(wasm_runtime, options, name, sex)
 
 
 @pytest.mark.parametrize("options", [{}, {"persona": "Davina", "sex": "f"}])
-def test_scalar_identity_repeats_after_reseeding_and_reset_without_a_seed(wasm_runtime, options):
+def test_scalar_identity_repeats_after_reseeding(wasm_runtime, options):
     with closing(make_env(**options, connection_kwargs={"runtime": wasm_runtime})) as env:
         runs = []
-        for seed in (123, 456, 123, None):
+        for seed in (123, 456, 123):
             obs, info = env.reset(seed=seed)
-            assert info["transport"]["world_seed"] == (123 if seed is None else seed)
+            assert info["transport"]["world_seed"] == seed
             if options:
                 assert (info["persona"], info["persona_sex"]) == ("Davina", "female")
             runs.append((obs["text"], info["persona"], info["persona_sex"]))
-        assert runs[0] == runs[2] == runs[3]
+        assert runs[0] == runs[2]
 
 
 def test_scalar_persona_options_override_connection_kwargs(wasm_runtime):
@@ -160,4 +160,11 @@ def test_interleaved_worlds_keep_overrides_local_and_reseed_independently(wasm_r
         assert identities[2].sex == "female" and identities[3].sex == "male"
         assert identities[2].name != "Ash" and identities[3].name != "Ash"
         provider.reset(seed=[None, 45, None, None])
-        assert identities[::2] == [connection._session.persona for connection in connections[::2]]
+        world_zero = [connection._session.persona for connection in connections[::2]]
+        assert world_zero[0] == Persona("Ash", "male")
+        assert provider._world_seeds[0] != 42 and provider._world_seeds[1] == 45
+    with closing(WasmProvider(runtime=wasm_runtime, worlds=2, personas=requested)) as other:
+        other_connections = other.create_connections(4)
+        other.reset(seed=42)
+        other.reset(seed=[None, 46, None, None])
+        assert [connection._session.persona for connection in other_connections[::2]] == world_zero
