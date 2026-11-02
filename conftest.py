@@ -1,11 +1,11 @@
 """
-Streaming the mudgym logger during a test run is opt-in via the MUDGYM_LOG_LEVEL environment variable (the same
-variable setup_logging() honours). For example:
+Streaming the mudgym logger during a test run is opt-in via the MUDGYM_LOG_LEVEL environment variable (the same variable
+setup_logging() honours). For example:
 
     MUDGYM_LOG_LEVEL=DEBUG pytest src/mudgym/connections/tests/test_connection.py -vv
 
-shows the per-command debug output (sm.send, sm.send_command.complete with seen_prompts/terminated/truncated, ...).
-With the variable unset the run stays quiet, since the library defaults to WARNING with a null handler. An explicit
+shows the per-command debug output (sm.send, sm.send_command.complete with seen_prompts/terminated/truncated, ...). With
+the variable unset the run stays quiet, since the library defaults to WARNING with a null handler. An explicit
 --log-cli-level on the command line always takes precedence.
 """
 
@@ -25,8 +25,8 @@ def tea_results(request):
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    # Tea timing is session-local and intentionally serial; under pytest-xdist workers keep their
-    # own config state, so the controller summary may be empty.
+    # Tea timing is session-local and intentionally serial; under pytest-xdist workers keep their own config state, so
+    # the controller summary may be empty.
     tea_results = getattr(config, "_tea_results", None)
     if not tea_results:
         return

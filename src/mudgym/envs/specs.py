@@ -10,28 +10,22 @@ BYTE_DTYPE = np.uint8
 BIT_DTYPE = np.int8  # Gymnasium's MultiBinary space and discrete action masks use int8.
 
 # game specific
-# The game's text is 7-bit: printable ASCII plus ANSI escapes and line breaks (the entire muddle
-# text database contains no byte above 0x7F). Wire bytes above 0x7F are protocol codes (fecodes and
-# the unsupported client mode), never text, and text paths decode as strict ASCII. Raw diagnostics
-# retain the Latin-1 byte-to-text mapping.
+# The game's text is 7-bit: printable ASCII plus ANSI escapes and line breaks.
 PRINTABLE_ASCII = string.ascii_letters + string.digits + string.punctuation + " "
 TEXT_CHARSET = PRINTABLE_ASCII + "\n"
 
-# Single-line game values: room names, weather, item descriptions. Same characters as text,
-# never a line break.
+# Single-line game values: room names, weather, item descriptions. Same characters as text, never a line break.
 SINGLE_LINE_CHARSET = PRINTABLE_ASCII
 
-# An action is one logical game input line: the session sends its observation-command line separately,
-# so a line break inside an action would smuggle extra wire commands. The game also
-# transliterates input bytes above 0x7F (a typed 0xE9 'e-acute' echoes back as 'i'), so actions
-# stay printable ASCII.
+# An action is one logical game input line: the session sends its observation-command line separately, so a line break
+# inside an action would smuggle extra wire commands. The game also transliterates input bytes above 0x7F (a typed 0xE9
+# 'e-acute' echoes back as 'i'), so actions stay printable ASCII.
 ACTION_CHARSET = PRINTABLE_ASCII
 
-# Game identifiers are single tokens: room ids ("groad1", "((store))", "Limbo"; at most 9 chars,
-# enumerated from the room db), object instance ids ("necklace0", "key22"; a vocabulary word of
-# at most 14 chars - MAXIDLEN in the game's database compiler - plus an instance number), and
-# direction words. Persona names are also identifiers (alphabetic, at most 10 chars) but their
-# limit lives with the persona logic in connections.persona.
+# Game identifiers are single tokens: room ids ("groad1", "((store))", "Limbo"; at most 9 chars, enumerated from the
+# room db), object instance ids ("necklace0", "key22"; a vocabulary word of at most 14 chars - MAXIDLEN in the game's
+# database compiler - plus an instance number), and direction words. Persona names are also identifiers (alphabetic, at
+# most 10 chars) but their limit lives with the persona logic in connections.persona.
 IDENTIFIER_CHARSET = string.ascii_letters + string.digits + "()-"
 IDENTIFIER_MAX_LENGTH = 17
 
@@ -42,8 +36,7 @@ ITEM_SPACE = spaces.Sequence(
     stack=False,
 )
 
-# a sequence of machine-readable game identifiers, eg the fei inventory ids ("brand39",
-# "cloth-of-gold")
+# a sequence of machine-readable game identifiers, eg the fei inventory ids ("brand39", "cloth-of-gold")
 IDENTIFIER_SPACE = spaces.Sequence(
     spaces.Text(max_length=IDENTIFIER_MAX_LENGTH, min_length=0, charset=IDENTIFIER_CHARSET),
     stack=False,

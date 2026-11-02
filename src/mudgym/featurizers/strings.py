@@ -8,8 +8,8 @@ def decode_text_bytes(data: bytes) -> str:
 
     The game's text output is 7-bit. A high byte in a text path is a leaked protocol byte, so it fails loudly with nearby byte context.
 
-    ANSI escape sequences are valid and are not removed here, callers can strip them separately when plain text
-    is wanted.
+    ANSI escape sequences are valid and are not removed here, callers can strip them separately when plain text is
+    wanted.
     """
     raw = bytes(data)
     try:
@@ -27,12 +27,11 @@ def decode_text_lines(data: bytes) -> list[str]:
 
 def encode_command_bytes(text: str) -> bytes:
     """
-    Encode a player command line as ASCII, failing clearly before any bytes reach the wire
-    when the text contains characters the game cannot receive.
+    Encode a player command line as ASCII, failing clearly before any bytes reach the wire when the text contains
+    characters the game cannot receive.
 
-    The game's text channel is 7-bit: a high byte sent as a command is
-    transliterated rather than echoed back, so the read window's exact-echo anchoring would
-    wait out its timeout instead of matching.
+    The game's text channel is 7-bit: a high byte sent as a command is transliterated rather than echoed back, so the
+    read window's exact-echo anchoring would wait out its timeout instead of matching.
     """
     try:
         return text.encode("ascii")

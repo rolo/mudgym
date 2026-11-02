@@ -1,13 +1,7 @@
-"""Run every docs notebook in Chromium from the built site, as a visitor would, and fail on any cell error.
+"""Run every docs notebook in Chromium from the built site, and install the built wheel in a fresh Pyodide.
 
-A browser workspace that cannot install or run MudGym still builds a clean static site, so this serves `site/` over
-HTTP and checks it two ways. It installs the built wheel in stock Pyodide and plays an episode, letting the wheel's
-metadata resolve its dependencies from PyPI. Then it runs every notebook in `site/lite/` with PyPI blocked, so a
-package the build failed to bundle fails too.
-
-Run through the justfile, which builds the docs first:
-
-    just check-docs-lite
+The notebooks run with PyPI blocked, so anything the build forgot to bundle fails. `just check-docs-lite` builds the
+docs first.
 """
 
 import functools
@@ -29,14 +23,13 @@ NOTEBOOKS_DIR = REPOSITORY_ROOT / "docs" / "notebooks"
 KERNEL_START_SECONDS = 180
 NOTEBOOK_RUN_SECONDS = 900
 KERNEL_STATUS = "() => window.jupyterapp?.shell.currentWidget?.sessionContext?.session?.kernel?.status ?? null"
-# Returning the command's promise would make evaluate wait for the whole run, so the deadline could never fire.
+# Don't return the promise, or evaluate waits for the whole run and the deadline never fires.
 RUN_ALL_CELLS = """() => {
     window.runAllError = null;
     window.jupyterapp.commands.execute("notebook:run-all-cells").catch((error) => {
         window.runAllError = String(error);
     });
 }"""
-# Cells left unrun mean the run is still going, or stopped at an error.
 RUN_STATE = """() => {
     const panel = window.jupyterapp.shell.currentWidget;
     const cells = panel.content.widgets.filter((cell) => cell.model.type === "code");
@@ -69,12 +62,11 @@ def run_notebook(browser: Browser, base_url: str, name: str) -> None:
     page = browser.new_page()
     page_errors = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
-    # JupyterLite's service worker fetches the kernel's requests itself, and only context routes see those.
+    # Context routes, since JupyterLite's service worker makes the kernel's requests.
     page.context.route("https://pypi.org/**", lambda route: route.abort())
     page.context.route("https://files.pythonhosted.org/**", lambda route: route.abort())
     try:
         page.goto(f"{base_url}/lite/notebooks/index.html?path={name}")
-        # Cells run before the kernel is up are skipped without an error.
         page.wait_for_function(f"({KERNEL_STATUS})() === 'idle'", timeout=KERNEL_START_SECONDS * 1000)
         deadline = time.monotonic() + NOTEBOOK_RUN_SECONDS
         page.evaluate(RUN_ALL_CELLS)
@@ -94,11 +86,10 @@ def run_notebook(browser: Browser, base_url: str, name: str) -> None:
 
 
 def check_wheel_install(browser: Browser, base_url: str) -> None:
-    """Install the built wheel in stock Pyodide, resolving dependencies without the docs requirements or lock."""
+    """Install the built wheel in a plain Pyodide, letting its metadata pull dependencies from PyPI."""
     wheels = SITE_DIR / "lite" / "static" / "pyodide-lock"
     (wheel,) = wheels.glob("mudgym-*.whl")
     lock = json.loads((wheels / "pyodide-lock.json").read_text())
-    # Use the same Pyodide release as the notebooks, with its original package list.
     pyodide_url = urljoin(lock["packages"]["micropip"]["file_name"], "pyodide.mjs")
     wheel_url = f"{base_url}/{wheel.relative_to(SITE_DIR).as_posix()}"
     source = f"import micropip\nawait micropip.install({wheel_url!r})\n"

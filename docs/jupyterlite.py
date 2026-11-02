@@ -1,17 +1,7 @@
-"""Build the browser workspace where the docs notebooks run with nothing to install.
+"""Build the JupyterLite site the docs notebooks run in, with `just docs-lite`.
 
-Every notebook in `docs/notebooks/` opens in JupyterLite, running on Python in the browser through Pyodide, with
-MudGym built from this checkout and the engine wheel uv.lock names. A notebook's browser version is the recorded one
-with its outputs cleared and the cells of its overlay in `docs/jupyterlite/browser/`, if it has one, swapped in by
-id. Only what differs in the browser lives there, such as an intro that says nothing needs installing, or weights
-offered for download rather than written beside the notebook.
-
-The workspace is written to `docs/pages/lite/`, which Git ignores, so the docs build publishes it with the pages and
-each notebook page links to its browser version there.
-
-Run through the justfile:
-
-    just docs-lite
+It uses this checkout's MudGym wheel and the engine version uv.lock has. A notebook's browser version is the recorded
+one with its outputs cleared and any cells from its overlay in `docs/jupyterlite/browser/` swapped in.
 """
 
 import json
@@ -29,12 +19,11 @@ OVERLAYS_DIR = LITE_SOURCE_DIR / "browser"
 OUTPUT_DIR = REPOSITORY_ROOT / "docs" / "pages" / "lite"
 ENGINE_PACKAGE = "mudgym-wasm-engine"
 JUPYTERLITE_VERSION = "0.8.3"
-# Naming the browser's kernel lets JupyterLite open a notebook without asking which kernel to start.
+# Naming the kernel saves JupyterLite asking which one to start.
 PYODIDE_KERNELSPEC = {"display_name": "Python (Pyodide)", "language": "python", "name": "python"}
 
 
 def cleared(cell: dict) -> dict:
-    """A copy of the cell ready for a fresh run, with no recorded outputs."""
     cell = {key: value for key, value in cell.items() if key not in ("outputs", "execution_count")}
     if cell["cell_type"] == "code":
         cell |= {"outputs": [], "execution_count": None}
@@ -42,7 +31,6 @@ def cleared(cell: dict) -> dict:
 
 
 def browser_notebook(source: dict, overlay: dict) -> dict:
-    """Swap the overlay's cells into the source notebook by id and clear every output."""
     replacements = {cell["id"]: cell for cell in overlay["cells"]}
     unknown = sorted(set(replacements) - {cell["id"] for cell in source["cells"]})
     if unknown:
@@ -66,7 +54,6 @@ def write_browser_notebooks(contents_dir: Path) -> None:
 
 
 def engine_version() -> str:
-    """The engine wheel version uv.lock resolved, which the native tests run."""
     lock = tomllib.loads((REPOSITORY_ROOT / "uv.lock").read_text())
     return next(package["version"] for package in lock["package"] if package["name"] == ENGINE_PACKAGE)
 
@@ -78,7 +65,7 @@ def build_wheel(wheels_dir: Path) -> Path:
 
 
 def configure(lite_dir: Path, wheel: Path) -> None:
-    """Resolve mudgym to this checkout's wheel, which PyPI's release of the same version is not, and pin the engine."""
+    """PyPI's mudgym of the same version isn't this checkout, so point it at the wheel and pin the engine."""
     pins = lite_dir / "pins.txt"
     pins.write_text(f"mudgym @ {wheel.as_uri()}\n{ENGINE_PACKAGE}=={engine_version()}\n")
     config_path = lite_dir / "jupyter_lite_config.json"
@@ -91,7 +78,7 @@ def configure(lite_dir: Path, wheel: Path) -> None:
 
 
 def build_workspace(workspace: Path, lite_dir: Path, contents_dir: Path) -> None:
-    # Jupyter's build database and this machine's Jupyter configuration stay in the scratch workspace.
+    # Keep Jupyter's config and build database in the scratch workspace, away from this machine's own.
     environment = os.environ | {
         f"JUPYTER_{name}_DIR": str(workspace / name.lower()) for name in ("CONFIG", "DATA", "RUNTIME")
     }
@@ -119,7 +106,6 @@ def build_workspace(workspace: Path, lite_dir: Path, contents_dir: Path) -> None
         "--no-sourcemaps",
     ]
     subprocess.run(command, cwd=workspace, env=environment, check=True)
-    # JupyterLite also copies its frontend bundler configuration, which browsers never load.
     for bundler_config in OUTPUT_DIR.glob("rspack.config*.js"):
         bundler_config.unlink()
 

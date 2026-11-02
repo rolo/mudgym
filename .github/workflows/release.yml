@@ -16,9 +16,8 @@ jobs:
       is_prerelease: ${{ steps.versions.outputs.is_prerelease }}
     steps:
       - uses: actions/checkout@v5
-      # Builds the sdist and wheel with uv build, runs twine check --strict and
-      # check-wheel-contents, renders the file trees and metadata into the job
-      # summary, and uploads everything as the "Packages" artifact.
+      # Builds the sdist and wheel with uv build, runs twine check --strict and check-wheel-contents, renders the file
+      # trees and metadata into the job summary, and uploads everything as the "Packages" artifact.
       - name: Build, check, and inspect the distributions
         id: baipp
         uses: hynek/build-and-inspect-python-package@2abe76da66d0a6a4a227101f9348ee855797cfa5 # v3.0.1
@@ -74,15 +73,14 @@ jobs:
         with:
           name: Packages
           path: dist
-      # Import-only smoke passes even when the environment cannot start, which
-      # is this package's most likely failure mode - so play a real episode.
+      # Import-only smoke passes even when the environment cannot start, which is this package's most likely failure
+      # mode - so play a real episode.
       - name: Play a WASM episode from the installed wheel
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
           /tmp/smoke/bin/python -I scripts/smoke.py
-  # CI runs uv sync --frozen everywhere else, so the lower bounds in
-  # pyproject.toml are otherwise entirely untested.
+  # CI runs uv sync --frozen everywhere else, so the lower bounds in pyproject.toml are otherwise entirely untested.
   lowest-resolution:
     name: Test at the declared minimum versions
     if: github.server_url == 'https://github.com'

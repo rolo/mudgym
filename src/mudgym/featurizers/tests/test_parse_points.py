@@ -6,8 +6,8 @@ SORCERISE_GAIN_BYTES = b"(Persona saved on +12,800 = \x1b[0;32;40m13,000\x1b[1;3
 # Captured from the live game: swearing kill during a probe run.
 SWEARING_LOSS_BYTES = b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\r\n"
 
-# Captured from the live game: 'say' with raw ESC bytes in the message; the game strips the ESC
-# from the spoken output, leaving the SGR body as plain text.
+# Captured from the live game: 'say' with raw ESC bytes in the message; the game strips the ESC from the spoken output,
+# leaving the SGR body as plain text.
 ESC_STRIPPED_SPEECH_BYTES = (
     b'\x1b[0;33;40mRaymond the sorcerer says "\x1b[1;33;40m'
     b'(x +99 = [0;32;40m99[1;37;40m)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
@@ -72,8 +72,8 @@ def test_esc_stripped_speech_cannot_fake_the_colour_anchor():
 
 
 def test_line_break_inside_the_parens_rejects_the_match():
-    # wrapped speech gets colour re-applied mid-message, so a pattern spanning lines is not a
-    # genuine event even when an SGR precedes the total
+    # wrapped speech gets colour re-applied mid-message, so a pattern spanning lines is not a genuine event even when an
+    # SGR precedes the total
     raw_bytes = b'says "\x1b[1;33;40mhello (+10 = \r\n\x1b[1;33;40m10)\x1b[0;33;40m".'
     parsed_points = parse_points_changes(raw_bytes)
     assert parsed_points["delta"] == 0

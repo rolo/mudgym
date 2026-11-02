@@ -24,8 +24,8 @@ from mudgym.session import MudSession
 
 logger = get_logger(__name__)
 
-# tearoom exits messages end with "..." but differ prior to that. Not exiting via the usual north exit and seeing one
-# of these means an episode doesn't really begin in the mudgym sense, so this may either break, or be useful for, some
+# tearoom exits messages end with "..." but differ prior to that. Not exiting via the usual north exit and seeing one of
+# these means an episode doesn't really begin in the mudgym sense, so this may either break, or be useful for, some
 # future use case I haven't thought of.
 TEAROOM_EXIT_NARRATION_END = re.compile(rb"(?:disperse away to nothingness|suddenly slide into shape)\.\.\.\r?\n")
 
@@ -38,9 +38,9 @@ DATABASE_BROADCAST_RE = re.compile(
 def command_rejected(raw_bytes: bytes, sent_lines: Sequence[str]) -> bool:
     """Whether the game's parser rejected any sent line, judged from the game output alone.
 
-    The echoes are removed first because they repeat whatever the player typed, so an action spelling out a
-    rejection line would otherwise report itself. Each prompt-delimited chunk is then one reply, so a rejection
-    starts a line within its chunk whether or not the prompt that follows it has arrived yet.
+    The echoes are removed first because they repeat whatever the player typed, so an action spelling out a rejection
+    line would otherwise report itself. Each prompt-delimited chunk is then one reply, so a rejection starts a line
+    within its chunk whether or not the prompt that follows it has arrived yet.
     """
     game_bytes = b"".join(split_on_echo_lines(raw_bytes, sent_lines) or [raw_bytes])
     return any(pattern.search(chunk) for chunk in split_on_prompt(game_bytes) for pattern in COMMAND_REJECTION_LINES)
@@ -163,8 +163,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
 
         text_chunks = [*pre_echo_render_chunks, *payload_text_chunks]
         if not response_complete:
-            # Without a complete response we cannot safely line chunks up with fields. Preserve the bytes as text
-            # rather than pretending the structured observation is complete.
+            # Without a complete response we cannot safely line chunks up with fields. Preserve the bytes as text rather
+            # than pretending the structured observation is complete.
             text_chunks.extend(render_chunks)
 
         # keeps the game's ANSI colour - text observation space doesn't.

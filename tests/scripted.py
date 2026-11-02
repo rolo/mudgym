@@ -8,10 +8,9 @@ from mudgym.featurizers.quickscore import QUICKSCORE_COMMAND
 
 PROMPT = b"\r\n*"
 
-# The canned world is Dally Lane (room groad3), quoted from real captures: the room, fes, fex, and
-# divider shapes are in src/mudgym/envs/fields/tests/payloads.py, and the necklace visit with its
-# sql listing is a captured episode of the same room. Persona names are generated fresh each
-# session; Alexander was the captured one.
+# The canned world is Dally Lane (room groad3), quoted from real captures: the room, fes, fex, and divider shapes are in
+# src/mudgym/envs/fields/tests/payloads.py, and the necklace visit with its sql listing is a captured episode of the
+# same room. Persona names are generated fresh each session; Alexander was the captured one.
 ROOM_TEXT = (
     b"\x1b[32mDally Lane\x1b[37m.\r\n"
     b"\x1b[0;32;40mYou are standing on a dusty road with rising ground both to the north and "
@@ -37,8 +36,8 @@ SQL_RESPONSE = (
     b"You are carrying the following:\r\n"
     b"        nothing.\r\n"
 )
-# Captured shape of the quickscore reply reset uses as its tearoom identity probe: the name line
-# (with the level title the game appends) then the stats line, whose values mirror FES_RESPONSE.
+# Captured shape of the quickscore reply reset uses as its tearoom identity probe: the name line (with the level title
+# the game appends) then the stats line, whose values mirror FES_RESPONSE.
 QS_RESPONSE = (
     b"\x1b[0;37;40mAlexander the protector\r\n"
     b"eff str 52      eff dex 53      sta \x1b[1;32;40m75\x1b[0;37;40m/\x1b[1;32;40m75\x1b[0;37;40m"
@@ -51,8 +50,8 @@ MGCHEATS_RESPONSE = (
     b"[mgcheats]room_id=groad3; room_name=dally lane; fighting=0; dark=0; glowing=0; "
     b"asleep=0; gifted=0; here=[necklace0, weather, road]; ticks=125; inventory=[][/mgcheats]\r\n"
 )
-# A canned transport answers every unscripted command the same way; the acknowledgment is the
-# captured response to "dance".
+# A canned transport answers every unscripted command the same way; the acknowledgment is the captured response to
+# "dance".
 OK_RESPONSE = b"\x1b[0;33;40mOK, Alexander the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n"
 
 OBSERVATION_COMMAND_RESPONSES = {
@@ -114,9 +113,9 @@ def scripted_response(lines: Sequence[str], *, reset_step: bool = False) -> byte
 class ScriptedConnection(MudConnection):
     """Deterministic transport double that returns canned game bytes to real MudEnv code.
 
-    Responses are keyed by the player's command line. A bare bytes response is treated as a normal
-    non-terminal step. Use the tuple response form when a test needs specific terminated/incomplete
-    flags or debug info. Unscripted commands get a generated response.
+    Responses are keyed by the player's command line. A bare bytes response is treated as a normal non-terminal step.
+    Use the tuple response form when a test needs specific terminated/incomplete flags or debug info. Unscripted
+    commands get a generated response.
     """
 
     def __init__(

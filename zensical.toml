@@ -1,9 +1,9 @@
 [project]
 site_name = "MudGym"
 site_description = "A reinforcement learning environment for MUD2"
-# Pages only: docs/code (example sources) and docs/recordings (captures and derived fragments)
-# sit outside the site build, and are pulled in via `--8<--` includes. docs/notebooks are derived
-# into docs/pages/notebooks by docs/notebooks.py before a build.
+# Pages only: docs/code (example sources) and docs/recordings (captures and derived fragments) sit outside the site
+# build, and are pulled in via `--8<--` includes. docs/notebooks are derived into docs/pages/notebooks by
+# docs/notebooks.py before a build.
 docs_dir = "docs/pages"
 site_dir = "site"
 nav = [
@@ -20,8 +20,8 @@ nav = [
   { "API Reference" = "api.md" },
 ]
 extra_css = ["stylesheets/theme.css", "stylesheets/extra.css"]
-# Extra rebuild triggers for `zensical serve`: the pages pull example code from docs/code and
-# recorded fragments from docs/recordings via `--8<--`, so changes there reload the browser too.
+# Extra rebuild triggers for `zensical serve`: the pages pull example code from docs/code and recorded fragments from
+# docs/recordings via `--8<--`, so changes there reload the browser too.
 watch = ["docs/code", "docs/recordings", "docs/notebooks"]
 
 [project.theme]
@@ -67,8 +67,7 @@ anchor_linenums = true
 line_spans = "__span"
 pygments_lang_class = true
 
-# Includes (`--8<--`) for example regions and recorded game output.
-# Missing or renamed includes fail the build.
+# Includes (`--8<--`) for example regions and recorded game output. Missing or renamed includes fail the build.
 [project.markdown_extensions.pymdownx.snippets]
 check_paths = true
 dedent_subsections = true

@@ -38,8 +38,8 @@ def test_tearoom_exit_completes_without_an_observation_probe(connection_key):
 @pytest.mark.parametrize("connection_key", connections)
 def test_quitting_the_game_terminates_the_step_and_reset_recovers(connection_key):
     """
-    A command that ends the game must come back with terminated=True, and reset() must ready up
-    again for another episode.
+    A command that ends the game must come back with terminated=True, and reset() must ready up again for another
+    episode.
     """
 
     connection = connections[connection_key]()

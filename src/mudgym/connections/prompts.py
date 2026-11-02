@@ -17,9 +17,8 @@ SGR_ONE_PLUS_STR = r"(?:\x1b\[[0-9;]*m)+"
 # ((----*))
 # (((----*)))
 #
-# I'm not sure if a mortal can become double or triple invisible, I don't think during
-# the regular course of play but possibly a wiz can do it and makes the regex simpler so can't hurt
-# to support it.
+# I'm not sure if a mortal can become double or triple invisible, I don't think during the regular course of play but
+# possibly a wiz can do it and makes the regex simpler so can't hurt to support it.
 #
 # decorations, each in its own colour, eg b"\x1b[0;34;40m(\x1b[1;34;40m*\x1b[0;34;40m)":
 # >*    conversing
@@ -40,10 +39,10 @@ STARLINE = DECORATIONS_BEFORE + rb"(?:" + DASHES + rb")?\*" + DECORATIONS_AFTER
 
 
 class Prompt(enum.Enum):
-    # Prompts which explicitly mark the end of an episode. Each is anchored to a whole wire line
-    # (optionally colour-wrapped) because the bare words are forgeable: a player speaking
-    # "Cheerio!" puts the text mid-line inside the speech quoting, and the command echo repeats
-    # whatever the player typed. The genuine lines carry nothing but the message itself.
+    # Prompts which explicitly mark the end of an episode. Each is anchored to a whole wire line (optionally
+    # colour-wrapped) because the bare words are forgeable: a player speaking "Cheerio!" puts the text mid-line inside
+    # the speech quoting, and the command echo repeats whatever the player typed. The genuine lines carry nothing but
+    # the message itself.
     GAME_OVER_EPISODE_POINTS = re.compile(
         rb"(?m)^" + SGR + rb"Overall, you (?:scored|lost) [\d,]+ points this game\." + SGR + rb"\r?$"
     )
@@ -65,8 +64,8 @@ GAME_OVER_PROMPTS = [
 ]
 
 
-# The parser's replies to a line it cannot read. Each is the game's own line, so it starts a line
-# (optionally colour-wrapped), while a spoken copy sits mid-line behind the speech quoting.
+# The parser's replies to a line it cannot read. Each is the game's own line, so it starts a line (optionally
+# colour-wrapped), while a spoken copy sits mid-line behind the speech quoting.
 COMMAND_REJECTION_LINES = [
     re.compile(rb"(?m)^" + SGR + message)
     for message in (

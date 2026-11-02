@@ -53,6 +53,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
         with:
-          # increasing from the default of 10 minutes, although github is having an incident
-          # with pages right now so this may be temporary
+          # increasing from the default of 10 minutes, although github is having an incident with pages right now so
+          # this may be temporary
           timeout: 1800000

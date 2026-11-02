@@ -7,8 +7,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 Cell = tuple[int, int]
 Step = tuple[int, int] | None
 
-# One compass step is two grid units, so a room can sit between two others. Up and down offset one unit
-# diagonally.
+# One compass step is two grid units, so a room can sit between two others. Up and down offset one unit diagonally.
 DIRECTION_STEPS: dict[str, tuple[int, int]] = {
     "north": (0, -2),
     "south": (0, 2),
@@ -66,7 +65,8 @@ def compass_step(action: object) -> Step:
 def candidate_offsets(step: Step) -> Iterator[Cell]:
     """Offsets in the order a new neighbour tries them.
 
-    Along ``step`` first, stretching it before falling back to nearby cells, then an expanding ring that guarantees a spot. Every radius is swept so no free cell is skipped.
+    Along ``step`` first, stretching it before falling back to nearby cells, then an expanding ring that guarantees a
+    spot. Every radius is swept so no free cell is skipped.
     """
     if step:
         for multiplier in (1, 2, 4, 8):
@@ -94,7 +94,8 @@ def place_rooms(
 ) -> tuple[dict[str, Cell], set[str]]:
     """Breadth-first placement from the first room, reseeding visited rooms the walk never reached.
 
-    Returns the placed cells and the frontier, the rooms an exit names that were never visited. Frontier rooms are placed but not expanded.
+    Returns the placed cells and the frontier, the rooms an exit names that were never visited. Frontier rooms are
+    placed but not expanded.
     """
     visited = set(visited_room_ids)
     placed: dict[str, Cell] = {}
@@ -149,7 +150,8 @@ def place_rooms(
 def layout_world_from_edges(room_ids: Sequence[str], edges: Iterable[tuple[str, str, str]]) -> dict[str, Cell]:
     """Place rooms from recorded ``(source, action, destination)`` moves.
 
-    Edges sort by source, action and destination before aliases resolve, so several actions to one room and one action to several rooms keep a stable order.
+    Edges sort by source, action and destination before aliases resolve, so several actions to one room and one action
+    to several rooms keep a stable order.
     """
     adjacency: dict[str, list[tuple[Step, str]]] = {}
     for source, action, destination in sorted((str(s), str(a), str(d)) for s, a, d in edges):

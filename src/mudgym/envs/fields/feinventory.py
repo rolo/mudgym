@@ -9,9 +9,9 @@ from mudgym.featurizers.strings import decode_text_lines
 
 from .field import ObservationField
 
-# A dark room shows "oo" in place of the room's visible portables (you can't see the floor), and a blinded
-# persona shows "--". The divider and the player's own inventory below it still show normally, so we just
-# drop these markers from the portables.
+# A dark room shows "oo" in place of the room's visible portables (you can't see the floor), and a blinded persona shows
+# "--". The divider and the player's own inventory below it still show normally, so we just drop these markers from the
+# portables.
 DARK_PORTABLES = "oo"
 BLIND_PORTABLES = "--"
 
@@ -25,16 +25,16 @@ def parse_inventory_lines(block: bytes) -> tuple[str, ...]:
 
 class FEInventoryField(ObservationField):
     """
-    Parses the ``fei`` command output, split by the inventory divider into portables (lying around) and
-    the player's own inventory.
+    Parses the ``fei`` command output, split by the inventory divider into portables (lying around) and the player's own
+    inventory.
     """
 
     command = "fei"
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {
-            # the real fei grammar emits identifiers only ("brand39", "cloth-of-gold", "key50" in
-            # the live captures), never descriptive phrases
+            # the real fei grammar emits identifiers only ("brand39", "cloth-of-gold", "key50" in the live captures),
+            # never descriptive phrases
             "portables": IDENTIFIER_SPACE,
             "inventory": IDENTIFIER_SPACE,
         }

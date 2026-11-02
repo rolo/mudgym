@@ -76,8 +76,8 @@ class FEXitsField(ObservationField):
     def full_extract(self, chunks: Sequence[bytes], **context: Any) -> dict[str, Any]:
         """Parse the latest FEX exits line.
 
-        When no exits line is recognised (e.g. a dark room returns a blank exits response), default to all
-        exits available so the agent can still attempt any direction.
+        When no exits line is recognised (e.g. a dark room returns a blank exits response), default to all exits
+        available so the agent can still attempt any direction.
         """
         match = self.find_last_line(self.REGEX, chunks)
         if match is None:

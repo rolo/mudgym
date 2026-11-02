@@ -26,8 +26,8 @@ test:
     uv run pytest --tb=short --durations=20 --cov=src --cov-branch \
         --cov-report=xml --cov-report=html --cov-report=term-missing
 
-# Build the sdist and wheel from scratch. Deliberately no `just publish`:
-# production publishing is CI and OIDC only, so a local mistake cannot reach PyPI.
+# Build the sdist and wheel from scratch. Deliberately no `just publish`: production publishing is CI and OIDC only, so
+# a local mistake cannot reach PyPI.
 build:
     rm -rf dist
     uv build
@@ -65,20 +65,20 @@ docs-lite:
 docs: docs-derive docs-lite
     uv run zensical serve
 
-# serve the docs while watching docs/code/: saving an example re-derives its fragments (recording it
-# live first when its commands changed or it is new), and zensical reloads the browser with the result
+# serve the docs while watching docs/code/: saving an example re-derives its fragments (recording it live first when its
+# commands changed or it is new), and zensical reloads the browser with the result
 docs-watch: docs-derive docs-lite
     #!/usr/bin/env bash
     set -euo pipefail
-    # the watcher runs without the `uv run` wrapper (the docs-derive dependency already synced .venv)
-    # so the trap's kill reaches the actual process instead of orphaning it when serve exits
+    # the watcher runs without the `uv run` wrapper (the docs-derive dependency already synced .venv) so the trap's kill
+    # reaches the actual process instead of orphaning it when serve exits
     .venv/bin/python docs/record.py --watch &
     watcher_pid=$!
     trap 'kill "$watcher_pid" 2>/dev/null || true' EXIT
     uv run zensical serve
 
-# docs/build.py wraps `zensical build --strict` and then scans the built pages: a failed exec code
-# block renders its traceback into the page instead of failing zensical, so the scan fails it loudly
+# docs/build.py wraps `zensical build --strict` and then scans the built pages: a failed exec code block renders its
+# traceback into the page instead of failing zensical, so the scan fails it loudly
 build-docs:
     uv run python docs/build.py
 

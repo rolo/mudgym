@@ -1,7 +1,7 @@
 """The MUD2 WASI engine as a MudGym connection.
 
-Runs on wasmtime in native Python and on the browser's own WebAssembly in Pyodide. The runtimes load what their
-host has on first use.
+Runs on wasmtime in native Python and on the browser's own WebAssembly in Pyodide. The runtimes load what their host has
+on first use.
 """
 
 from importlib import import_module

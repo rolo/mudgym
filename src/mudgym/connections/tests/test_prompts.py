@@ -22,8 +22,8 @@ def test_command_rejection_lines_match_system_lines_but_not_spoken_copies(messag
 
 
 class TestGameOverPromptsRejectPlayerAuthoredText:
-    """The game-over lines carry nothing but the message, so quoted speech and command echoes
-    (which put the words mid-line) must not read as an episode end."""
+    """The game-over lines carry nothing but the message, so quoted speech and command echoes (which put the words
+    mid-line) must not read as an episode end."""
 
     def test_the_real_quit_cheerio_line_matches(self):
         # captured from the live game: the buffer ends right after the word when pexpect matches

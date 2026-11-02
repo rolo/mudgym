@@ -37,8 +37,8 @@ def test_ascii_commands_encode_unchanged():
 
 
 def test_non_ascii_commands_fail_before_the_wire():
-    # the game transliterates high bytes rather than echoing them, so the exact-echo anchor
-    # would never match; fail clearly before sending instead
+    # the game transliterates high bytes rather than echoing them, so the exact-echo anchor would never match; fail
+    # clearly before sending instead
     with pytest.raises(ValueError, match="outside ASCII"):
         encode_command_bytes("say caf\xe9")
     with pytest.raises(ValueError, match="outside ASCII"):

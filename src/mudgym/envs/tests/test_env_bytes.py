@@ -36,8 +36,7 @@ def test_env_bytes_reset_returns_raw_bytes(scripted_env_factory):
         obs["raw_bytes"][:bytes_length],
         np.frombuffer(info["raw_bytes"], dtype=obs["raw_bytes"].dtype),
     )
-    # episode setup ends with the tearoom exit, so neither its command nor narration belongs to
-    # the first observation
+    # episode setup ends with the tearoom exit, so neither its command nor narration belongs to the first observation
     assert b"move north" not in info["raw_bytes"]
     assert isinstance(info["render_bytes"], bytes)
     assert info["render_bytes"] == env.unwrapped.last_render_bytes

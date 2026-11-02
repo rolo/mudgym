@@ -8,7 +8,6 @@ def has_game_over_prompt(raw_bytes: bytes) -> bool:
 
 def is_permadeath(raw_bytes: bytes) -> bool:
     """
-    Permadeath (eg, combat, touchstone, dragon flee) prints no points change events so we trap it
-    specifically.
+    Permadeath (eg, combat, touchstone, dragon flee) prints no points change events so we trap it specifically.
     """
     return Prompt.GAME_OVER_NOT_UPDATING_PERSONA.value.search(raw_bytes) is not None

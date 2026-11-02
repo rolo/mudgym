@@ -23,8 +23,8 @@ def test_live_reset_and_step_keep_complete_command_echoes(live_env_factory, tmp_
         assert "fei" not in obs["portables"]
         assert "fei" not in obs["inventory"]
 
-    # Count echoes in received bytes, independently of the send log. Separate lines may be
-    # echoed on either side of the action response, but each must arrive intact exactly once.
+    # Count echoes in received bytes, independently of the send log. Separate lines may be echoed on either side of the
+    # action response, but each must arrive intact exactly once.
     pending_lines = []
     for call in map(json.loads, capture_path.read_text().splitlines()[1:]):
         if call["call"] == "send_line":

@@ -24,18 +24,15 @@ from mudgym.notebooks.style import (
 
 
 def grid_style(minimum_width: str) -> str:
-    # auto-fit, not auto-fill, so a single item fills the width instead of
-    # sitting in a narrow column beside empty ones.
+    # auto-fit, not auto-fill, so a single item fills the width instead of sitting in a narrow column beside empty ones.
     return f"display:grid;gap:0.6rem;{BLOCK_MARGIN}grid-template-columns:repeat(auto-fit,minmax({minimum_width},1fr));"
 
 
 def show_table(rows: Sequence[Mapping[str, Any]], *, mono_columns: Sequence[str] = ()) -> HTML:
     """Render rows of data as a quiet, readable table.
 
-    Columns come from the keys of the first row. Numbers are right-aligned in
-    tabular figures and booleans read as yes/no. Columns named in
-    ``mono_columns`` are set in the code face, which suits agent names,
-    commands, and room ids.
+    Columns come from the keys of the first row. Numbers are right-aligned in tabular figures and booleans read as
+    yes/no. Columns named in ``mono_columns`` are set in the code face, which suits agent names, commands, and room ids.
     """
     rows = list(rows)
     if not rows:
@@ -109,9 +106,8 @@ def show_turn_bars(
 ) -> HTML:
     """Render one integer series as a thin bar sparkline over turns.
 
-    Every turn is a full-height hover target with a native tooltip, and the
-    caption direct-labels the peak. ``max_value`` pins the scale to a known
-    ceiling, such as the party size, so half-full reads as half-full.
+    Every turn is a full-height hover target with a native tooltip, and the caption direct-labels the peak.
+    ``max_value`` pins the scale to a known ceiling, such as the party size, so half-full reads as half-full.
     """
     values = [int(row[value_key]) for row in rows]
     if not values:
@@ -149,8 +145,8 @@ def show_turn_bars(
         f'<span style="{LABEL_STYLE}">{html_lib.escape(label)}</span>'
         f'<span style="font-family:{MONO};font-size:0.78rem;color:{MUTED};">{caption}</span>'
         '</div><div style="overflow-x:auto;">'
-        f'<svg width="{width}" height="{plot_height + 2}" viewBox="0 0 {width} {plot_height + 2}" role="img" aria-label="'
-        f'{html_lib.escape(label)}">'
+        f'<svg width="{width}" height="{plot_height + 2}" viewBox="0 0 {width} {plot_height + 2}" role="img" '
+        f'aria-label="{html_lib.escape(label)}">'
         f"{''.join(bars)}"
         f'<rect x="0" y="{plot_height}" width="{width}" height="1" fill="{RULE}"/></svg></div></div>'
     )
@@ -159,8 +155,7 @@ def show_turn_bars(
 def show_cards(cards: Mapping[str, Mapping[str, Any]], *, minimum_width: str = "17rem") -> HTML:
     """Render titled label/value panels in a responsive grid.
 
-    Reads better than a table for a handful of records with long values, such
-    as one observation per agent.
+    Reads better than a table for a handful of records with long values, such as one observation per agent.
     """
     panels = []
     for title, fields in cards.items():

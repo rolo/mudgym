@@ -1,8 +1,8 @@
 """An action is one logical game input line.
 
-A line break inside an action would smuggle an extra wire command past Session's line framing (the
-observation-command line is sent separately), so the action charset excludes CR and LF while the
-observation text charset keeps its line-break support.
+A line break inside an action would smuggle an extra wire command past Session's line framing (the observation-command
+line is sent separately), so the action charset excludes CR and LF while the observation text charset keeps its
+line-break support.
 """
 
 import pytest

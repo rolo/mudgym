@@ -1,9 +1,9 @@
 """Reward parsing regressions: player-authored text must never forge points events.
 
-The terminal echo places the exact command text ahead of the game's response, and spoken text is
-re-emitted inside the response, so a command like ``say hello (+10 = 10)`` puts the points pattern
-on the wire twice without any points changing hands. Genuine events colour the resulting total
-(see ``mudgym.featurizers.points``), which player-authored text cannot reproduce.
+The terminal echo places the exact command text ahead of the game's response, and spoken text is re-emitted inside the
+response, so a command like ``say hello (+10 = 10)`` puts the points pattern on the wire twice without any points
+changing hands. Genuine events colour the resulting total (see ``mudgym.featurizers.points``), which player-authored
+text cannot reproduce.
 """
 
 from tests.scripted import OBSERVATION_COMMAND_RESPONSES, PROMPT
@@ -101,8 +101,8 @@ def test_tearoom_points_event_updates_the_episode_start_without_reward(scripted_
 
 
 def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory):
-    # A plain parenthesised number carries no raw-wire signal distinguishing it from player text,
-    # so it must not become reward, termination, or score metadata.
+    # A plain parenthesised number carries no raw-wire signal distinguishing it from player text, so it must not become
+    # reward, termination, or score metadata.
     body = b'Dumbo the novice says "\x1b[1;33;40m(2000000)\x1b[0;33;40m".\r\n'
     responses = {"look": scripted_step_bytes("look", body)}
     env = scripted_env_factory(responses=responses)
@@ -116,9 +116,9 @@ def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory)
 
 
 def test_points_pattern_spoken_in_game_output_forges_no_reward(scripted_env_factory):
-    # speech is re-emitted uniformly coloured, never with a coloured total, so neither the echo
-    # nor the spoken output of a points-shaped message counts as an event. Speech batches go out
-    # on two wire lines, hence the two echoes in the canned bytes.
+    # speech is re-emitted uniformly coloured, never with a coloured total, so neither the echo nor the spoken output of
+    # a points-shaped message counts as an event. Speech batches go out on two wire lines, hence the two echoes in the
+    # canned bytes.
     speech_body = b'\x1b[0;33;40mDumbo the novice says "\x1b[1;33;40mhello (+10 = 10)\x1b[0;33;40m".\x1b[1;37;40m\r\n'
     raw_bytes = scripted_step_bytes("say hello (+10 = 10)", speech_body)
     env = scripted_env_factory(responses={"say hello (+10 = 10)": raw_bytes})

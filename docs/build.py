@@ -1,12 +1,7 @@
-"""Build the docs site strictly and refuse a build that rendered a code block error into a page.
+"""Build the docs with `just build-docs`, failing if a code block's traceback ended up in a page.
 
-zensical's strict mode cannot see a failed `exec="true"` code block: markdown-exec catches the
-exception, logs it to a python logger the Rust issue counter never reads, and renders the traceback
-into the page as if it were the block's output. The built HTML is therefore the reliable seam --
-after a strict build this scans every page (tags stripped, because pygments splits the text across
-spans) and fails loudly if a traceback was published as documentation.
-
-Run through the justfile as `just build-docs`; CI runs the same command.
+zensical's strict mode misses a failed `exec="true"` block and renders its traceback as the output, so we look for one
+in the built HTML, with the tags stripped since pygments splits it over spans.
 """
 
 import re
@@ -39,7 +34,6 @@ def main() -> None:
         raise SystemExit(build.returncode)
 
     pages = sorted(SITE_DIR.rglob("*.html"))
-    # zensical can also succeed without writing a page, e.g. when a `watch` path lies outside docs/.
     if not pages:
         raise SystemExit("zensical reported success but built no pages. Check zensical.toml.")
     offending = pages_with_rendered_errors(pages)

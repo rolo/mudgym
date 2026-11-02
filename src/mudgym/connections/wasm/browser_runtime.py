@@ -45,8 +45,8 @@ class BrowserRuntime:
     def __init__(self, *, wasm_path: Path | None = None) -> None:
         """Load the self-contained engine module from its wheel or an explicit module path."""
         self.instantiate = run_js(resources.files(__package__).joinpath("wasi_shim.js").read_text())
-        # An older browser would reject the module with a compile error that names no browser. JavaScript's null, for
-        # a browser that can run it, arrives as None or Pyodide's jsnull, and both are false.
+        # An older browser would reject the module with a compile error that names no browser. JavaScript's null, for a
+        # browser that can run it, arrives as None or Pyodide's jsnull, and both are false.
         if unsupported := self.instantiate.unsupportedReason():
             raise RuntimeError(unsupported)
         self.wasm_path = engine_module_path(wasm_path)

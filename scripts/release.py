@@ -28,8 +28,8 @@ def run(command: list[str]) -> subprocess.CompletedProcess:
 def read(command: list[str]) -> str:
     """Run a command that must succeed and return its stripped stdout.
 
-    Its output is captured, so a failure has to hand the tool's own message back rather than
-    die with a traceback that hides the one line explaining what went wrong.
+    Its output is captured, so a failure has to hand the tool's own message back rather than die with a traceback that
+    hides the one line explaining what went wrong.
     """
     completed = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True, check=False)
     if completed.returncode:
@@ -46,8 +46,8 @@ def succeeds(command: list[str]) -> bool:
 def canonical_version(requested_version: str) -> str:
     """Return the PEP 440 spelling uv would write, refusing anything else.
 
-    The release workflow asserts that the tag equals the built metadata version, so a
-    non-canonical spelling here becomes a failed publish after the tag is already pushed.
+    The release workflow asserts that the tag equals the built metadata version, so a non-canonical spelling here
+    becomes a failed publish after the tag is already pushed.
     """
     if requested_version.startswith("v"):
         raise SystemExit("Pass the package version without the v prefix (for example, 0.4.0).")
@@ -126,8 +126,8 @@ def commit_and_tag(version: str, tag: str) -> None:
 def push_atomically(tag: str) -> None:
     """Push the release commit and its tag together, or neither.
 
-    GitHub supports atomic pushes: neither main nor the tag is updated if one ref is rejected.
-    CI publishes only after receiving the tag and passing its own gates.
+    GitHub supports atomic pushes: neither main nor the tag is updated if one ref is rejected. CI publishes only after
+    receiving the tag and passing its own gates.
     """
     push = subprocess.run(["git", "push", "--atomic", "origin", RELEASE_BRANCH, tag], cwd=REPOSITORY_ROOT, check=False)
     if push.returncode:

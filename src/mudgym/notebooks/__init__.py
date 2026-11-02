@@ -1,8 +1,7 @@
 """Helpers for rendering MUD output nicely inside notebooks.
 
-Everything the notebooks and docs are meant to use is re-exported here. The
-browser copies of the examples import these names from a wheel built elsewhere,
-so a rename that forgets one fails in a notebook cell with nowhere to show it.
+Everything the notebooks and docs are meant to use is re-exported here. The browser copies of the examples import these
+names from a wheel built elsewhere, so a rename that forgets one fails in a notebook cell with nowhere to show it.
 """
 
 from mudgym.notebooks.frames import (

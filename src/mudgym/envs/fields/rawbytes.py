@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 
 class RawBytesField(ObservationField):
     """
-    Returns the raw bytes from the game response, including ANSI escape codes, prompt markers
-    and line breaks as a fixed-size uint8 numpy array.
+    Returns the raw bytes from the game response, including ANSI escape codes, prompt markers and line breaks as a
+    fixed-size uint8 numpy array.
     """
 
     def __init__(self, max_bytes: int = DEFAULT_MAX_BYTES, include_keys: Sequence[str] | None = None):

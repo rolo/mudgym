@@ -14,9 +14,9 @@ from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_env_factory):
     """A player-state refusal in an observation-command slot must not crash the parse.
 
-    The refusal chunk occupies the field's position in the tail split, so alignment holds;
-    the field keeps its empty defaults for the turn, the refusal is recorded in the info
-    dict, and the player-visible line stays in the text observation.
+    The refusal chunk occupies the field's position in the tail split, so alignment holds; the field keeps its empty
+    defaults for the turn, the refusal is recorded in the info dict, and the player-visible line stays in the text
+    observation.
     """
     env = scripted_env_factory(observation="parsed")
     obs, _, field_refusals = env.bytes_to_observation(
@@ -43,9 +43,9 @@ def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_en
 def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory):
     """A mid-fight blinding must not crash the parse (captured live: vampire casts blindness).
 
-    sql answers with the blind refusal, fes still answers its score line, fex answers a
-    blank line (same shape as a dark room), and fei shows only the blind ``--`` placeholder
-    above the divider. Every slot resolves and the refusal keeps sql's empty defaults.
+    sql answers with the blind refusal, fes still answers its score line, fex answers a blank line (same shape as a dark
+    room), and fei shows only the blind ``--`` placeholder above the divider. Every slot resolves and the refusal keeps
+    sql's empty defaults.
     """
     env = scripted_env_factory(observation="parsed")
     obs, _, field_refusals = env.bytes_to_observation(

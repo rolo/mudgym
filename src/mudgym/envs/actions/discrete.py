@@ -29,11 +29,10 @@ class DiscreteActions:
 
 class DiscreteActionSpaceWrapper(ActionWrapper):
     """
-    Sets the action space to a discrete categorical multiple choice space.
-    Maps discrete actions (ints) to string commands for the underlying env.
+    Sets the action space to a discrete categorical multiple choice space. Maps discrete actions (ints) to string
+    commands for the underlying env.
 
-    We use `command` to refer to the text sent to the game and `action` as the
-    RL/gymnasium side concept.
+    We use `command` to refer to the text sent to the game and `action` as the RL/gymnasium side concept.
     """
 
     def __init__(self, env, commands):

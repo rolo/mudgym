@@ -7,10 +7,9 @@ This payload will include any game events which have occurred since the last ste
 auto commands) echoed back, then any game events in response to our command. Each game event is delimited by a prompt
 marker (*) to tell the user the game is ready for the next command.
 
-The game's text output is 7-bit: printable ASCII plus ANSI escape sequences, sent over telnet. Bytes
-above 0x7F are protocol codes (fecodes and the unsupported client mode), never text, and text paths
-reject them loudly as leaks. Raw diagnostics use Latin-1 so they can render arbitrary wire bytes
-without masking the original error.
+The game's text output is 7-bit: printable ASCII plus ANSI escape sequences, sent over telnet. Bytes above 0x7F are
+protocol codes (fecodes and the unsupported client mode), never text, and text paths reject them loudly as leaks. Raw
+diagnostics use Latin-1 so they can render arbitrary wire bytes without masking the original error.
 
 The functions in this module are for splitting these bytes in some different variations:
 
@@ -56,9 +55,9 @@ def split_on_echo_lines(raw_bytes: bytes, echo_lines: list[str | bytes]) -> list
     """
     Split raw bytes around each echoed line in order, removing the echoes themselves.
 
-    A step's batch can go out on more than one wire line (speech commands take the auto commands
-    on a separate line), and each sent line is echoed separately. Returns len(echo_lines) + 1
-    segments, or None when any echo is missing from the bytes.
+    A step's batch can go out on more than one wire line (speech commands take the auto commands on a separate line),
+    and each sent line is echoed separately. Returns len(echo_lines) + 1 segments, or None when any echo is missing from
+    the bytes.
     """
     segments: list[bytes] = []
     remainder = raw_bytes
@@ -74,8 +73,8 @@ def split_on_echo_lines(raw_bytes: bytes, echo_lines: list[str | bytes]) -> list
 
 def split_on_prompt(raw_bytes: bytes, *, preserve_ansi: bool = False) -> list[bytes]:
     """
-    Split raw bytes into a list of chunks delimited by prompt markers.
-    We discard the final chunk, which should be empty, as the game always sends a prompt marker after the last command.
+    Split raw bytes into a list of chunks delimited by prompt markers. We discard the final chunk, which should be
+    empty, as the game always sends a prompt marker after the last command.
     """
     if preserve_ansi:
         chunks = []

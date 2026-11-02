@@ -21,9 +21,9 @@ class ObservationField(ABC):
 
     A `chunk` is the game's output bytes for a single game event delimited by a game prompt marker.
 
-    The abstract methods (``full_space()``, ``full_empty()``, ``full_extract()``) declare the parser's
-    full capability; ``space()``, ``empty()``, and ``extract()`` restrict that capability to
-    ``include_keys`` and are what consumers read.
+    The abstract methods (``full_space()``, ``full_empty()``, ``full_extract()``) declare the parser's full capability;
+    ``space()``, ``empty()``, and ``extract()`` restrict that capability to ``include_keys`` and are what consumers
+    read.
     """
 
     command: str | None = None
@@ -32,9 +32,9 @@ class ObservationField(ABC):
     # `text` key.
     remove_on_match: bool = True
 
-    # Messages the game emits in place of a command's real output when the persona cannot act
-    # (unconscious, asleep, ...). A refusal claims the field's slot but carries no data.
-    # Unknown responses keep failing loudly in MudEnv's observation parser.
+    # Messages the game emits in place of a command's real output when the persona cannot act (unconscious, asleep,
+    # ...). A refusal claims the field's slot but carries no data. Unknown responses keep failing loudly in MudEnv's
+    # observation parser.
     PLAYER_STATE_REFUSALS: tuple[re.Pattern[bytes], ...] = (
         re.compile(rb"You can't wake yourself up yet!"),
         re.compile(rb"You can't see a thing, you're blind\."),

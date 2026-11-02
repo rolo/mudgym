@@ -11,9 +11,8 @@ Magic user:
 Dood the mage
 eff str 68      eff dex 59      sta 28/48       mag 48  pts 140,000     gam 2
 
-The first line is the persona's full name, so it carries whatever level, prefix and postfix they
-have, and Sir/Lady and Brother/Sister put the title first: bare_persona_name knows the shapes.
-The magic user's mag column is optional.
+The first line is the persona's full name, so it carries whatever level, prefix and postfix they have, and Sir/Lady and
+Brother/Sister put the title first: bare_persona_name knows the shapes. The magic user's mag column is optional.
 """
 
 import re

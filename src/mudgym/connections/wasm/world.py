@@ -128,8 +128,8 @@ class WasmSession:
             if result == SessionResultCode.OUTPUT_OVERFLOW:
                 raise _engine_error("output-overflow", result, f"receive overflowed for player {self.player_id}")
             if result == SessionResultCode.GAME_INDETERMINATE:
-                # Same rule as send: the caller learns from the world's status,
-                # not from an exception unwinding a Gym transition.
+                # Same rule as send: the caller learns from the world's status, not from an exception unwinding a Gym
+                # transition.
                 return b""
             if result < 0:
                 raise _engine_error("receive-failed", result, f"receive failed for player {self.player_id}")

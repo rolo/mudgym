@@ -165,10 +165,9 @@ def setup_logging(
 ) -> None:
     """Configure compact console logging for the mudgym package.
 
-    This installs a real handler on the ``mudgym`` logger so CLIs, training
-    scripts, and notebooks get formatted output without configuring the root
-    logger. Library users can ignore this function and use their application
-    logging setup instead.
+    This installs a real handler on the ``mudgym`` logger so CLIs, training scripts, and notebooks get formatted output
+    without configuring the root logger. Library users can ignore this function and use their application logging setup
+    instead.
 
     Args:
         level: Desired logging level (name or int). Defaults to MUDGYM_LOG_LEVEL env var or WARNING.
@@ -193,8 +192,8 @@ def setup_logging(
         # Use a simple time format: HH:MM:SS.ffffff
         timestamper = structlog.processors.TimeStamper(fmt="%H:%M:%S.%f")
 
-        # set_exc_info promotes a live exception onto the event; format_exc_info
-        # then renders it to text for the compact renderer.
+        # set_exc_info promotes a live exception onto the event; format_exc_info then renders it to text for the compact
+        # renderer.
         exception_processors: list[Processor] = [
             structlog.dev.set_exc_info,
             structlog.processors.format_exc_info,
@@ -202,8 +201,8 @@ def setup_logging(
 
         renderer = CompactConsoleRenderer(colors=_stream_supports_color(stream))
 
-        # foreign_pre_chain renders records from plain stdlib loggers (non-structlog)
-        # and should mirror the structlog chain for consistent output.
+        # foreign_pre_chain renders records from plain stdlib loggers (non-structlog) and should mirror the structlog
+        # chain for consistent output.
         foreign_pre_chain: list[Processor] = [
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
@@ -254,9 +253,8 @@ def get_logger(name: str | None = None) -> Any:
     """
     Get a structlog logger for the given name.
 
-    Always use this in mudgym modules instead of structlog.get_logger().
-    This is intentionally side-effect free: call setup_logging() from an
-    entrypoint when compact console logs are desired.
+    Always use this in mudgym modules instead of structlog.get_logger(). This is intentionally side-effect free: call
+    setup_logging() from an entrypoint when compact console logs are desired.
 
     Args:
         name: Logger name (typically __name__)

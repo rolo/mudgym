@@ -72,8 +72,8 @@ def _shutdown_worlds(worlds: Iterable[WasmWorld]) -> list[BaseException]:
 class WorldAdvancementFailed(RuntimeError):
     """Some worlds ended during advancement, while healthy siblings still advanced.
 
-    ``successes`` maps each advanced world to its tick count. ``failures`` retains each terminal world's
-    exception, including any partial advancement reported by the engine.
+    ``successes`` maps each advanced world to its tick count. ``failures`` retains each terminal world's exception,
+    including any partial advancement reported by the engine.
     """
 
     def __init__(
@@ -160,8 +160,8 @@ class WasmConnection(MudConnection):
                 queued_output = session.receive()
         game_bytes = pending_output + ticket.output + queued_output
         raw_bytes = pending_output + command_bytes + b"\r\n" + ticket.output + queued_output
-        # A drain may report departure with final bytes after a COMPLETED ticket.
-        # Scan all engine output, including bytes queued before this command.
+        # A drain may report departure with final bytes after a COMPLETED ticket. Scan all engine output, including
+        # bytes queued before this command.
         terminated = (
             ticket.status
             in {
@@ -208,8 +208,8 @@ class WasmConnection(MudConnection):
         game_bytes = b"".join(response.game_bytes for response in responses)
         terminated = any(response.terminated for response in responses)
         incomplete = any(response.incomplete for response in responses)
-        # Later peer commands and the coordinator's tick can enqueue output after our send.
-        # Drain at the observation boundary, including passive reads during a joint reset.
+        # Later peer commands and the coordinator's tick can enqueue output after our send. Drain at the observation
+        # boundary, including passive reads during a joint reset.
         session = self._require_session()
         if not session.departed:
             queued_output = session.receive()
@@ -284,9 +284,9 @@ class WasmConnection(MudConnection):
 class WasmProvider:
     """MudGym provider spreading stable connections over fresh isolated WASI worlds.
 
-    ``runtime`` hosts the worlds, and defaults to the engine compiled once for this Python: under wasmtime natively,
-    and on the browser's WebAssembly in Pyodide. ``ticks_per_step`` is how many passive cycles the step hook runs
-    between the actions and the observations, which is how far fights, weather and wandering mobiles move on.
+    ``runtime`` hosts the worlds, and defaults to the engine compiled once for this Python: under wasmtime natively, and
+    on the browser's WebAssembly in Pyodide. ``ticks_per_step`` is how many passive cycles the step hook runs between
+    the actions and the observations, which is how far fights, weather and wandering mobiles move on.
     """
 
     def __init__(
@@ -301,8 +301,8 @@ class WasmProvider:
         personas: Sequence[tuple[str] | tuple[str | None, str | None]] | None = None,
         persona_pool: Sequence[tuple[str, str | None]] | None = None,
     ) -> None:
-        # Resolve worlds=None when the factory supplies its connection count.
-        # An explicit world count shares connections by modulo.
+        # Resolve worlds=None when the factory supplies its connection count. An explicit world count shares connections
+        # by modulo.
         if worlds is not None and (isinstance(worlds, bool) or not isinstance(worlds, int) or worlds < 1):
             raise ValueError("worlds must be a positive integer or None")
         if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms < 1:

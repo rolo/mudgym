@@ -9,8 +9,8 @@ from typing import Any
 class HTML:
     """Minimal stand-in for ``IPython.display.HTML``.
 
-    Jupyter and marimo render anything exposing ``_repr_html_``, so notebook
-    output needs no dependency on IPython's interactive-shell stack.
+    Jupyter and marimo render anything exposing ``_repr_html_``, so notebook output needs no dependency on IPython's
+    interactive-shell stack.
     """
 
     def __init__(self, data: str) -> None:
@@ -24,8 +24,8 @@ class HTML:
         return f"<HTML output, {len(self.data)} characters>"
 
 
-# Every value lives in theme.css, which the docs load directly. Notebooks never
-# load it, so each token carries its value from the file as the var() fallback.
+# Every value lives in theme.css, which the docs load directly. Notebooks never load it, so each token carries its value
+# from the file as the var() fallback.
 THEME_CSS = resources.files("mudgym.notebooks").joinpath("theme.css").read_text(encoding="utf-8")
 THEME = dict(re.findall(r"--notebook-([a-z-]+):\s*([^;]+);", THEME_CSS))
 

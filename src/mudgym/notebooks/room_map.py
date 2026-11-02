@@ -29,12 +29,12 @@ MAP_IDS = itertools.count(1)
 MAP_LIVE_FILL = f"color-mix(in srgb, {ACCENT} 40%, {PAGE})"
 MAP_ROOM_FILL = f"color-mix(in srgb, {SECONDARY} 8%, {PAGE})"
 
-# Where an edge label may sit along its edge, from the middle outwards, and how far it may step to either side at
-# each, in label heights.
+# Where an edge label may sit along its edge, from the middle outwards, and how far it may step to either side at each,
+# in label heights.
 LABEL_ANCHORS = (0.5, 0.38, 0.62, 0.26, 0.74, 0.14, 0.86)
 LABEL_STRIDES = (0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3)
-# Where a label may go when nothing beside its edge is clear: points round the middle of the edge, nearest first,
-# out to about two rooms either way.
+# Where a label may go when nothing beside its edge is clear: points round the middle of the edge, nearest first, out to
+# about two rooms either way.
 NEARBY_OFFSETS = sorted(
     ((column * 10, row * 10) for column in range(-30, 31) for row in range(-20, 21)),
     key=lambda offset: math.hypot(*offset),
@@ -79,9 +79,12 @@ def show_room_map(
 ) -> HTML:
     """Draw rooms and directed moves as a static SVG map.
 
-    ``edges`` contains ``(source, direction, destination)`` triples. Without ``graph``, the room strings are both identifiers and display names. With ``graph``, keys identify rooms and each node's ``name`` supplies its label, matching the interactive notebook maps. If no route is supplied, show every graph room and exit.
+    ``edges`` contains ``(source, direction, destination)`` triples. Without ``graph``, the room strings are both
+    identifiers and display names. With ``graph``, keys identify rooms and each node's ``name`` supplies its label,
+    matching the interactive notebook maps. If no route is supplied, show every graph room and exit.
 
-    ``occupants`` marks rooms containing agents and ``new_rooms`` highlights discoveries. ``edge_labels`` can replace each direction caption with a reward or action value. Labels and highlights never change room identity.
+    ``occupants`` marks rooms containing agents and ``new_rooms`` highlights discoveries. ``edge_labels`` can replace
+    each direction caption with a reward or action value. Labels and highlights never change room identity.
     """
     graph = graph or {}
     room_labels = {room_id: str(room.get("name", room_id)) for room_id, room in graph.items()}
@@ -125,8 +128,8 @@ def show_room_map(
     side_padding = 40
     top_padding = 78
 
-    # The layout puts a compass step two grid units away. Up, down and a crowded room's exits can land one unit
-    # away, so a unit clears a room box both ways.
+    # The layout puts a compass step two grid units away. Up, down and a crowded room's exits can land one unit away, so
+    # a unit clears a room box both ways.
     grid = layout_world_from_edges(ordered_rooms, clean_edges)
     column_unit = room_width + 8
     row_unit = room_height + 8
@@ -154,8 +157,8 @@ def show_room_map(
         scale = min(horizontal, vertical)
         return start[0] + delta_x * scale, start[1] + delta_y * scale
 
-    # One arrow per room pair, captioned with every direction that linked them,
-    # so a pair walked both ways is drawn once rather than twice on itself.
+    # One arrow per room pair, captioned with every direction that linked them, so a pair walked both ways is drawn once
+    # rather than twice on itself.
     labels_by_pair: dict[tuple[str, str], dict[str, str]] = {}
     for edge in clean_edges:
         source, direction, destination = edge
@@ -165,9 +168,8 @@ def show_room_map(
     line_style = f"stroke:{SECONDARY};stroke-opacity:0.5;stroke-width:2;"
     label_style = f"font-family:{MONO};fill:{SECONDARY};"
 
-    # Each label sits on an opaque plate, so it stays readable where the gap
-    # between two rooms is narrower than the word. MONO advances 0.6em per
-    # character, which is enough to size the plate without measuring text.
+    # Each label sits on an opaque plate, so it stays readable where the gap between two rooms is narrower than the
+    # word. MONO advances 0.6em per character, which is enough to size the plate without measuring text.
     label_padding_x = 5
     label_padding_y = 2.5
     label_height = small_font + 2 * label_padding_y
@@ -178,8 +180,8 @@ def show_room_map(
     # has to stay inside the drawing, above the legend.
     compass_x, compass_y = svg_width - 52, 40
     legend_y = svg_height - 24
-    # Taken boxes are filed by the cells of a coarse grid they touch, so a spot is tested only against boxes near it
-    # and a map of the whole Land stays quick to draw.
+    # Taken boxes are filed by the cells of a coarse grid they touch, so a spot is tested only against boxes near it and
+    # a map of the whole Land stays quick to draw.
     grid_cell = 100
     taken_by_cell: dict[tuple[int, int], list[tuple[float, float, float, float]]] = {}
 
@@ -231,9 +233,9 @@ def show_room_map(
             f'style="{line_style}" marker-end="url(#{map_id}-arrow)" />'
         )
 
-        # The first clear spot beside the edge, trying the middle of the edge before points further along it, then
-        # the nearest clear spot round the middle. A label never sits on a room's name just to stay by its arrow, and
-        # only where nothing nearby is clear does it take the spot that covers least.
+        # The first clear spot beside the edge, trying the middle of the edge before points further along it, then the
+        # nearest clear spot round the middle. A label never sits on a room's name just to stay by its arrow, and only
+        # where nothing nearby is clear does it take the spot that covers least.
         plate_width = 0.62 * small_font * len(label) + 2 * label_padding_x
         span = math.hypot(end[0] - start[0], end[1] - start[1]) or 1.0
         step_x = -(end[1] - start[1]) / span * label_separation
@@ -264,9 +266,8 @@ def show_room_map(
         ) or min(beside_edge, key=cover_of)
         take(plate)
 
-        # Captions are drawn after the rooms: a label longer than the gap
-        # between two rooms would otherwise be painted over by the room it
-        # reaches into and read as a truncated word.
+        # Captions are drawn after the rooms: a label longer than the gap between two rooms would otherwise be painted
+        # over by the room it reaches into and read as a truncated word.
         edge_captions.append(
             f'<rect class="edge-label-plate" x="{plate[0]:.1f}" y="{plate[1]:.1f}" '
             f'width="{plate[2]:.1f}" height="{plate[3]:.1f}" rx="{CORNER_RADIUS}" style="fill:{PAGE};" />'
@@ -320,16 +321,18 @@ def show_room_map(
         f'<text x="{compass_x - 20}" y="{compass_y + 4}">W</text></g>'
     )
     legend_text_style = f"font-family:{SANS};fill:{MUTED};"
-    # Start the second entry past the first one's text, so renaming either keeps
-    # a gap instead of printing one legend on top of the other.
+    # Start the second entry past the first one's text, so renaming either keeps a gap instead of printing one legend on
+    # top of the other.
     second_entry_x = side_padding + 24 + max(70, round(6.4 * len(occupants_label))) + 24
     legend = (
         f'<rect x="{side_padding}" y="{legend_y - 13}" width="16" height="16" rx="{CORNER_RADIUS}" '
         f'style="fill:{MAP_LIVE_FILL};stroke:{PRIMARY};stroke-width:1.5;" />'
-        f'<text x="{side_padding + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">{html_lib.escape(occupants_label)}</text>'
+        f'<text x="{side_padding + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">'
+        f"{html_lib.escape(occupants_label)}</text>"
         f'<rect x="{second_entry_x}" y="{legend_y - 13}" width="16" height="16" rx="{CORNER_RADIUS}" '
         f'style="fill:{MAP_ROOM_FILL};stroke:{ACCENT};stroke-width:3;" />'
-        f'<text x="{second_entry_x + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">{html_lib.escape(new_rooms_label)}</text>'
+        f'<text x="{second_entry_x + 24}" y="{legend_y}" font-size="11.5" style="{legend_text_style}">'
+        f"{html_lib.escape(new_rooms_label)}</text>"
     )
 
     caption_markup = (
@@ -338,8 +341,8 @@ def show_room_map(
         if caption
         else ""
     )
-    # A big map scrolls inside its panel rather than shrinking its labels to
-    # nothing, and a small one stays at its drawn size.
+    # A big map scrolls inside its panel rather than shrinking its labels to nothing, and a small one stays at its drawn
+    # size.
     return HTML(
         f'<div class="notebook-map" style="{PANEL_STYLE}padding:0.5rem 0.6rem 0.35rem;overflow-x:auto;'
         f'{BLOCK_MARGIN}">'

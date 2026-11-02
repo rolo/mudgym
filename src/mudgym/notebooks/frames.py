@@ -27,9 +27,8 @@ from mudgym.notebooks.style import (
 )
 from mudgym.notebooks.tables import show_table
 
-# Every widget here carries its own inline styles and <style> block. That is
-# what makes it render inside marimo components such as mo.accordion, whose
-# content sits behind a boundary a page stylesheet does not reach, and in static
+# Every widget here carries its own inline styles and <style> block. That is what makes it render inside marimo
+# components such as mo.accordion, whose content sits behind a boundary a page stylesheet does not reach, and in static
 # HTML exports with no kernel attached. Duplicated blocks are harmless.
 FRAME_STYLE = (
     f"background:{TERMINAL_SURFACE};"
@@ -44,8 +43,8 @@ FRAME_STYLE = (
     f"border:1px solid {PRIMARY};"
 )
 
-# Long output collapses rather than scrolling: a frame with its own scrollbar
-# inside the notebook's is awkward to drive and hides how much output there is.
+# Long output collapses rather than scrolling: a frame with its own scrollbar inside the notebook's is awkward to drive
+# and hides how much output there is.
 COLLAPSED_LINE_COUNT = 24
 
 # Each widget needs its own id or two of them on a page drive each other.
@@ -127,8 +126,8 @@ ACCORDION_SUMMARY_STYLE = (
     f"color:{PAGE};"
 )
 
-# Episode captions read as the h3 headings the notebooks write by hand, so a
-# rendered episode sits in the same register as the surrounding markdown.
+# Episode captions read as the h3 headings the notebooks write by hand, so a rendered episode sits in the same register
+# as the surrounding markdown.
 CAPTION_STYLE = f"font-family:{SANS};font-size:1.18rem;font-weight:720;color:{SECONDARY};margin:0 0 0.45rem;"
 
 # MUD2's prompt is a bright blue asterisk, and the player's command follows it in the input style.
@@ -179,8 +178,8 @@ def frame_html(inner_html: str, *, collapse: bool) -> HTML:
 def show_ansi(value: Any, *, scroll: bool = True) -> HTML:
     """Render ANSI text or bytes in the game-output frame.
 
-    Long output collapses to about a screen behind a ``show more`` toggle;
-    ``scroll=False`` renders the frame at its full height instead.
+    Long output collapses to about a screen behind a ``show more`` toggle; ``scroll=False`` renders the frame at its
+    full height instead.
     """
     text = display_text(value)
     return frame_html(ansi_html(text), collapse=scroll and is_long_output(text))
@@ -195,8 +194,8 @@ def show_text(value: Any, *, scroll: bool = True) -> HTML:
 def observation_text(value: Any) -> str:
     """Format one observation field for the observation tab.
 
-    Arrays are unwrapped through ``tolist`` rather than an isinstance check, so
-    this module renders Gymnasium observations without importing numpy.
+    Arrays are unwrapped through ``tolist`` rather than an isinstance check, so this module renders Gymnasium
+    observations without importing numpy.
     """
     if isinstance(value, (bytes, bytearray, memoryview)):
         return display_text(value)
@@ -216,10 +215,9 @@ def show_game_tabs(
 ) -> HTML:
     """Render one game response as tabs for its display and raw protocol output.
 
-    ``display`` shows ``info["render_bytes"]``, unless an explicit override is supplied,
-    while ``raw`` shows ``info["raw_bytes"]`` (the protocol output the action produced).
-    Passing ``observation`` adds a third tab listing the fields the environment produced
-    for the same step.
+    ``display`` shows ``info["render_bytes"]``, unless an explicit override is supplied, while ``raw`` shows
+    ``info["raw_bytes"]`` (the protocol output the action produced). Passing ``observation`` adds a third tab listing
+    the fields the environment produced for the same step.
     """
     group = f"game-tabs-{next(TAB_GROUP_IDS)}"
     display_bytes = info["render_bytes"] if render_bytes is None else render_bytes
@@ -320,8 +318,7 @@ def show_frames(frames: Mapping[str, Any], *, label: str = "", selected: int = -
 def game_accordion(items: Mapping[str, Any], *, expanded: bool = True) -> HTML:
     """Stack titled, collapsible sections that are expanded by default.
 
-    A ``<details>``-based replacement for ``mo.accordion``, which always starts
-    closed in a static HTML export.
+    A ``<details>``-based replacement for ``mo.accordion``, which always starts closed in a static HTML export.
     """
     open_attribute = " open" if expanded else ""
     sections = "".join(
@@ -343,8 +340,8 @@ def transition_caption(transition: Mapping[str, Any], position: int) -> str:
 
     action = transition.get("action")
     if action is not None:
-        # Gymnasium hands back numpy integers, so index by protocol rather than
-        # isinstance to name those as directions too.
+        # Gymnasium hands back numpy integers, so index by protocol rather than isinstance to name those as directions
+        # too.
         indexable = hasattr(action, "__index__") and not isinstance(action, bool)
         action_index = operator.index(action) if indexable else None
         if action_index is not None and 0 <= action_index < len(DIRECTIONS):
@@ -367,11 +364,9 @@ def show_episode(
 ) -> HTML:
     """Render one episode as a captioned game frame per transition.
 
-    Each transition holds at least ``info``, the Gymnasium step info carrying
-    the rendered bytes. The frame shows the result of the action, so
-    ``next_observation`` fills the observation tab, falling back to
-    ``observation``. ``caption`` receives the transition and its 1-based
-    position and returns the line above each frame.
+    Each transition holds at least ``info``, the Gymnasium step info carrying the rendered bytes. The frame shows the
+    result of the action, so ``next_observation`` fills the observation tab, falling back to ``observation``.
+    ``caption`` receives the transition and its 1-based position and returns the line above each frame.
     """
     transitions = list(transitions)
     if not transitions:
@@ -392,9 +387,8 @@ def show_episode(
 def show_episode_transcript(steps: Sequence[Mapping[str, Any]], *, scroll: bool = True) -> HTML:
     """Render an episode in one game frame, as the terminal shows it.
 
-    Each step holds the ``command`` typed, a ``note`` on it such as its step and
-    reward, and the game's ``reply`` as text or bytes. The command follows MUD2's
-    prompt with the note at the end of its line, and the reply comes under it.
+    Each step holds the ``command`` typed, a ``note`` on it such as its step and reward, and the game's ``reply`` as
+    text or bytes. The command follows MUD2's prompt with the note at the end of its line, and the reply comes under it.
     """
     steps = list(steps)
     if not steps:

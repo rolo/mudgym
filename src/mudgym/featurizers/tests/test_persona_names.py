@@ -36,8 +36,8 @@ def test_bare_name_of_a_normally_ordered_full_name(full_name, expected_name):
 @pytest.mark.parametrize(
     "full_name, expected_name",
     [
-        # Sir/Lady (unprotected non-magic-user, 102,400 points) and Brother/Sister (protected
-        # magic-user, 6,400) put the level first, so the persona is the last word
+        # Sir/Lady (unprotected non-magic-user, 102,400 points) and Brother/Sister (protected magic-user, 6,400) put the
+        # level first, so the persona is the last word
         ("Sir Dood", "Dood"),
         ("Lady Dood", "Dood"),
         ("Brother Dood", "Dood"),
@@ -56,8 +56,8 @@ def test_bare_name_of_a_reverse_ordered_full_name(full_name, expected_name):
 @pytest.mark.parametrize(
     "full_name, expected_name",
     [
-        # persona names are alphabetic and unvetted against the level vocabulary, so a level word
-        # can be the name itself: the ordering, not the word, decides which end to read
+        # persona names are alphabetic and unvetted against the level vocabulary, so a level word can be the name
+        # itself: the ordering, not the word, decides which end to read
         ("Lady the protector", "Lady"),
         ("Sir the mage", "Sir"),
         ("Sir Sister", "Sister"),

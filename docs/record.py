@@ -1,28 +1,13 @@
-"""Capture the documentation examples' game sessions and derive the fragments the docs display.
+"""Record the docs examples against the live game, and turn the recordings into the fragments the docs show.
 
-The example code shown on the docs pages lives in `docs/code/`, one file per example, inside
-`--8<--` snippet regions the pages include -- so the code a reader sees is exactly the code that
-runs. Each example runs in two phases:
+The examples live in `docs/code/` and the pages include their code, so what you read is what ran. Recording saves each
+connection's transcript to `docs/recordings/`, which is committed. Deriving replays them with no game behind it and
+writes the fragments, which aren't. If an example's commands stop matching its recording, deriving fails and it needs
+recording again.
 
-- record: the example plays the live game through the configured connection backend and each connection transcript is written to `docs/recordings/<name>*.session.jsonl`, the committed source of truth.
-- derive: the example runs again over `ReplayConnection`, with no game behind it, and the displayed
-  fragments (`docs/recordings/*.md`, `*.ansi`) are regenerated locally from the replayed transcript.
-
-The generated fragments are ignored by Git. Because they come from a committed capture,
-presentation edits still re-derive the same world instead of rerolling a random one.
-`tests/test_docs_recordings.py` verifies that every capture replays and produces its fragments
-without touching the game. Replay is strict: if an example's commands no longer match its capture,
-deriving fails loudly and the capture needs re-recording.
-
-Run through the justfile:
-
-    just docs-record                  # play the examples against the live game, rewrite captures + fragments
-    just docs-record actions-text     # ... for a subset by name
-    just docs-derive                  # rewrite fragments from the committed captures without a live game
-    just docs-watch                   # serve the docs, refreshing whichever example is saved as you edit
-
-Re-record captures once their code and protocol have settled, then commit the capture refresh
-separately from the implementation changes.
+    just docs-record [names]    # play the examples against the live game
+    just docs-derive            # rewrite the fragments from the committed recordings
+    just docs-watch             # serve the docs and refresh whichever example you save
 """
 
 import argparse
@@ -56,12 +41,10 @@ RECORDINGS_DIR = REPOSITORY_ROOT / "docs" / "recordings"
 
 
 def discover_examples() -> dict[str, Callable]:
-    """Load every example in docs/code/; the recording name is the file stem with dashes."""
+    """Load every example in docs/code/, named by its file stem with dashes."""
     examples: dict[str, Callable] = {}
     for path in sorted(DOCS_CODE_DIR.glob("*.py")):
         name = path.stem.replace("_", "-")
-        # editor duplicates like "index_single copy.py" would otherwise record under a name no
-        # ownership glob or dash-prefix check can see
         if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", name):
             raise SystemExit(
                 f"{path.name} yields recording name {name!r}; example file stems must use only "
@@ -74,7 +57,6 @@ def discover_examples() -> dict[str, Callable]:
         if not callable(example):
             raise SystemExit(f"{path} must define an example(fragments) function.")
         examples[name] = example
-    # fragment ownership globs on `<name>-*` require that no name extends another with a dash
     for name in examples:
         clashes = [other for other in examples if other != name and other.startswith(f"{name}-")]
         if clashes:
@@ -100,7 +82,6 @@ def capture_paths(name: str) -> list[Path]:
 
 
 def fragment_paths(name: str, directory: Path) -> list[Path]:
-    """Every fragment a recording owns; discover_examples() guarantees the dash-prefix invariant."""
     patterns = (f"{name}.md", f"{name}.ansi", f"{name}-*.md", f"{name}-*.ansi")
     return sorted(path for pattern in patterns for path in directory.glob(pattern))
 
@@ -116,7 +97,6 @@ def describe_repository() -> str:
 
 
 def describe_path(path: Path) -> str:
-    """The repo-relative path for the usual case, the absolute one when writing elsewhere (tests)."""
     try:
         return str(path.relative_to(REPOSITORY_ROOT))
     except ValueError:
@@ -124,15 +104,12 @@ def describe_path(path: Path) -> str:
 
 
 class FragmentWriters:
-    """Write an example's displayed fragments, tying each one to its connection captures."""
-
     def __init__(self, example_name: str, fragments_dir: Path, captures_dir: Path):
         self.example_name = example_name
         self.fragments_dir = fragments_dir
         self.captures_dir = captures_dir
 
     def validated_fragment_name(self, name: str) -> str:
-        """Fragments must glob under their example's name, or stale-cleanup and ownership fall apart."""
         if name != self.example_name and not name.startswith(f"{self.example_name}-"):
             raise SystemExit(
                 f"Fragment {name!r} does not belong to example {self.example_name!r}; "
@@ -141,7 +118,6 @@ class FragmentWriters:
         return name
 
     def provenance(self) -> str:
-        """An HTML comment tying the fragment to its capture, invisible in the rendered docs."""
         name = self.example_name
         patterns = (f"{name}.session.jsonl", f"{name}.env*.session.jsonl", f"{name}.player_*.session.jsonl")
         paths = sorted(path for pattern in patterns for path in self.captures_dir.glob(pattern))
@@ -191,12 +167,7 @@ def swapped_default_backends(
     connection_factory,
     parallel_provider_factory,
 ) -> Iterator[None]:
-    """Point the factory defaults at different backends while an example runs.
-
-    The example code must stay a bare ``make_env()`` / ``make_parallel_env()`` call -- it is the
-    code readers see -- so the swap happens at the registry defaults the factory resolves at call
-    time, restored on the way out.
-    """
+    """Swap the registry's default backends while an example runs, so the example stays a plain `make_env()` call."""
     previous = (
         registry.default_connection,
         registry.default_parallel_provider_factory,
@@ -213,11 +184,7 @@ def swapped_default_backends(
 
 
 def record(name: str, version: str) -> None:
-    """Play the example against the live game, capturing every session it opens.
-
-    ``version`` is captured by the caller before any recording is touched, so rewriting captures
-    does not mark the run's own provenance dirty.
-    """
+    """Play the example against the live game, saving every session it opens."""
     metadata = {"recorded_by": f"just docs-record {name}", "mudgym": version}
     live_connection = registry.default_connection
     live_parallel_provider = registry.default_parallel_provider_factory
@@ -240,8 +207,7 @@ def record(name: str, version: str) -> None:
     with swapped_default_backends(connection_factory, parallel_provider_factory):
         EXAMPLES[name](FragmentWriters(name, RECORDINGS_DIR, RECORDINGS_DIR))
 
-    # only after a successful run: captures the example no longer produces (a removed agent, fewer
-    # envs) must not linger, but a failed run must not have deleted the previous good captures either
+    # Only after a successful run, so a failed one keeps the old recordings.
     for stale in set(capture_paths(name)) - set(written):
         stale.unlink()
     for path in capture_paths(name):
@@ -249,12 +215,10 @@ def record(name: str, version: str) -> None:
 
 
 def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
-    """Replay the example's committed captures and rewrite the fragments the docs display."""
     if not capture_paths(name):
         raise SystemExit(f"No connection capture for {name!r}; run `just docs-record {name}` first.")
 
-    # clear the recording's fragments first, so ones the replay no longer produces (a removed
-    # agent, a renamed fragment) cannot linger and keep rendering in the docs
+    # Clear the old fragments first, so ones the example stopped writing don't hang about.
     for stale in fragment_paths(name, fragments_dir):
         stale.unlink()
 
@@ -286,11 +250,7 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
 
 
 def refresh_example(name: str) -> None:
-    """Derive one example's fragments, recording it live first when its capture is stale or missing.
-
-    Presentation edits keep the recorded world: derivation alone answers them. The live game is only
-    contacted when the example has no capture yet, or replay proves its commands have changed.
-    """
+    """Derive an example's fragments, recording it first if it has no recording yet or its commands changed."""
     if not capture_paths(name):
         print(f"{name}: no capture yet; recording against the live game")
         record(name, describe_repository())
@@ -308,18 +268,13 @@ def refresh_example(name: str) -> None:
 def snapshot_mtimes() -> dict[Path, int]:
     mtimes = {}
     for path in sorted(DOCS_CODE_DIR.glob("*.py")):
-        with contextlib.suppress(FileNotFoundError):  # an editor save racing the scan; settled next poll
+        with contextlib.suppress(FileNotFoundError):  # mid-save, the next poll picks it up
             mtimes[path] = path.stat().st_mtime_ns
     return mtimes
 
 
 def watch(poll_seconds: float = 0.5) -> None:
-    """Watch docs/code/, refreshing an example's recording and fragments whenever its file is saved.
-
-    A failed refresh (a half-saved file, the game unreachable, a bug in the example) is reported and
-    watching continues; the next save retries. Pair with `just docs`: zensical's server watches
-    docs/code/ and docs/recordings/ too, so the browser reloads with whatever a refresh writes.
-    """
+    """Refresh an example whenever its file in docs/code/ is saved, and keep watching if a refresh fails."""
     global EXAMPLES
     print(f"Watching {describe_path(DOCS_CODE_DIR)} (Ctrl-C to stop)")
     seen = snapshot_mtimes()
@@ -371,8 +326,7 @@ def main(argv: list[str]) -> None:
         raise SystemExit(f"Unknown recordings: {', '.join(unknown)}. Valid names: {', '.join(EXAMPLES)}.")
 
     RECORDINGS_DIR.mkdir(exist_ok=True)
-    # one version for the whole run, taken before any capture is rewritten: deleting or rewriting
-    # tracked recordings mid-run must not turn the remaining headers' provenance dirty
+    # Take the version before rewriting any recordings, or git describe would call it dirty.
     version = None if args.derive_only else describe_repository()
     for name in names:
         if not args.derive_only:

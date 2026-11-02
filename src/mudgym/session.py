@@ -13,8 +13,8 @@ class MudSession:
         self.connection = connection
         self.observation_line = observation_line
 
-        # A pending command has been sent to the game but its response hasn't been read yet.
-        # This is for the two step act/observe pattern to ensure we have the latest game text to act on.
+        # A pending command has been sent to the game but its response hasn't been read yet. This is for the two step
+        # act/observe pattern to ensure we have the latest game text to act on.
         self.pending_command: str | None = None
 
     def reset(self, *, seed: int | None = None) -> tuple[str, int]:
@@ -42,16 +42,16 @@ class MudSession:
     def receive(self) -> tuple[bytes, bool, bool, dict]:
         """Send any observation commands, then read the completed response.
 
-        This is called without a pending player command during reset for the final observation sweep
-        after every player has entered the world.
+        This is called without a pending player command during reset for the final observation sweep after every player
+        has entered the world.
         """
         command = self.pending_command
         try:
             if self.observation_line:
                 self.connection.send_line(self.observation_line)
         except ConnectionClosedError:
-            # If the player action made it onto the wire, there may still be a response worth
-            # reading. With no pending action there is nothing to recover, so surface the failure.
+            # If the player action made it onto the wire, there may still be a response worth reading. With no pending
+            # action there is nothing to recover, so surface the failure.
             if command is None:
                 raise
         return self.read_pending_response()
