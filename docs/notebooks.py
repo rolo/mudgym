@@ -33,6 +33,8 @@ def execute(path: Path) -> None:
     notebook = nbformat.read(path, as_version=4)
     # Anything the notebook writes stays out of the repo.
     with tempfile.TemporaryDirectory(prefix=f"{path.stem}-") as working_directory:
+        for helper in NOTEBOOKS_DIR.glob("*.py"):
+            shutil.copy(helper, working_directory)
         client = NotebookClient(
             notebook,
             kernel_name=KERNEL_NAME,
@@ -64,9 +66,27 @@ def page_markdown(path: Path, sibling_names: set[str]) -> tuple[str, dict[str, b
     return f"{title}{separator}\n{links}\n{rest}", resources.get("outputs", {})
 
 
+def remove_leftover_pages(pages_dir: Path, notebook_names: set[str], helper_names: set[str]) -> None:
+    # Only derive writes here, so anything that isn't a current notebook's page, assets or downloads is left over.
+    pages = {name for stem in notebook_names for name in (f"{stem}.md", f"{stem}.ipynb", f"{stem}_files")}
+    current = pages | helper_names
+    for entry in pages_dir.iterdir():
+        if entry.name in current:
+            continue
+        if entry.is_dir():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+
+
 def derive(paths: list[Path], pages_dir: Path = PAGES_DIR) -> None:
     sibling_names = {path.stem for path in NOTEBOOKS_DIR.glob("*.ipynb")}
+    helpers = sorted(NOTEBOOKS_DIR.glob("*.py"))
     pages_dir.mkdir(parents=True, exist_ok=True)
+    remove_leftover_pages(pages_dir, sibling_names, {helper.name for helper in helpers})
+    # A notebook imports the modules beside it, so they're downloads too.
+    for helper in helpers:
+        shutil.copyfile(helper, pages_dir / helper.name)
     for path in paths:
         shutil.rmtree(pages_dir / f"{path.stem}_files", ignore_errors=True)
         markdown, outputs = page_markdown(path, sibling_names)

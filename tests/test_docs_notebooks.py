@@ -13,6 +13,7 @@ docs_notebooks = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(docs_notebooks)
 
 NOTEBOOK_PATHS = docs_notebooks.notebook_paths([])
+HELPER_PATHS = sorted(docs_notebooks.NOTEBOOKS_DIR.glob("*.py"))
 
 
 @pytest.mark.parametrize("path", NOTEBOOK_PATHS, ids=lambda path: path.stem)
@@ -38,3 +39,18 @@ def test_notebook_derives_a_page_linking_its_browser_version_and_a_download(path
     # Links to sibling notebooks open their pages on the site.
     assert ".ipynb)" not in page.replace(f"({path.name})", "").replace(browser_version, "")
     assert (tmp_path / path.name).read_bytes() == path.read_bytes()
+    for helper in HELPER_PATHS:
+        assert (tmp_path / helper.name).read_bytes() == helper.read_bytes()
+
+
+def test_deriving_removes_what_a_removed_notebook_left_and_keeps_the_other_pages(tmp_path):
+    derived, other = NOTEBOOK_PATHS[:2]
+    for name in ("retired.md", "retired.ipynb", f"{other.stem}.md"):
+        (tmp_path / name).write_text("left from an earlier run")
+    (tmp_path / "retired_files").mkdir()
+
+    docs_notebooks.derive([derived], pages_dir=tmp_path)
+
+    names = {entry.name for entry in tmp_path.iterdir()}
+    assert not names & {"retired.md", "retired.ipynb", "retired_files"}
+    assert {f"{derived.stem}.md", f"{other.stem}.md"} | {helper.name for helper in HELPER_PATHS} <= names

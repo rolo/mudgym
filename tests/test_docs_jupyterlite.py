@@ -26,6 +26,8 @@ def test_every_docs_notebook_gets_a_browser_version_ready_to_run(tmp_path):
         sources = {cell["id"]: cell["source"] for cell in notebook["cells"]}
         for cell in overlay_cells:
             assert sources[cell["id"]] == cell["source"], f"{path.name} cell {cell['id']}"
+    for helper in docs_jupyterlite.NOTEBOOKS_DIR.glob("*.py"):
+        assert (tmp_path / "files" / helper.name).read_bytes() == helper.read_bytes()
 
 
 def test_an_overlay_naming_a_cell_its_notebook_lacks_is_refused():

@@ -51,6 +51,9 @@ def write_browser_notebooks(contents_dir: Path) -> None:
         overlay = json.loads(overlay_path.read_text()) if overlay_path.is_file() else {"cells": []}
         notebook = browser_notebook(json.loads(path.read_text()), overlay)
         (contents_dir / path.name).write_text(json.dumps(notebook, indent=1, ensure_ascii=False) + "\n")
+    # The notebooks import the modules beside them.
+    for helper in NOTEBOOKS_DIR.glob("*.py"):
+        shutil.copyfile(helper, contents_dir / helper.name)
 
 
 def engine_version() -> str:
