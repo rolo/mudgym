@@ -74,6 +74,20 @@ def test_matches_pytorch_given_the_same_weights_and_batch():
             np.testing.assert_allclose(parameter.data, their_parameters[name].detach().numpy(), atol=1e-6, err_msg=name)
 
 
+def test_linear_gives_an_unbatched_input_the_gradients_of_a_batch_of_one():
+    gradients = []
+    for shape in [(2,), (1, 2)]:
+        # a square layer, where scalar gradients would broadcast through Adam unnoticed
+        torch.manual_seed(0)
+        layer = torch.nn.Linear(2, 2)
+        value = torch.as_tensor(np.array([1.0, -2.0], dtype=np.float32).reshape(shape))
+        torch.nn.functional.smooth_l1_loss(layer(value), torch.as_tensor(np.zeros(shape, dtype=np.float32))).backward()
+        gradients.append([layer.weight.grad, layer.bias.grad])
+
+    for unbatched, batched in zip(*gradients, strict=True):
+        np.testing.assert_allclose(unbatched, batched, strict=True)
+
+
 def test_adam_moves_each_weight_by_the_learning_rate_against_its_gradient_on_its_first_step():
     layer = torch.nn.Linear(2, 2)
     before = layer.weight.data.copy()

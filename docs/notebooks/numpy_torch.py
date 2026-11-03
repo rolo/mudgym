@@ -195,8 +195,11 @@ def embedding(indices, weight: Tensor) -> Tensor:
 def linear(value: Tensor, weight: Tensor, bias: Tensor) -> Tensor:
     def backward_step(gradient):
         accumulate(value, gradient @ weight.data)
-        accumulate(weight, gradient.T @ value.data)
-        accumulate(bias, gradient.sum(axis=0))
+        # like PyTorch, take one unbatched input or any number of batch dimensions as rows of a single batch
+        out_features, in_features = weight.shape
+        gradient_rows = gradient.reshape(-1, out_features)
+        accumulate(weight, gradient_rows.T @ value.data.reshape(-1, in_features))
+        accumulate(bias, gradient_rows.sum(axis=0))
 
     return derived(value.data @ weight.data.T + bias.data, (value, weight, bias), backward_step)
 
