@@ -381,16 +381,17 @@ class WasmProvider:
             return self._world_seeds[world_index]
         return self._world_randoms[world_index].getrandbits(32)
 
-    def _seeds_for_reset(self, seed: int | list[int | None] | None) -> tuple[int, ...]:
+    def _seeds_for_reset(self, seed: int | list[int | None] | None) -> tuple[tuple[int, ...], list[random.Random]]:
+        """Each world's seed for this reset, and the generators to install once the new worlds are built."""
         if seed is None:
-            return tuple(self._unseeded_world_seed(world_index) for world_index in range(self.worlds))
+            world_seeds = tuple(self._unseeded_world_seed(world_index) for world_index in range(self.worlds))
+            return world_seeds, list(self._world_randoms)
         if isinstance(seed, int) and not isinstance(seed, bool):
             world_seeds = tuple(
                 validate_seed(seed + world_index, label=f"seed for world {world_index}")
                 for world_index in range(self.worlds)
             )
-            self._world_randoms = [random.Random(world_seed) for world_seed in world_seeds]
-            return world_seeds
+            return world_seeds, [random.Random(world_seed) for world_seed in world_seeds]
         if not isinstance(seed, list):
             raise TypeError("provider reset seed must be an integer, a list of integers/None, or None")
         if len(seed) != len(self._connections):
@@ -403,14 +404,15 @@ class WasmProvider:
             if candidate is not None:
                 validate_seed(candidate, label=f"seed[{connection_index}]")
         world_seeds = []
+        world_randoms = list(self._world_randoms)
         for world_index in range(self.worlds):
             candidate = seed[world_index]
             if candidate is None:
                 world_seeds.append(self._unseeded_world_seed(world_index))
             else:
-                self._world_randoms[world_index] = random.Random(candidate)
+                world_randoms[world_index] = random.Random(candidate)
                 world_seeds.append(candidate)
-        return tuple(world_seeds)
+        return tuple(world_seeds), world_randoms
 
     def _build_world_with_sessions(self, slots: Sequence[int], seed: int) -> tuple[WasmWorld, list[WasmSession]]:
         personas = resolve_personas([self.personas[index] for index in slots], pool=self.persona_pool, seed=seed)
@@ -453,10 +455,11 @@ class WasmProvider:
         self._require_world_connections_quiescent(world_index)
         slots = self._world_slots[world_index]
         if seed is None:
+            world_random = None
             seed = self._unseeded_world_seed(world_index)
         else:
             seed = validate_seed(seed, label="world seed")
-            self._world_randoms[world_index] = random.Random(seed)
+            world_random = random.Random(seed)
         new_world, sessions = self._build_world_with_sessions(slots, seed)
         old_world = self._ordered_worlds[world_index]
         for connection_index, session in zip(slots, sessions, strict=True):
@@ -465,6 +468,8 @@ class WasmProvider:
         self._world_seeds = tuple(
             seed if index == world_index else previous for index, previous in enumerate(self._world_seeds)
         )
+        if world_random is not None:
+            self._world_randoms[world_index] = world_random
         old_world.shutdown()
 
     def reset(self, *, seed: int | list[int | None] | None = None) -> None:
@@ -476,7 +481,7 @@ class WasmProvider:
                 raise RuntimeError("cannot reset before creating connections")
             if any(connection._pending_responses for connection in self._connections):
                 raise RuntimeError("cannot reset WASI worlds while a connection has unread responses")
-            world_seeds = self._seeds_for_reset(seed)
+            world_seeds, world_randoms = self._seeds_for_reset(seed)
             futures = []
             try:
                 built = ordered_future_results(
@@ -504,6 +509,7 @@ class WasmProvider:
             old_worlds = self._ordered_worlds
             self._ordered_worlds = new_worlds
             self._world_seeds = world_seeds
+            self._world_randoms = world_randoms
             if shutdown_errors := _shutdown_worlds(old_worlds):
                 raise BaseExceptionGroup("previous WASI world shutdown failed after reset", shutdown_errors)
 

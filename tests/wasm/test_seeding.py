@@ -3,8 +3,21 @@ from contextlib import closing
 import pytest
 
 from mudgym import make_env
-from mudgym.connections.wasm import WasmProvider
+from mudgym.connections.wasm import WasmProvider, WasmtimeRuntime
 from mudgym.connections.wasm.engine_contract import MAX_SAFE_INTEGER
+
+
+class RefusingRuntime(WasmtimeRuntime):
+    """The real runtime, refusing to build a world with one chosen seed."""
+
+    def __init__(self, refused_seed):
+        super().__init__()
+        self.refused_seed = refused_seed
+
+    def create_world(self, *, seed, **options):
+        if seed == self.refused_seed:
+            raise RuntimeError(f"world construction refused for seed {seed}")
+        return super().create_world(seed=seed, **options)
 
 
 @pytest.mark.parametrize("seed_options", [{}, {"seed": None}])
@@ -58,3 +71,35 @@ def test_unseeded_resets_move_to_new_worlds_that_the_first_seed_reproduces(wasm_
     assert runs[0][0] == 123
     assert len(set(runs[0])) == 3
     assert runs[0] == runs[1]
+
+
+def test_a_failed_seeded_reset_leaves_the_worlds_later_unseeded_resets_draw_unchanged():
+    runtime = RefusingRuntime(refused_seed=456)
+    seeds = []
+    for with_failed_seeded_reset in (False, True):
+        with closing(make_env(connection_kwargs={"runtime": runtime})) as env:
+            assert env.reset(seed=123)[1]["transport"]["world_seed"] == 123
+            if with_failed_seeded_reset:
+                with pytest.raises(RuntimeError, match="refused for seed 456"):
+                    env.reset(seed=456)
+            seeds.append(env.reset()[1]["transport"]["world_seed"])
+    assert seeds[0] != 123
+    assert seeds[0] == seeds[1]
+
+
+def test_a_failed_seeded_reset_of_one_connection_leaves_the_worlds_it_draws_later_unchanged():
+    runtime = RefusingRuntime(refused_seed=456)
+    seeds = []
+    for with_failed_seeded_reset in (False, True):
+        with closing(WasmProvider(runtime=runtime, worlds=1)) as provider:
+            (connection,) = provider.create_connections(1)
+            provider.reset(seed=123)
+            connection.reset()
+            if with_failed_seeded_reset:
+                with pytest.raises(RuntimeError, match="refused for seed 456"):
+                    connection.reset(seed=456)
+            connection.reset()
+            connection.send_line("look")
+            seeds.append(connection.read_response()[3]["world_seed"])
+    assert seeds[0] != 123
+    assert seeds[0] == seeds[1]
