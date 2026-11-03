@@ -42,9 +42,9 @@ release-retry version:
     uv run python scripts/release.py {{version}} --retry
 
 # JupyterLab sits on top rather than in .venv, as its server brings cffi, which the tests check MudGym never needs.
-# open the docs notebooks in JupyterLab, with the modules they import beside them
-lab:
-    uv run --group notebooks --with jupyterlab jupyter lab docs/notebooks
+# open the docs notebooks in JupyterLab, with the modules they import beside them, `just lab all` for every interface
+lab interfaces="local":
+    uv run --group notebooks --with jupyterlab jupyter lab docs/notebooks --ip={{ if interfaces == "all" { "0.0.0.0" } else if interfaces == "local" { "localhost" } else { error("just lab takes `all`, or nothing for this machine only") } }}
 
 # play the docs examples against the live game to record connection calls in docs/recordings/
 docs-record *names:
