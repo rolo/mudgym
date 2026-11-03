@@ -7,8 +7,9 @@ from mudgym.notebooks import show_episode_transcript
 
 
 class Screen:
-    def __init__(self, lines=16):
+    def __init__(self, lines=16, title=None):
         self.lines = lines
+        self.title = title
         self.moves = []
         self.handle = display(HTML(""), display_id=True)
         self.drawn_at = 0.0
@@ -21,7 +22,7 @@ class Screen:
             self.draw()
 
     def draw(self):
-        self.handle.update(show_episode_transcript(self.moves, lines=self.lines))
+        self.handle.update(show_episode_transcript(self.moves, lines=self.lines, title=self.title))
         self.drawn_at = perf_counter()
 
 
