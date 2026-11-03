@@ -59,9 +59,6 @@ jobs:
           token: ${{ secrets.GH_PAT || github.token }}
       - name: Run tests (with coverage)
         run: just test
-      # The run above skips the comparison with PyTorch, which isn't in the locked environment.
-      - name: Check numpy_torch against PyTorch
-        run: just test-torch
       # Only upload cover on GitHub
       - name: Upload coverage data
         if: github.server_url == 'https://github.com'

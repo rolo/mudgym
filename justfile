@@ -23,7 +23,7 @@ test:
         --cov-report=xml --cov-report=html --cov-report=term-missing
 
 # check the docs notebooks' numpy_torch against PyTorch's CPU build, which stays out of the locked environment
-test-torch:
+test-pytorch:
     uv run --locked --with torch --index https://download.pytorch.org/whl/cpu pytest tests/test_docs_numpy_torch.py
 
 # There's deliberately no `just publish`: publishing is CI and OIDC only, so a local mistake can't reach PyPI.

@@ -1,0 +1,44 @@
+name: PyTorch reference
+on:
+  # Torch is a large download, so this runs only when numpy_torch or its check changes.
+  push:
+    branches: ['**']
+    paths:
+      - docs/notebooks/numpy_torch.py
+      - tests/test_docs_numpy_torch.py
+      - .github/workflows/pytorch.yml
+  pull_request:
+    paths:
+      - docs/notebooks/numpy_torch.py
+      - tests/test_docs_numpy_torch.py
+      - .github/workflows/pytorch.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+jobs:
+  pytorch:
+    name: PyTorch reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install just
+        uses: extractions/setup-just@v4
+        with:
+          github-token: ${{ secrets.GH_PAT || github.token }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7.1.2
+        with:
+          enable-cache: true
+          github-token: ${{ secrets.GH_PAT || github.token }}
+      - name: Install dependencies
+        run: just install
+      - name: Compare numpy_torch with PyTorch
+        run: just test-pytorch
