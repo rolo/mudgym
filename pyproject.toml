@@ -23,7 +23,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -74,7 +73,7 @@ notebooks = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.12.17,<0.13"]
+requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
