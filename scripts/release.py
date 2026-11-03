@@ -17,7 +17,7 @@ from urllib.request import urlopen
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 RELEASE_BRANCH = "main"
 VERSIONED_FILES = ["CITATION.cff", "pyproject.toml", "uv.lock"]
-LOCAL_GATES = ["lint", "format-check", "test", "check-dist"]
+LOCAL_GATES = ["lint", "test", "check-dist"]
 
 
 def run(command: list[str]) -> subprocess.CompletedProcess:

@@ -66,7 +66,8 @@ dev = [
   "tabulate>=0.10.0",
   {include-group = "docs"},
 ]
-# Runs docs/notebooks against the local engine. CI only converts their recorded outputs.
+# Runs docs/notebooks against the local engine, for recording them and for `just lab`. CI only converts their recorded
+# outputs.
 notebooks = [
   "ipykernel>=7.3.0",
   "matplotlib>=3.11.2",

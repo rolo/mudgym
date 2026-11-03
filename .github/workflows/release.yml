@@ -80,7 +80,7 @@ jobs:
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet dist/*.whl
           /tmp/smoke/bin/python -I scripts/smoke.py
-  # CI runs uv sync --frozen everywhere else, so the lower bounds in pyproject.toml are otherwise entirely untested.
+  # CI runs uv sync --locked everywhere else, so the lower bounds in pyproject.toml are otherwise entirely untested.
   lowest-resolution:
     name: Test at the declared minimum versions
     if: github.server_url == 'https://github.com'

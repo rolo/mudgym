@@ -1,4 +1,4 @@
-"""Build the docs with `just build-docs`, failing if a code block's traceback ended up in a page.
+"""Build the docs with `just docs-build`, failing if a code block's traceback ended up in a page.
 
 zensical's strict mode misses a failed `exec="true"` block and renders its traceback as the output, so we look for one
 in the built HTML, with the tags stripped since pygments splits it over spans.

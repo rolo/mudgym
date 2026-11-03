@@ -1,6 +1,6 @@
 """Run every docs notebook in Chromium from the built site, and install the built wheel in a fresh Pyodide.
 
-The notebooks run with PyPI blocked, so anything the build forgot to bundle fails. `just check-docs-lite` builds the
+The notebooks run with PyPI blocked, so anything the build forgot to bundle fails. `just docs-check` builds the
 docs first.
 """
 
@@ -139,7 +139,7 @@ def check_wheel_install(browser: Browser, base_url: str) -> None:
 
 def main() -> int:
     if not (SITE_DIR / "lite" / "notebooks" / "index.html").is_file():
-        raise SystemExit("site/lite has no notebook app. Build the docs first with `just build-docs`.")
+        raise SystemExit("site/lite has no notebook app. Build the docs first with `just docs-build`.")
     names = [path.name for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb"))]
     with serve_site() as base_url, sync_playwright() as playwright:
         browser = playwright.chromium.launch()

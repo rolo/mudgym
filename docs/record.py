@@ -7,7 +7,7 @@ recording again.
 
     just docs-record [names]    # play the examples against the live game
     just docs-derive            # rewrite the fragments from the committed recordings
-    just docs-watch             # serve the docs and refresh whichever example you save
+    just docs                   # serve the docs and refresh whichever example you save
 """
 
 import argparse
