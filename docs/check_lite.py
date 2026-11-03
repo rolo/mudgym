@@ -85,6 +85,31 @@ def run_notebook(browser: Browser, base_url: str, name: str) -> None:
         page.close()
 
 
+def check_notebook_links(browser: Browser, base_url: str, names: list[str]) -> None:
+    """Reach the notebook index through the menu, then open each notebook in a new tab."""
+    page = browser.new_page()
+    try:
+        for docs_path in ("", "environments/"):
+            page.goto(f"{base_url}/{docs_path}")
+            page.locator(".md-nav--primary").get_by_role("link", name="Notebooks", exact=True).click()
+            page.wait_for_url(f"{base_url}/notebooks/")
+            page.get_by_role("heading", name="Notebooks", level=1).wait_for()
+        for name in names:
+            link = page.locator(f'a[href$="lite/notebooks/index.html?path={name}"]')
+            with page.expect_popup() as opened:
+                link.click()
+            notebook = opened.value
+            try:
+                notebook.wait_for_url(f"{base_url}/lite/notebooks/index.html?path={name}")
+                notebook.wait_for_function(f"({KERNEL_STATUS})() === 'idle'", timeout=KERNEL_START_SECONDS * 1000)
+                assert page.url == f"{base_url}/notebooks/"
+            finally:
+                notebook.close()
+    finally:
+        page.close()
+    print("Notebook links: menu opens the index, and each notebook opens JupyterLite in a new tab", flush=True)
+
+
 def check_wheel_install(browser: Browser, base_url: str) -> None:
     """Install the built wheel in a plain Pyodide, letting its metadata pull dependencies from PyPI."""
     wheels = SITE_DIR / "lite" / "static" / "pyodide-lock"
@@ -144,6 +169,7 @@ def main() -> int:
     with serve_site() as base_url, sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         try:
+            check_notebook_links(browser, base_url, names)
             check_wheel_install(browser, base_url)
             for name in names:
                 started = time.monotonic()

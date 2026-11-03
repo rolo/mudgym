@@ -42,6 +42,5 @@ outputwasm/
 site/
 docs/recordings/*.ansi
 docs/recordings/*.md
-docs/pages/notebooks/
 # the notebooks' browser versions, built by docs/jupyterlite.py
 docs/pages/lite/

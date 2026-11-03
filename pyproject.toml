@@ -54,7 +54,7 @@ docs = [
   "zensical>=0.0.62",
   "mkdocstrings-python>=2.0.8",
   "markdown-exec>=1.12.3",
-  "nbconvert>=7.16",
+  "nbclient>=0.10.4",
 ]
 dev = [
   "ruff>=0.16.8",
@@ -65,8 +65,8 @@ dev = [
   "tabulate>=0.10.0",
   {include-group = "docs"},
 ]
-# Runs docs/notebooks against the local engine, for recording them and for `just lab`. CI only converts their recorded
-# outputs.
+# Runs docs/notebooks against the local engine, for recording them and for `just lab`. CI builds their browser
+# versions and runs them in Chromium.
 notebooks = [
   "ipykernel>=7.3.0",
   "matplotlib>=3.11.2",

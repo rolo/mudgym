@@ -2,8 +2,8 @@
 site_name = "MudGym"
 site_description = "A reinforcement learning environment for MUD2"
 # Pages only: docs/code (example sources) and docs/recordings (captures and derived fragments) sit outside the site
-# build, and are pulled in via `--8<--` includes. docs/notebooks are derived into docs/pages/notebooks by
-# docs/notebooks.py before a build.
+# build, and are pulled in via `--8<--` includes. docs/notebooks run in the JupyterLite workspace built by
+# docs/jupyterlite.py.
 docs_dir = "docs/pages"
 site_dir = "site"
 nav = [
@@ -13,10 +13,7 @@ nav = [
   { "Actions" = "actions.md" },
   { "Rewards" = "rewards.md" },
   { "Multi-agent" = "multiagent.md" },
-  { "Notebooks" = [
-    { "Quickstart" = "notebooks/quickstart.md" },
-    { "Goal room DQN" = "notebooks/goal_room_dqn.md" },
-  ] },
+  { "Notebooks" = "notebooks/index.md" },
   { "API Reference" = "api.md" },
 ]
 extra_css = ["stylesheets/theme.css", "stylesheets/extra.css"]

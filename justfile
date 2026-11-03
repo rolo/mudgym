@@ -54,16 +54,15 @@ lab interfaces="local":
 docs-record *names:
     uv run python docs/record.py {{names}}
 
-# replay committed connection captures and convert the recorded notebooks into the ignored pages the docs use
+# replay committed connection captures into the ignored fragments the docs use
 docs-derive *names:
     uv run python docs/record.py --derive-only {{names}}
-    uv run python docs/notebooks.py
 
-# re-run the docs notebooks against the live game, recording their outputs, then derive their pages
+# re-run the docs notebooks against the live game and record their outputs
 docs-notebooks *names:
-    uv run --group notebooks python docs/notebooks.py --execute {{names}}
+    uv run --group notebooks python docs/notebooks.py {{names}}
 
-# build the browser workspace where the docs notebooks run in JupyterLite, which each notebook page links to
+# build the browser workspace where the docs notebooks run in JupyterLite
 docs-lite:
     uv run python docs/jupyterlite.py
 
