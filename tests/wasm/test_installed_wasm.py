@@ -281,7 +281,7 @@ def test_closing_the_wasm_envs_releases_their_workers(wasm_runtime):
             env.close()
             env.close()
     assert not [
-        thread for thread in threading.enumerate() if thread not in before and thread.name.startswith("wasmtime-world")
+        thread for thread in threading.enumerate() if thread not in before and thread.name.startswith("wasm-world")
     ]
 
 
