@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import random
 import secrets
 import sys
@@ -375,17 +376,20 @@ class WasmProvider:
             self._executor = self.runtime.executor(resolved_worlds)
             return list(self._connections)
 
-    def _unseeded_world_seed(self, world_index: int) -> int:
-        """The construction seed's world on the first reset, then a new world from that world's generator."""
+    def _unseeded_world_seed(self, world_index: int, world_random: random.Random) -> int:
+        """The construction seed's world on the first reset, then a new world drawn from ``world_random``.
+
+        Callers pass a copy of the world's generator and install it once the world is built, so a failed reset draws
+        nothing.
+        """
         if not self._ordered_worlds:
             return self._world_seeds[world_index]
-        return self._world_randoms[world_index].getrandbits(32)
+        return world_random.getrandbits(32)
 
     def _seeds_for_reset(self, seed: int | list[int | None] | None) -> tuple[tuple[int, ...], list[random.Random]]:
         """Each world's seed for this reset, and the generators to install once the new worlds are built."""
         if seed is None:
-            world_seeds = tuple(self._unseeded_world_seed(world_index) for world_index in range(self.worlds))
-            return world_seeds, list(self._world_randoms)
+            seed = [None] * len(self._connections)
         if isinstance(seed, int) and not isinstance(seed, bool):
             world_seeds = tuple(
                 validate_seed(seed + world_index, label=f"seed for world {world_index}")
@@ -404,11 +408,11 @@ class WasmProvider:
             if candidate is not None:
                 validate_seed(candidate, label=f"seed[{connection_index}]")
         world_seeds = []
-        world_randoms = list(self._world_randoms)
+        world_randoms = [copy.copy(world_random) for world_random in self._world_randoms]
         for world_index in range(self.worlds):
             candidate = seed[world_index]
             if candidate is None:
-                world_seeds.append(self._unseeded_world_seed(world_index))
+                world_seeds.append(self._unseeded_world_seed(world_index, world_randoms[world_index]))
             else:
                 world_randoms[world_index] = random.Random(candidate)
                 world_seeds.append(candidate)
@@ -455,8 +459,8 @@ class WasmProvider:
         self._require_world_connections_quiescent(world_index)
         slots = self._world_slots[world_index]
         if seed is None:
-            world_random = None
-            seed = self._unseeded_world_seed(world_index)
+            world_random = copy.copy(self._world_randoms[world_index])
+            seed = self._unseeded_world_seed(world_index, world_random)
         else:
             seed = validate_seed(seed, label="world seed")
             world_random = random.Random(seed)
@@ -468,8 +472,7 @@ class WasmProvider:
         self._world_seeds = tuple(
             seed if index == world_index else previous for index, previous in enumerate(self._world_seeds)
         )
-        if world_random is not None:
-            self._world_randoms[world_index] = world_random
+        self._world_randoms[world_index] = world_random
         old_world.shutdown()
 
     def reset(self, *, seed: int | list[int | None] | None = None) -> None:
