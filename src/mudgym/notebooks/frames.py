@@ -170,7 +170,8 @@ def frame_html(inner_html: str, *, collapse: bool, lines: int | None = None) -> 
     else:
         frame_id = f"game-frame-fixed-{next(FRAME_IDS)}"
         frame = (
-            f'<div class="game-frame" id="{frame_id}" style="{FRAME_STYLE}height:{lines * 1.5:g}em;{FIXED_FRAME_STYLE}">'
+            f'<div class="game-frame" id="{frame_id}" '
+            f'style="{FRAME_STYLE}height:{lines * 1.5:g}em;{FIXED_FRAME_STYLE}">'
             f'<div style="margin-bottom:auto;">{inner_html}</div></div>'
             # Where scripts run, also scroll to the newest output, for browsers that open a reversed scroll at its top.
             f"<script>(function () {{ var frame = document.getElementById({frame_id!r}); "
@@ -374,7 +375,10 @@ def transition_caption(transition: Mapping[str, Any], position: int) -> str:
 
 
 def episode_transitions(episode: Mapping[str, Any] | Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    """An episode's transitions, given either the transitions themselves or a mapping holding them as ``transitions``."""
+    """An episode's transitions.
+
+    Takes either the transitions themselves or a mapping holding them as ``transitions``.
+    """
     return list(episode["transitions"] if isinstance(episode, Mapping) else episode)
 
 
@@ -414,6 +418,15 @@ def transition_note(transition: Mapping[str, Any], position: int) -> str:
     return note if reward is None else f"{note} · reward {reward:+.2f}"
 
 
+def transcript_text(transition: Mapping[str, Any]) -> str:
+    """A transition's command after the prompt with the game's reply under it, or just the reply without an action."""
+    reply = display_text(transition["info"]["render_bytes"])
+    action = transition.get("action")
+    if action is None:
+        return reply
+    return f"{PROMPT}{action_command(action)}\n{reply}"
+
+
 def show_episode_transcript(
     episode: Mapping[str, Any] | Sequence[Mapping[str, Any]],
     *,
@@ -424,18 +437,15 @@ def show_episode_transcript(
     """Render an episode in one game frame, as the terminal shows it.
 
     Takes the same episode as ``show_episode``. Each command follows MUD2's prompt with its step and reward at the end
-    of the line, and the game's reply from ``info`` comes under it. ``title`` heads the frame as ``show_episode``
-    captions its steps. ``lines`` fixes the frame at that many lines tall, scrolling and opening on the latest output, so
-    a transcript redrawn while an episode plays holds still.
+    of the line, and the game's reply from ``info`` comes under it. A transition without an action shows just its reply.
+    ``title`` heads the frame as ``show_episode`` captions its steps. ``lines`` fixes the frame at that many lines tall,
+    scrolling and opening on the latest output, so a transcript redrawn while an episode plays holds still.
     """
     transitions = episode_transitions(episode)
     if not transitions:
         return empty_html("No transitions.")
 
-    texts = [
-        f"{PROMPT}{action_command(transition['action'])}\n{display_text(transition['info']['render_bytes'])}"
-        for transition in transitions
-    ]
+    texts = [transcript_text(transition) for transition in transitions]
     rendered = "".join(
         f'<div style="margin-top:{"0.6rem" if position > 1 else "0"};">'
         f'<span style="{NOTE_STYLE}">{html_lib.escape(transition_note(transition, position))}</span>'

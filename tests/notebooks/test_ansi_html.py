@@ -58,6 +58,13 @@ def test_an_episode_transcript_echoes_each_action_after_the_prompt_with_its_step
     assert "step 2 · reward +1.00</span>" in transcript
 
 
+def test_a_transcript_shows_just_the_reply_for_a_transition_without_an_action():
+    transcript = show_episode_transcript([{"step": 3, "reward": -0.5, "info": {"render_bytes": b"Hut.\n"}}]).data
+
+    assert "*</span>" not in transcript
+    assert "step 3 · reward -0.50</span>Hut.\n</div>" in transcript
+
+
 def test_episode_views_take_an_episode_holding_its_transitions():
     transitions = [{"step": 1, "action": "look", "reward": 1, "info": {"render_bytes": b"Hut.\n", "raw_bytes": b""}}]
 
