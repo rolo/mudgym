@@ -70,3 +70,15 @@ def test_send_rejects_a_second_command_while_one_is_pending():
 
     with pytest.raises(RuntimeError, match="still waiting"):
         session.send("dance")
+
+
+@pytest.mark.parametrize(("terminated", "incomplete"), [(True, False), (False, True)])
+def test_terminal_or_incomplete_response_invalidates_the_connection(terminated, incomplete):
+    response = b"response", terminated, incomplete, {}
+    connection = ScriptedConnection(responses={"look": response})
+    session = make_session(connection)
+
+    result = session.command("look")
+
+    assert result[1:3] == (terminated, incomplete)
+    assert connection.invalidated is True

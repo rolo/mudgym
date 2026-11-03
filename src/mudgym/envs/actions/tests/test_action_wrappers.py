@@ -46,11 +46,12 @@ def test_parallel_directions_wrapper_has_matching_api_and_independent_spaces(scr
         wrapped.close()
 
 
-def test_discrete_action_wrapper_invalid_action_index(scripted_env):
+@pytest.mark.parametrize("action", [-1, 2])
+def test_discrete_action_wrapper_invalid_action_index(scripted_env, action):
     actions = ["a", "b"]
     wrapped = DiscreteActionSpaceWrapper(scripted_env, actions)
     with pytest.raises(ValueError, match="Invalid discrete action"):
-        wrapped.action(2)
+        wrapped.action(action)
 
 
 def test_discrete_action_wrapper_numpy_array_input(scripted_env):

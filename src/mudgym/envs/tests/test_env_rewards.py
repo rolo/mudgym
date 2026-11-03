@@ -44,6 +44,20 @@ def test_genuine_points_event_updates_observation_reward_and_info(scripted_env_f
     assert info["points"] == 13_000
 
 
+def test_points_event_wins_over_an_earlier_stale_status_line(scripted_env_factory):
+    # the fes line still reports the 200 points from before the event that follows it
+    fes = OBSERVATION_COMMAND_RESPONSES["fes"]
+    step_bytes = scripted_step_bytes("mgsorcerise", b"").replace(fes, fes + PROMPT + SORCERISE_BODY)
+    env = scripted_env_factory(responses={"mgsorcerise": step_bytes})
+    obs, _ = env.reset()
+    start_points = int(obs["points"])
+
+    obs, reward, _, _, _ = env.step("mgsorcerise")
+
+    assert obs["points"] == 13_000
+    assert reward == obs["points"] - start_points
+
+
 def test_tearoom_points_event_updates_the_episode_start_without_reward(scripted_env_factory):
     responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY, status_points=13_000)}
     env = scripted_env_factory(responses=responses, tearoom_commands="mgsorcerise")
