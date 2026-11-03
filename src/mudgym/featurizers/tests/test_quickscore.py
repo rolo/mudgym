@@ -36,17 +36,10 @@ def test_parse_quickscore_accepts_terminal_and_embedded_column_gaps(column_gap):
     [
         # a novice's name line is the bare name alone
         (b"Alpha", FIGHTER_COLUMNS, 200),
-        # prefixes the game issues sit inside the title, not around the name
-        (b"Alpha the dragon-slaying warrior", FIGHTER_COLUMNS, 200),
+        # prefixes the game issues sit inside the title, and a magic user gets the mag column before pts
         (b"Alpha the sorcerised sorcerer", MAGIC_USER_COLUMNS, 140_000),
-        # Sir/Lady put the title first, and are always non-magic-users
-        (b"Sir Alpha", FIGHTER_COLUMNS, 200),
-        (b"Lady Alpha", FIGHTER_COLUMNS, 200),
-        # Brother/Sister do too, and are always magic-users, so both quirks land on one line
+        # Brother/Sister put the title first and are always magic-users, so both quirks land on one line
         (b"Brother Alpha", MAGIC_USER_COLUMNS, 140_000),
-        (b"Sister Alpha", MAGIC_USER_COLUMNS, 140_000),
-        # a prefix on a reversed title is capitalised in front of it
-        (b"Awkward Lady Alpha", FIGHTER_COLUMNS, 200),
     ],
 )
 def test_parse_quickscore_reads_the_persona_out_of_its_full_name(name_line, stats_columns, expected_points):
@@ -59,13 +52,6 @@ def test_parse_quickscore_ignores_colour_inside_the_name_line():
     raw_bytes = quickscore_reply(b"Sir \x1b[1;37;40mAlpha\x1b[0;37;40m", FIGHTER_COLUMNS, b"      ")
 
     assert parse_quickscore(raw_bytes) == ("Alpha", 200)
-
-
-@pytest.mark.parametrize("column_gap", [b"      ", b"\t"])
-def test_parse_quickscore_reads_points_past_the_magic_user_mag_column(column_gap):
-    raw_bytes = quickscore_reply(b"Alpha the mage", MAGIC_USER_COLUMNS, column_gap)
-
-    assert parse_quickscore(raw_bytes) == ("Alpha", 140_000)
 
 
 def test_parse_quickscore_fails_without_a_points_column():

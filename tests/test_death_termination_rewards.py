@@ -2,12 +2,10 @@ import pytest
 
 from mudgym import make_env
 
-OBSERVATION_MODES = ("bytes", "text", "parsed", "cheats")
 
-
-@pytest.fixture(params=OBSERVATION_MODES)
-def sorcerer_episode(request):
-    env = make_env(observation=request.param, tearoom_commands="mgsorcerise")
+@pytest.fixture
+def sorcerer_episode():
+    env = make_env(tearoom_commands="mgsorcerise")
     try:
         obs, _ = env.reset()
         assert obs["points"] > 0

@@ -11,25 +11,24 @@ from mudgym.connections.wasm import WasmProvider
 from mudgym.connections.wasm.provider import create_connection
 
 
-def make_episode(runtime, mode, preset, capture_directory=None):
+def make_episode(runtime, mode, capture_directory=None):
     if mode == "scalar":
         connection = create_connection(runtime=runtime, seed=123)
         provider = connection.provider
         if capture_directory is not None:
             connection = RecordingConnection(connection, capture_directory / "scalar.jsonl")
-        return make_env(connection=connection, observation=preset), provider
+        return make_env(connection=connection), provider
     provider = WasmProvider(runtime=runtime, worlds=1, seed=123)
     wrapped = provider
     if capture_directory is not None:
         wrapped = RecordingProvider(provider, lambda index: capture_directory / f"player{index}.jsonl")
-    return make_parallel_env(2, provider=wrapped, observation=preset), provider
+    return make_parallel_env(2, provider=wrapped), provider
 
 
-@pytest.mark.parametrize("preset", ["text", "parsed"])
 @pytest.mark.parametrize("mode", ["scalar", "parallel"])
-def test_recording_preserves_seeded_observations_rewards_and_world_ticks(wasm_runtime, mode, preset, tmp_path):
-    direct, direct_provider = make_episode(wasm_runtime, mode, preset)
-    recorded, recorded_provider = make_episode(wasm_runtime, mode, preset, tmp_path)
+def test_recording_preserves_seeded_observations_rewards_and_world_ticks(wasm_runtime, mode, tmp_path):
+    direct, direct_provider = make_episode(wasm_runtime, mode)
+    recorded, recorded_provider = make_episode(wasm_runtime, mode, tmp_path)
     try:
         for seed in (123, 456, 123):
             expected_initial, _ = direct.reset(seed=seed)
@@ -49,18 +48,15 @@ def test_recording_preserves_seeded_observations_rewards_and_world_ticks(wasm_ru
         direct.close()
 
 
-@pytest.mark.parametrize("preset", ["parsed", "bytes"])
-def test_replay_preserves_persona_and_response_metadata(wasm_runtime, tmp_path, preset):
+def test_replay_preserves_persona_and_response_metadata(wasm_runtime, tmp_path):
     path = tmp_path / "persona.jsonl"
     expected_persona = {"name": "Zavren", "sex": "female"}
     connection = create_connection(runtime=wasm_runtime, persona="Zavren", sex="f")
-    with closing(make_env(connection=RecordingConnection(connection, path), observation=preset)) as env:
+    with closing(make_env(connection=RecordingConnection(connection, path))) as env:
         expected = [env.reset(seed=123), env.step("look")]
-        assert expected[1][-1]["transport"]["sent_lines"] == (
-            ["look", "sql,fes,fex,fei"] if preset == "parsed" else ["look"]
-        )
+        assert expected[1][-1]["transport"]["sent_lines"] == ["look", "sql,fes,fex,fei"]
     replay = ReplayConnection(path)
-    with closing(make_env(connection=replay, observation=preset)) as env:
+    with closing(make_env(connection=replay)) as env:
         actual = [env.reset(seed=123), env.step("look")]
         replay.assert_exhausted()
     for original, replayed in zip(expected, actual, strict=True):

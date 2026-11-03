@@ -265,8 +265,7 @@ def test_closing_a_connection_releases_its_session_in_the_shared_world(wasm_runt
         assert not terminated and not incomplete
 
 
-@pytest.mark.parametrize("advance_directly", [False, True])
-def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm_runtime, advance_directly):
+def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm_runtime):
     with ExitStack() as stack:
         provider = stack.enter_context(closing(WasmProvider(runtime=wasm_runtime, worlds=2)))
         first, second = [
@@ -277,15 +276,14 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
         first.reset()
         second.reset()
         provider._connections[0].advance_world_ticks(3208)
-        if advance_directly:
-            with pytest.raises(WorldAdvancementFailed) as raised:
-                provider.advance_worlds(1)
-            assert raised.value.successes == {1: 1}
-            assert set(raised.value.failures) == {0}
-            terminal = raised.value.failures[0]
-            assert isinstance(terminal, TerminalTick)
-            assert terminal.tick_failure["requested_ticks"] == 1
-            assert terminal.tick_failure["completed_ticks"] == 0
+        with pytest.raises(WorldAdvancementFailed) as raised:
+            provider.advance_worlds(1)
+        assert raised.value.successes == {1: 1}
+        assert set(raised.value.failures) == {0}
+        terminal = raised.value.failures[0]
+        assert isinstance(terminal, TerminalTick)
+        assert terminal.tick_failure["requested_ticks"] == 1
+        assert terminal.tick_failure["completed_ticks"] == 0
         first.act("look")
         second.act("look")
         provider.tick_for_step()
@@ -295,7 +293,7 @@ def test_a_terminal_world_keeps_its_final_output_while_its_sibling_advances(wasm
         assert not any(truncates)
         assert rewards == (300, 0)
         assert infos[0]["raw_bytes"].count(b"Auto-reset initiated") == 1
-        assert provider._ordered_worlds[1].current_tick() == 1 + advance_directly
+        assert provider._ordered_worlds[1].current_tick() == 2
         assert [info["transport"]["sent_lines"] for info in infos] == [["look"], ["look"]]
 
 

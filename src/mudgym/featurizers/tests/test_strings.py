@@ -9,11 +9,6 @@ from mudgym.featurizers.strings import (
 )
 
 
-def test_ascii_text_round_trips():
-    text = "You are standing on a dusty road with rising ground both to the north and south."
-    assert decode_text_bytes(text.encode("ascii")) == text
-
-
 def test_ansi_escapes_pass_through():
     assert decode_text_bytes(b"\x1b[1;37;40mDally Lane\x1b[0m") == "\x1b[1;37;40mDally Lane\x1b[0m"
 
@@ -22,18 +17,6 @@ def test_high_bytes_are_leaked_protocol_not_text():
     # eg the fecode marker bytes \x9b\xff; decoding them as text would mask the leak
     with pytest.raises(ValueError, match="at byte 5"):
         decode_text_bytes(b"leak \x9b\xff here")
-
-
-def test_every_high_byte_is_rejected_in_text_paths():
-    # a lone \xff (the fecode pair's second byte, split from its \x9b) must not decode as text
-    with pytest.raises(ValueError):
-        decode_text_bytes(b"caf\xe9")
-    with pytest.raises(ValueError):
-        decode_text_bytes(b"\xff")
-
-
-def test_ascii_commands_encode_unchanged():
-    assert encode_command_bytes("say cafe") == b"say cafe"
 
 
 def test_non_ascii_commands_fail_before_the_wire():

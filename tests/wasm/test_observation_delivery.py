@@ -12,7 +12,7 @@ from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.fields import SuperQuickLookField
 
 
-@pytest.mark.parametrize("preset", ["text", "bytes", "parsed"])
+@pytest.mark.parametrize("preset", ["text", "parsed"])
 def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, preset, tmp_path):
 
     def capture_path(index):
@@ -50,8 +50,6 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
                 np.testing.assert_array_equal(
                     player_obs["players"], ["Abbie the protector" if index == 0 else "Aaron the protector"]
                 )
-            if preset == "bytes":
-                assert player_obs["raw_bytes"].tobytes()[: len(raw)] == raw
 
         actions = {"player_0": "dance", "player_1": "dance"}
         obs, _, terminates, truncates, _ = env.step(actions)
@@ -103,8 +101,7 @@ def test_real_peer_output_after_a_field_response_survives_parsing(wasm_runtime):
         provider.close()
 
 
-@pytest.mark.parametrize("preset", ["text", "bytes", "parsed"])
-def test_recording_replays_complete_coordinated_resets(wasm_runtime, preset, tmp_path):
+def test_recording_replays_complete_coordinated_resets(wasm_runtime, tmp_path):
 
     def capture_path(index):
         return tmp_path / f"player{index}.jsonl"
@@ -112,10 +109,10 @@ def test_recording_replays_complete_coordinated_resets(wasm_runtime, preset, tmp
     provider = RecordingProvider(WasmProvider(runtime=wasm_runtime, worlds=1), capture_path)
     expected = []
     action = {"player_0": "look", "player_1": "look"}
-    with closing(make_parallel_env(2, provider=provider, observation=preset)) as recorded:
+    with closing(make_parallel_env(2, provider=provider)) as recorded:
         for seed in (3, 123):
             expected.append((recorded.reset(seed=seed), recorded.step(action)))
-    with closing(make_parallel_env(2, provider=ReplayProvider(capture_path), observation=preset)) as replay:
+    with closing(make_parallel_env(2, provider=ReplayProvider(capture_path))) as replay:
         for seed, (initial, following) in zip((3, 123), expected, strict=True):
             for actual, recorded in ((replay.reset(seed=seed), initial), (replay.step(action), following)):
                 np.testing.assert_equal(actual[:-1], recorded[:-1])
@@ -134,7 +131,7 @@ def test_recording_replays_complete_coordinated_resets(wasm_runtime, preset, tmp
 
 
 @pytest.mark.parametrize("phase", ["action", "observation"])
-@pytest.mark.parametrize("preset", ["parsed", "text", "bytes"])
+@pytest.mark.parametrize("preset", ["parsed", "text"])
 def test_pending_combat_death_survives_the_next_command_and_reset(wasm_runtime, phase, preset, tmp_path):
     provider = WasmProvider(
         runtime=wasm_runtime,

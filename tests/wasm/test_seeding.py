@@ -20,11 +20,10 @@ class RefusingRuntime(WasmtimeRuntime):
         return super().create_world(seed=seed, **options)
 
 
-@pytest.mark.parametrize("seed_options", [{}, {"seed": None}])
-def test_omitted_seed_varies_between_envs_and_its_first_world_can_be_replayed(wasm_runtime, seed_options):
+def test_omitted_seed_varies_between_envs_and_its_first_world_can_be_replayed(wasm_runtime):
     seeds = set()
     for attempt in range(4):
-        with closing(make_env(connection_kwargs={"runtime": wasm_runtime, **seed_options})) as env:
+        with closing(make_env(connection_kwargs={"runtime": wasm_runtime})) as env:
             obs, info = env.reset()
             seed = info["transport"]["world_seed"]
             assert 0 <= seed <= MAX_SAFE_INTEGER

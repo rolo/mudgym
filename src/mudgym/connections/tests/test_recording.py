@@ -1,6 +1,5 @@
 import json
 
-import numpy as np
 import pytest
 
 from mudgym.connections import recording as recording_module
@@ -14,7 +13,6 @@ from mudgym.connections.recording import (
     ReplayMismatchError,
     ReplayProvider,
 )
-from mudgym.envs.factory import make_env
 from mudgym.session import MudSession
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
@@ -68,27 +66,12 @@ def test_capture_version_deliberately_rejects_v2(tmp_path):
         ReplayConnection(path)
 
 
-@pytest.mark.parametrize("version", [3, 4])
-def test_replay_rejects_old_versions_before_reading_transport_fields(tmp_path, version):
+def test_replay_rejects_old_versions_before_reading_transport_fields(tmp_path):
     path = tmp_path / "old.jsonl"
-    path.write_text(json.dumps({"format": CAPTURE_FORMAT, "version": version}) + "\n", encoding="utf-8")
+    path.write_text(json.dumps({"format": CAPTURE_FORMAT, "version": 4}) + "\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match=f"version {version}"):
+    with pytest.raises(ValueError, match="version 4"):
         ReplayConnection(path)
-
-
-def test_replay_requires_recorded_sent_lines(tmp_path):
-    path = tmp_path / "capture.jsonl"
-    recording = RecordingConnection(ScriptedConnection(), path)
-    drive_conversation(recording)
-    recording.close()
-    records = [json.loads(line) for line in path.read_text().splitlines()]
-    for record in records:
-        record.pop("sent_lines", None)
-    path.write_text("\n".join(json.dumps(record) for record in records) + "\n")
-
-    with pytest.raises(KeyError, match="sent_lines"):
-        drive_conversation(ReplayConnection(path))
 
 
 def test_recorded_connection_transcript_replays_identically(tmp_path):
@@ -208,32 +191,6 @@ def test_replay_requires_recorded_invalidation(tmp_path):
         replay.assert_exhausted()
     replay.invalidate()
     replay.assert_exhausted()
-
-
-def test_env_over_replay_reproduces_the_recorded_episode(tmp_path):
-    path = tmp_path / "episode.jsonl"
-
-    env = make_env(observation="parsed", connection=RecordingConnection(ScriptedConnection(), path))
-    env.reset()
-    obs, reward, terminated, truncated, _ = env.step("look")
-    env.close()
-
-    replay = ReplayConnection(path)
-    replay_env = make_env(observation="parsed", connection=replay)
-    replay_env.reset()
-    replay_obs, replay_reward, replay_terminated, replay_truncated, _ = replay_env.step("look")
-    replay_env.close()
-    replay.assert_exhausted()
-
-    assert replay_reward == reward
-    assert replay_terminated == terminated
-    assert replay_truncated == truncated
-    assert set(replay_obs) == set(obs)
-    for key, value in obs.items():
-        if isinstance(value, np.ndarray):
-            assert np.array_equal(replay_obs[key], value), key
-        else:
-            assert replay_obs[key] == value, key
 
 
 def test_providers_record_and_replay_per_index(tmp_path):

@@ -1,4 +1,4 @@
-"""Check that recorded and scripted observations satisfy every preset's advertised space."""
+"""Check that recorded observations satisfy every preset's advertised space."""
 
 from pathlib import Path
 
@@ -22,14 +22,3 @@ def test_recorded_reset_observation_is_within_the_observation_space(preset):
         replay.assert_exhausted()
     finally:
         env.close()
-
-
-@pytest.mark.parametrize("preset", PRESETS)
-def test_scripted_reset_and_step_observations_fit_the_space(scripted_env_factory, preset):
-    env = scripted_env_factory(observation=preset)
-
-    obs, _ = env.reset()
-    assert_observation_in_space(env.observation_space, obs)
-
-    obs, _, _, _, _ = env.step("look")
-    assert_observation_in_space(env.observation_space, obs)

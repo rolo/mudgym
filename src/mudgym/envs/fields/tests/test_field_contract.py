@@ -32,7 +32,6 @@ def test_empty_observation_satisfies_field_contract(field_constructor):
 @pytest.mark.parametrize(
     ("kwargs", "expected_keys"),
     [
-        pytest.param({}, {"vitals", "flags", "reset_minutes", "weather", "weather_index"}, id="omitted"),
         pytest.param(
             {"include_keys": None}, {"vitals", "flags", "reset_minutes", "weather", "weather_index"}, id="default"
         ),

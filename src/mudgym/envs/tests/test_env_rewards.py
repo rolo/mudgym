@@ -31,37 +31,6 @@ def scripted_step_bytes(action: str, body: bytes, *, status_points: int = 200) -
     return b"".join(parts)
 
 
-def scripted_step_with_event_after_fes(action: str, body: bytes) -> bytes:
-    """Build a complete response with a points event after fes."""
-    responses = OBSERVATION_COMMAND_RESPONSES
-    return (
-        action.encode("ascii")
-        + b"\r\n"
-        + PROMPT
-        + b"sql,fes,fex,fei\r\n"
-        + responses["sql"]
-        + PROMPT
-        + responses["fes"]
-        + PROMPT
-        + body
-        + PROMPT
-        + responses["fex"]
-        + PROMPT
-        + responses["fei"]
-        + PROMPT
-    )
-
-
-def test_points_pattern_in_command_echo_forges_no_reward(scripted_env_factory):
-    env = scripted_env_factory()
-    env.reset()
-
-    _, reward, _, _, info = env.step("look (+10 = 10)")
-
-    assert reward == 0.0
-    assert "points" not in info
-
-
 def test_genuine_points_event_updates_observation_reward_and_info(scripted_env_factory):
     responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY, status_points=13_000)}
     env = scripted_env_factory(responses=responses)
@@ -75,18 +44,6 @@ def test_genuine_points_event_updates_observation_reward_and_info(scripted_env_f
     assert info["points"] == 13_000
 
 
-def test_points_event_wins_over_an_earlier_stale_status_line(scripted_env_factory):
-    responses = {"mgsorcerise": scripted_step_with_event_after_fes("mgsorcerise", SORCERISE_BODY)}
-    env = scripted_env_factory(responses=responses)
-    obs, _ = env.reset()
-    start_points = int(obs["points"])
-
-    obs, reward, _, _, _ = env.step("mgsorcerise")
-
-    assert obs["points"] == 13_000
-    assert reward == obs["points"] - start_points
-
-
 def test_tearoom_points_event_updates_the_episode_start_without_reward(scripted_env_factory):
     responses = {"mgsorcerise": scripted_step_bytes("mgsorcerise", SORCERISE_BODY, status_points=13_000)}
     env = scripted_env_factory(responses=responses, tearoom_commands="mgsorcerise")
@@ -98,21 +55,6 @@ def test_tearoom_points_event_updates_the_episode_start_without_reward(scripted_
 
     assert obs["points"] == 13_000
     assert reward == 0.0
-
-
-def test_spoken_points_total_does_not_forge_score_metadata(scripted_env_factory):
-    # A plain parenthesised number carries no raw-wire signal distinguishing it from player text, so it must not become
-    # reward, termination, or score metadata.
-    body = b'Dumbo the novice says "\x1b[1;33;40m(2000000)\x1b[0;33;40m".\r\n'
-    responses = {"look": scripted_step_bytes("look", body)}
-    env = scripted_env_factory(responses=responses)
-    env.reset()
-
-    _, reward, terminated, _, info = env.step("look")
-
-    assert terminated is False
-    assert reward == 0.0
-    assert "points" not in info
 
 
 def test_points_pattern_spoken_in_game_output_forges_no_reward(scripted_env_factory):

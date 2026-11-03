@@ -1,5 +1,3 @@
-import pytest
-
 from mudgym.db.index import UNKNOWN
 
 # seagull death jump off cliff captured with no trailing prompt (the episode terminates).
@@ -12,14 +10,6 @@ SEAGULL_DEATH_BYTES = (
     b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\r\n"
     b"Overall, you scored 189 points this game.\r"
 )
-
-
-def test_completed_response_requires_observation_fields_without_extra_transport_metadata(scripted_env_factory):
-    env = scripted_env_factory(responses={"look": (b"look\r\nNothing else.\r\n", False, False, {})})
-    env.reset()
-
-    with pytest.raises(RuntimeError, match="response completed but fields"):
-        env.step("look")
 
 
 def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_factory):

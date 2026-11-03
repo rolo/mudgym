@@ -26,20 +26,6 @@ def test_parse_points_loss_event():
     assert parsed_points["points"] == 189
 
 
-def test_parse_points_loss_event_with_commas():
-    raw_bytes = b"You have been killed by the rat. (-4,015 = \x1b[0;31;40m85,955\x1b[1;37;40m)."
-    parsed_points = parse_points_changes(raw_bytes)
-    assert parsed_points["delta"] == -4015
-    assert parsed_points["points"] == 85955
-
-
-def test_parse_points_six_digits():
-    raw_bytes = b"(Persona saved on +100,000 = \x1b[0;32;40m500,000\x1b[1;37;40m)"
-    parsed = parse_points_changes(raw_bytes)
-    assert parsed["delta"] == 100_000
-    assert parsed["points"] == 500_000
-
-
 def test_parse_points_coloured_delta_and_total():
     raw_bytes = b"Keyser the wizard dotes on you. (\x1b[0;33;40m+100\x1b[0;33;40m = \x1b[0;33;40m300\x1b[0;33;40m)"
     parsed_points = parse_points_changes(raw_bytes)

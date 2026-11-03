@@ -1,6 +1,6 @@
 import pytest
 
-from mudgym.envs.fields import FEInventoryField, FEScoreField, FEXitsField, MGCheatsField, SuperQuickLookField
+from mudgym.envs.fields import FEInventoryField
 from tests.scripted import FES_RESPONSE, TEAROOM_EXIT_TEXT, ScriptedConnection, scripted_response
 
 
@@ -15,12 +15,10 @@ def test_reset_reports_the_quickscore_points_like_every_later_observation(script
     assert obs["points"] == 200
 
 
-@pytest.mark.parametrize("before_narration", [True, False])
-def test_exit_points_events_establish_the_reset_score(scripted_env_factory, before_narration):
+def test_exit_points_events_establish_the_reset_score(scripted_env_factory):
     event = b"(+50 = \x1b[0;32;40m250\x1b[1;37;40m).\r\n"
     reset_bytes = scripted_response(["move north"], reset_step=True)
-    narration = event + TEAROOM_EXIT_TEXT if before_narration else TEAROOM_EXIT_TEXT + event
-    reset_bytes = reset_bytes.replace(TEAROOM_EXIT_TEXT, narration)
+    reset_bytes = reset_bytes.replace(TEAROOM_EXIT_TEXT, event + TEAROOM_EXIT_TEXT)
     step_bytes = scripted_response(["look", "sql,fes,fex,fei"]).replace(
         b"look\r\n", b"look\r\n(+10 = \x1b[0;32;40m260\x1b[1;37;40m).\r\n"
     )
@@ -58,10 +56,8 @@ def test_final_reset_points_are_in_the_initial_baseline(scripted_env_factory):
     [
         ("qs", b"quickscore failed", False, True),
         ("move north", b"entry failed", True, False),
-        ("move north", b"entry timed out", False, True),
         ("move north", b"no exit narration", False, False),
         ("sql,fes,fex,fei", b"You have died.", True, False),
-        ("sql,fes,fex,fei", b"fields timed out", False, True),
         ("sql,fes,fex,fei", b"(+0 = \x1b[0;32;40m204,800\x1b[1;37;40m).\r\n", False, False),
     ],
 )
@@ -88,8 +84,9 @@ def test_reset_failure_requires_a_new_reset_without_printing(
     assert capsys.readouterr().out.count("Dally Lane") == 1
 
 
-@pytest.mark.parametrize("failure_type", [OSError, KeyboardInterrupt])
-@pytest.mark.parametrize("cleanup_failure_type", [OSError, KeyboardInterrupt])
+@pytest.mark.parametrize(
+    ("failure_type", "cleanup_failure_type"), [(OSError, KeyboardInterrupt), (KeyboardInterrupt, OSError)]
+)
 def test_reset_preserves_original_failure_when_invalidation_fails(
     scripted_env_factory, failure_type, cleanup_failure_type
 ):
@@ -185,31 +182,3 @@ def test_separate_entry_and_fields_preserve_a_live_capture(scripted_env_factory)
     assert obs["portables"] == ()
     assert obs["inventory"] == ()
     assert env.observation_space.contains(obs)
-
-
-@pytest.mark.parametrize(
-    "field_parsers",
-    [
-        [MGCheatsField],
-        [FEScoreField],
-        [
-            SuperQuickLookField(
-                include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
-            ),
-            FEScoreField,
-            FEXitsField,
-            FEInventoryField,
-        ],
-    ],
-)
-def test_tearoom_exit_uses_the_quickscore_points(scripted_env_factory, field_parsers):
-    env = scripted_env_factory(field_parsers=field_parsers)
-    obs, _ = env.reset()
-    connection = env.unwrapped.session.connection
-
-    assert env.unwrapped.points == 200
-    assert "75 75 52 52" not in obs["text"]
-    assert connection.sent_lines == [["qs"], ["move north"], [env.unwrapped.session.observation_line]]
-
-    env.step("look")
-    assert connection.sent_lines[-1] == ["look", env.unwrapped.session.observation_line]

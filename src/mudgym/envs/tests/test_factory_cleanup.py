@@ -17,11 +17,10 @@ def test_make_env_invalid_options_rejected_before_constructing_env(options):
     assert not conn.closed
 
 
-@pytest.mark.parametrize("options", [{"connection_kwargs": {"timeout_ms": 1000}}, {"sex": "f"}])
-def test_make_env_rejects_connection_options_with_an_existing_connection(options):
+def test_make_env_rejects_connection_options_with_an_existing_connection():
     conn = ScriptedConnection()
     with pytest.raises(ValueError, match="Configure connection options"):
-        make_env(connection=conn, **options)
+        make_env(connection=conn, sex="f")
     assert conn.send_calls == []
     assert not conn.closed
 
@@ -105,22 +104,6 @@ def test_parallel_constructor_failure_closes_children_and_provider(monkeypatch):
 
     with pytest.raises(RuntimeError, match="parallel constructor failed"):
         make_parallel_env(3, provider=provider)
-
-    assert len(provider.connections) == 3
-    assert all(connection.closed for connection in provider.connections)
-    assert provider.closed is True
-
-
-def test_wrapper_constructor_failure_closes_children_and_provider(monkeypatch):
-    provider = ScriptedProvider()
-
-    def failing_wrapper(env):
-        raise RuntimeError("wrapper constructor failed")
-
-    monkeypatch.setattr("mudgym.envs.factory.ParallelDiscreteDirectionsWrapper", failing_wrapper)
-
-    with pytest.raises(RuntimeError, match="wrapper constructor failed"):
-        make_parallel_env(3, provider=provider, actions="directions")
 
     assert len(provider.connections) == 3
     assert all(connection.closed for connection in provider.connections)

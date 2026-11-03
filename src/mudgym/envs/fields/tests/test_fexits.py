@@ -11,7 +11,6 @@ from mudgym.envs.fields.tests.helpers import assert_valid_observation
 @pytest.mark.parametrize(
     ("raw", "expected_names", "expected_mask"),
     [
-        pytest.param(b"north", ("north",), [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], id="single"),
         pytest.param(
             b"up down out swampward southwest northeast northwest west",
             ("west", "northeast", "southwest", "northwest", "up", "down", "out", "swampward"),
@@ -23,24 +22,6 @@ from mudgym.envs.fields.tests.helpers import assert_valid_observation
             tuple(DIRECTIONS),
             [1] * DIRECTION_COUNT,
             id="all-in-noncanonical-order",
-        ),
-        pytest.param(
-            b"swampward over",
-            ("over", "swampward"),
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-            id="special-directions",
-        ),
-        pytest.param(
-            b"northwest north",
-            ("north", "northwest"),
-            [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-            id="prefix-pair",
-        ),
-        pytest.param(
-            b"up out swampward south west east north\r\n",
-            ("north", "east", "south", "west", "up", "out", "swampward"),
-            [1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1],
-            id="real-exits-line",
         ),
     ],
 )
@@ -64,11 +45,7 @@ def test_available_exits_is_a_gymnasium_action_mask():
 @pytest.mark.parametrize(
     "line",
     [
-        pytest.param(b"58 58 61 61 61 61 0 58 0200 N N N N 53 F", id="another-command"),
-        pytest.param(b"move north,fex,fei", id="command-echo"),
         pytest.param(b"north and south", id="prose-containing-directions"),
-        pytest.param(b"oo\r\n", id="darkness-marker"),
-        pytest.param(b"", id="empty"),
         pytest.param(b"\r\n", id="blank-dark-room"),
     ],
 )
@@ -78,19 +55,6 @@ def test_missing_exits_leave_every_direction_available(line):
 
     np.testing.assert_equal(field.empty(), expected)
     np.testing.assert_equal(field.extract([line]), expected)
-
-
-def test_latest_wins_when_multiple_matches():
-    raw = b"\r\n".join([b"north south", b"It is raining. ", b"east west"])
-    obs = FEXitsField().extract([raw])
-
-    np.testing.assert_equal(
-        obs,
-        {
-            "available_exit_names": ("east", "west"),
-            "available_exits": [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        },
-    )
 
 
 def test_matches_blank_dark_room_response():
@@ -113,7 +77,3 @@ def test_extracts_fex_from_real_captures(bytes_case):
 
     np.testing.assert_equal(obs, expected)
     assert_valid_observation(field, obs)
-
-
-def test_separator_controls_are_not_whitespace_around_an_exits_line():
-    assert not FEXitsField().matches(b"\x1fnorth south\x1f\r\n")

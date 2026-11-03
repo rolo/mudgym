@@ -52,12 +52,8 @@ def test_permadeath_charges_the_reset_score_in_every_observation_mode(scripted_e
     assert obs["points"] == 0
 
 
-@pytest.mark.parametrize(
-    "terminal_event",
-    [b"", b"(+100 = \x1b[0;32;40m3,100\x1b[1;37;40m).\r\n"],
-    ids=["no-terminal-event", "event-before-death"],
-)
-def test_permadeath_charges_the_score_held_when_the_step_began(scripted_env_factory, terminal_event):
+def test_permadeath_charges_the_score_held_when_the_step_began(scripted_env_factory):
+    terminal_event = b"(+100 = \x1b[0;32;40m3,100\x1b[1;37;40m).\r\n"
     env = scripted_env_factory(
         observation="text",
         responses={

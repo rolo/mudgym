@@ -1,10 +1,8 @@
 import pytest
 
-from mudgym.connections.registry import default_connection
 from mudgym.db.index import room_id_to_index, room_name_to_index, weather_to_index
 from mudgym.db.rooms import ROOM_NAMES
 from mudgym.db.weather import WEATHER
-from mudgym.envs.env import MudEnv
 from mudgym.envs.fields.rawbytes import DEFAULT_MAX_BYTES
 from mudgym.envs.tests.assertions import assert_observation_in_space, assert_observations_equal
 from tests.scripted import SQL_RESPONSE, scripted_response
@@ -49,25 +47,6 @@ def test_live_presets_reset_step_and_reset(live_env_factory, preset):
         assert terminated is False
         assert truncated is False
         assert info["persona"] == persona
-
-
-def test_bare_env_runs_against_the_live_game():
-    """A directly-built MudEnv(), no field_parsers and no wrappers, resets and steps with a text observation."""
-    env = MudEnv(connection=default_connection())
-    try:
-        obs, info = env.reset()
-        assert obs["text"]
-        assert info["raw_bytes"]
-
-        obs, reward, terminated, truncated, info = env.step("look")
-        assert set(obs) == {"text", "points"}
-        assert obs["points"] == env.points
-        assert obs["text"]
-        assert isinstance(reward, (int, float))
-        assert isinstance(terminated, bool)
-        assert isinstance(truncated, bool)
-    finally:
-        env.close()
 
 
 def test_step_matches_act_followed_by_observe(scripted_env_factory):

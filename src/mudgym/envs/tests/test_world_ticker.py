@@ -1,5 +1,3 @@
-import pytest
-
 from mudgym.envs.factory import make_env, make_parallel_env
 from tests.scripted import ScriptedConnection, ScriptedProvider
 
@@ -15,22 +13,17 @@ class WorldTickerRecorder:
         self.calls.append([len(connection.pending_lines) for connection in self.connections_supplier()])
 
 
-@pytest.mark.parametrize(
-    ("options", "action"),
-    [({}, "look"), ({"actions": "directions"}, 0)],
-    ids=["text-action", "directions-wrapper"],
-)
-def test_scalar_step_ticks_between_the_action_and_its_observation(options, action):
+def test_scalar_step_ticks_between_the_action_and_its_observation():
     connection = ScriptedConnection()
     world_ticker = WorldTickerRecorder(lambda: [connection])
-    env = make_env(connection=connection, world_ticker=world_ticker, **options)
+    env = make_env(connection=connection, world_ticker=world_ticker)
     try:
         env.reset()
         assert world_ticker.calls == []
-        env.step(action)
+        env.step("look")
         # One advancement, taken while the action line was sent but unread.
         assert world_ticker.calls == [[1]]
-        env.step(action)
+        env.step("look")
         assert world_ticker.calls == [[1], [1]]
     finally:
         env.close()

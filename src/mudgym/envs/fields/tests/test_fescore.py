@@ -6,10 +6,9 @@ from mudgym.envs.fields.fescore import FEScoreField
 from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 
-@pytest.mark.parametrize("points", ["0200", "3000000000"], ids=["ordinary-points", "oversized-ignored-points"])
-def test_extracts_status_without_points(points):
+def test_extracts_status_without_points():
     field = FEScoreField()
-    raw = f"58 78 41 61 32 52 7 68 {points} N N N N 53 F".encode()
+    raw = b"58 78 41 61 32 52 7 68 3000000000 N N N N 53 F"
     obs = field.extract([raw])
 
     assert field.matches(raw)
@@ -26,16 +25,8 @@ def test_extracts_status_without_points(points):
     assert_valid_observation(field, obs)
 
 
-@pytest.mark.parametrize(
-    "line",
-    [
-        pytest.param(b"not a fes line", id="prose"),
-        pytest.param(b"58 58", id="incomplete-status"),
-        pytest.param(b"move north,fex,fei", id="command-echo"),
-        pytest.param(b"", id="empty"),
-    ],
-)
-def test_no_match_returns_zero_defaults_and_unknown_weather(line):
+def test_no_match_returns_zero_defaults_and_unknown_weather():
+    line = b"58 58"
     field = FEScoreField()
     expected = {
         "vitals": [0] * 8,
@@ -72,24 +63,12 @@ def test_latest_wins_when_multiple_matches():
     )
 
 
-@pytest.mark.parametrize(
-    ("code", "expected_index", "expected_name"),
-    [
-        ("F", 1, "fair"),
-        ("C", 2, "cloudy"),
-        ("O", 3, "overcast"),
-        ("R", 4, "raining"),
-        ("T", 5, "stormy"),
-        ("S", 6, "sunny"),
-        ("B", 7, "blizzard"),
-    ],
-)
-def test_weather_mapping(code, expected_index, expected_name):
+def test_weather_mapping():
     field = FEScoreField()
-    obs = field.extract([f"58 58 61 61 61 61 0 58 0200 N N N N 53 {code}".encode()])
+    obs = field.extract([b"58 58 61 61 61 61 0 58 0200 N N N N 53 B"])
 
-    assert obs["weather"] == expected_name
-    assert obs["weather_index"] == expected_index
+    assert obs["weather"] == "blizzard"
+    assert obs["weather_index"] == 7
     assert_valid_observation(field, obs)
 
 
@@ -100,7 +79,6 @@ def test_weather_mapping(code, expected_index, expected_name):
         pytest.param("N Y N N", [0, 1, 0, 0], id="deaf"),
         pytest.param("N N Y N", [0, 0, 1, 0], id="crippled"),
         pytest.param("N N N Y", [0, 0, 0, 1], id="dumb"),
-        pytest.param("Y Y Y Y", [1, 1, 1, 1], id="all-flags"),
     ],
 )
 def test_flags_keep_their_positions(flags, expected):

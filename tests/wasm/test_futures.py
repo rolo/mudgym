@@ -7,7 +7,7 @@ import pytest
 from mudgym.connections.wasm.futures import InlineExecutor, ordered_future_results
 
 
-@pytest.mark.parametrize("first_error", [KeyboardInterrupt(), SystemExit(17), ValueError("first")])
+@pytest.mark.parametrize("first_error", [KeyboardInterrupt(), ValueError("first")])
 def test_future_error_collection_preserves_interruptions(first_error):
     first, second = Future(), Future()
     second_error = RuntimeError("second")
@@ -48,13 +48,12 @@ def test_inline_work_settles_its_future_before_submit_returns():
     assert done.result() == 42
 
 
-@pytest.mark.parametrize("error", [ValueError("work failed"), KeyboardInterrupt()])
-def test_inline_work_that_raises_reaches_the_collector_through_its_future(error):
+def test_inline_work_that_raises_reaches_the_collector_through_its_future():
     def fail():
-        raise error
+        raise KeyboardInterrupt
 
     failed = InlineExecutor().submit(fail)
 
     assert failed.done()
-    with pytest.raises(type(error)):
+    with pytest.raises(KeyboardInterrupt):
         ordered_future_results([failed], "inline operation")

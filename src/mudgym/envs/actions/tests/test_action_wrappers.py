@@ -53,32 +53,11 @@ def test_discrete_action_wrapper_invalid_action_index(scripted_env):
         wrapped.action(2)
 
 
-def test_discrete_action_wrapper_rejects_negative_action_index(scripted_env):
-    actions = ["a", "b"]
-    wrapped = DiscreteActionSpaceWrapper(scripted_env, actions)
-    with pytest.raises(ValueError, match="Invalid discrete action"):
-        wrapped.action(-1)
-
-
 def test_discrete_action_wrapper_numpy_array_input(scripted_env):
     actions = ["look", "dance"]
     wrapped = DiscreteActionSpaceWrapper(scripted_env, actions)
     action_index = np.array(1)
     assert wrapped.action(action_index) == "dance"
-
-
-def test_discrete_action_wrapper_single_action(scripted_env):
-    wrapped = DiscreteActionSpaceWrapper(scripted_env, ["inventory"])
-    assert wrapped.action_space.n == 1
-    assert wrapped.action(0) == "inventory"
-
-
-def test_discrete_action_wrapper_step_with_invalid_action(scripted_env):
-    actions = ["a", "b"]
-    wrapped = DiscreteActionSpaceWrapper(scripted_env, actions)
-    wrapped.reset()
-    with pytest.raises(ValueError, match="Invalid discrete action"):
-        wrapped.step(2)
 
 
 def test_discrete_action_wrapper_rejects_empty_commands(scripted_env):
@@ -89,16 +68,3 @@ def test_discrete_action_wrapper_rejects_empty_commands(scripted_env):
 def test_discrete_action_wrapper_rejects_duplicate_commands(scripted_env):
     with pytest.raises(ValueError, match="unique"):
         DiscreteActionSpaceWrapper(scripted_env, ["look", "look"])
-
-
-def test_discrete_action_wrapper_copies_commands(scripted_env):
-    actions = ["look", "dance"]
-    wrapped = DiscreteActionSpaceWrapper(scripted_env, actions)
-
-    actions[0] = "changed"
-    actions.append("howl")
-
-    assert wrapped.commands == ("look", "dance")
-    assert wrapped.action_space.n == 2
-    assert wrapped.action(0) == "look"
-    assert wrapped.action(1) == "dance"

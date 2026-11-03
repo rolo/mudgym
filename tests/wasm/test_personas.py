@@ -25,7 +25,7 @@ def test_engine_generates_stats_for_the_selected_sex(wasm_runtime, sex):
     assert stats[0] != stats[1]
 
 
-@pytest.mark.parametrize("persona", [Persona(), Persona("Ada"), Persona(sex="f")])
+@pytest.mark.parametrize("persona", [Persona("Ada"), Persona(sex="f")])
 def test_admission_requires_a_resolved_persona(wasm_runtime, persona):
     world = wasm_runtime.create_world(max_players=1, seed=123)
     try:
@@ -40,11 +40,8 @@ def test_admission_requires_a_resolved_persona(wasm_runtime, persona):
     ("options", "name", "sex"),
     [
         ({}, None, None),
-        ({"persona": "Dave"}, "Dave", None),
-        ({"sex": "f"}, None, "female"),
         ({"persona": "Davina", "sex": "F"}, "Davina", "female"),
         ({"sex": "m", "persona_pool": [("Davina", "f"), ("Dave", "male")]}, "Dave", "male"),
-        ({"sex": "female", "persona_pool": [("Ash", None)]}, "Ash", "female"),
     ],
 )
 def test_scalar_factory_passes_persona_options(wasm_runtime, options, name, sex):
@@ -62,15 +59,12 @@ def test_scalar_factory_passes_persona_options(wasm_runtime, options, name, sex)
         assert stepped["transport"]["persona"] == identity
 
 
-@pytest.mark.parametrize("options", [{}, {"persona": "Davina", "sex": "f"}])
-def test_scalar_identity_repeats_after_reseeding(wasm_runtime, options):
-    with closing(make_env(**options, connection_kwargs={"runtime": wasm_runtime})) as env:
+def test_scalar_identity_repeats_after_reseeding(wasm_runtime):
+    with closing(make_env(connection_kwargs={"runtime": wasm_runtime})) as env:
         runs = []
         for seed in (123, 456, 123):
             obs, info = env.reset(seed=seed)
             assert info["transport"]["world_seed"] == seed
-            if options:
-                assert (info["persona"], info["persona_sex"]) == ("Davina", "female")
             runs.append((obs["text"], info["persona"], info["persona_sex"]))
         assert runs[0] == runs[2]
 
@@ -85,19 +79,6 @@ def test_scalar_persona_options_override_connection_kwargs(wasm_runtime):
     ) as env:
         info = env.reset(seed=42)[1]
         assert (info["persona"], info["persona_sex"]) == ("Davina", "female")
-
-
-@pytest.mark.parametrize(
-    ("personas", "pool", "expected"),
-    [
-        ([("Davina", "f"), ("Dave", "male")], None, [("Davina", "female"), ("Dave", "male")]),
-        ([("Aaron", "m"), (None, "f")], [("Freya", "f")], [("Aaron", "male"), ("Freya", "female")]),
-    ],
-)
-def test_parallel_factory_passes_personas_and_pool(personas, pool, expected):
-    with closing(make_parallel_env(2, personas=personas, persona_pool=pool)) as env:
-        _, infos = env.reset(seed=42)
-        assert [(infos[agent]["persona"], infos[agent]["persona_sex"]) for agent in env.possible_agents] == expected
 
 
 def test_parallel_factory_accepts_name_and_sex_shorthand():

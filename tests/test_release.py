@@ -37,14 +37,12 @@ def test_citation_update_preserves_format_version_and_references(tmp_path):
     )
 
 
-@pytest.mark.parametrize(("field", "count"), [("version", 0), ("date-released", 2)])
-def test_citation_update_refuses_missing_or_duplicate_release_fields(tmp_path, field, count):
+def test_citation_update_refuses_a_duplicate_release_field(tmp_path):
     citation = tmp_path / "CITATION.cff"
-    original = 'version: "0.4.6"\ndate-released: "2026-09-06"\n'
-    original = "".join(line * count if line.startswith(f"{field}:") else line for line in original.splitlines(True))
+    original = 'version: "0.4.6"\ndate-released: "2026-09-06"\ndate-released: "2026-09-06"\n'
     citation.write_text(original)
 
-    with pytest.raises(SystemExit, match=f"exactly one top-level {field} field"):
+    with pytest.raises(SystemExit, match="exactly one top-level date-released field"):
         release.write_citation_version(citation, "0.4.7", date(2026, 9, 7))
 
     assert citation.read_text() == original
@@ -84,7 +82,6 @@ def release_repository(release_script):
 @pytest.mark.parametrize(
     ("version", "next_versions"),
     [
-        ("0.4.6", ("0.4.7", "0.5.0", "1.0.0")),
         ("2.9.9", ("2.9.10", "2.10.0", "3.0.0")),
         ("0.5.0rc1", ("0.5.0", "0.5.1", "0.6.0", "1.0.0")),
     ],

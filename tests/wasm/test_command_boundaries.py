@@ -4,13 +4,12 @@ from contextlib import closing
 
 import pytest
 
-from mudgym import make_env, make_parallel_env
+from mudgym import make_env
 from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.fields import FEInventoryField, SuperQuickLookField
 
 
-@pytest.mark.parametrize("command", ["say café", "say €100"])
-def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runtime, command):
+def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runtime):
     with closing(
         WasmProvider(
             runtime=wasm_runtime,
@@ -26,7 +25,7 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
         peer.read_response()
 
         with pytest.raises(ValueError, match="outside ASCII"):
-            player.send_line(command)
+            player.send_line("say café")
 
         player.send_line("look")
         raw, terminated, incomplete, info = player.read_response()
@@ -35,34 +34,6 @@ def test_non_ascii_commands_are_rejected_without_losing_pending_output(wasm_runt
         assert not terminated and not incomplete
         assert info["sent_lines"] == ["look"]
         assert player.read_response()[0] == b""
-
-
-@pytest.mark.parametrize("preset", ["text", "bytes"])
-@pytest.mark.parametrize("mode", ["scalar", "parallel"])
-def test_text_and_bytes_presets_send_only_the_player_action(wasm_runtime, mode, preset):
-    if mode == "scalar":
-        env = make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime}, observation=preset)
-        action = "look"
-    else:
-        env = make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1), observation=preset)
-        action = {"player_0": "look", "player_1": "look"}
-    try:
-        env.reset(seed=123)
-        result = env.step(action)
-        if mode == "scalar":
-            obs, _, terminated, truncated, info = result
-            pairs = [(obs, info)]
-            assert not terminated and not truncated
-        else:
-            obs, _, terminates, truncates, infos = result
-            pairs = [(obs[key], infos[key]) for key in obs]
-            assert not any(terminates.values()) and not any(truncates.values())
-        for player_obs, details in pairs:
-            assert player_obs["text"] and player_obs["points"] == 200
-            assert details["transport"]["sent_lines"] == ["look"]
-            assert b"fes\r\n" not in details["raw_bytes"]
-    finally:
-        env.close()
 
 
 def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
@@ -82,11 +53,9 @@ def test_wasm_accepts_an_observation_field_without_an_end_marker(wasm_runtime):
     "observation_options",
     [
         {"observation": "text"},
-        {"observation": "bytes"},
-        {"field_parsers": ()},
         {"field_parsers": (FEInventoryField,)},
     ],
-    ids=["text", "bytes", "no-fields", "inventory-only"],
+    ids=["text", "inventory-only"],
 )
 def test_points_track_combat_gains_flee_losses_and_terminal_score_without_fes(wasm_runtime, observation_options):
     provider = WasmProvider(

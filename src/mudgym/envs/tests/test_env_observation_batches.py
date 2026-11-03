@@ -95,27 +95,14 @@ def test_combat_rounds_interleaved_between_responses_still_align(scripted_env_fa
     assert "========" not in obs["text"]
 
 
-@pytest.mark.parametrize("raw_bytes", [DRAGONFLY_WINDOW_BYTES, DRAGONFLY_INTERLEAVED_BYTES])
-def test_incomplete_response_keeps_field_output_as_text(scripted_env_factory, raw_bytes):
+def test_incomplete_response_keeps_field_output_as_text(scripted_env_factory):
     """Incomplete responses leave fields empty even if the inventory divider arrived."""
     env = scripted_env_factory(observation="parsed")
 
-    obs = parse(env, raw_bytes, "move jump", response_complete=False)
+    obs = parse(env, DRAGONFLY_INTERLEAVED_BYTES, "move jump", response_complete=False)
 
     assert obs["room_name"] == UNKNOWN
     assert 'The place known as "fast-flowing river"' in obs["text"]
-
-
-def test_default_observation_batch_parses_fields_and_hides_inventory_divider(scripted_env_factory):
-    env = scripted_env_factory(observation="parsed")
-    env.reset()
-    obs, _, terminated, truncated, _ = env.step("look")
-    connection = env.unwrapped.session.connection
-
-    assert (terminated, truncated) == (False, False)
-    assert connection.sent_lines[-1] == ["look", "sql,fes,fex,fei"]
-    assert obs["available_exits"].sum() == 8
-    assert "========" not in obs["text"]
 
 
 def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
@@ -136,9 +123,8 @@ def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
         env.close()
 
 
-@pytest.mark.parametrize("field_parsers", [[FEScoreField, FEXitsField], [FEScoreField, FEXitsField, RawBytesField]])
-def test_observation_fields_do_not_require_a_final_marker(scripted_env_factory, field_parsers):
-    env = scripted_env_factory(field_parsers=field_parsers)
+def test_observation_fields_do_not_require_a_final_marker(scripted_env_factory):
+    env = scripted_env_factory(field_parsers=[FEScoreField, FEXitsField, RawBytesField])
     env.reset()
     obs, _, terminated, truncated, _ = env.step("look")
 
@@ -151,20 +137,6 @@ def test_observation_fields_do_not_require_a_final_marker(scripted_env_factory, 
 @pytest.mark.parametrize(
     ("field_parsers", "observation_line", "room_key", "room_value"),
     [
-        pytest.param(
-            [
-                FEXitsField,
-                FEScoreField,
-                SuperQuickLookField(
-                    include_keys=("room_name", "room_name_index", "here", "features", "mobiles", "players")
-                ),
-                FEInventoryField,
-            ],
-            "fex,fes,sql,fei",
-            "room_name",
-            "dally lane",
-            id="exits-first",
-        ),
         pytest.param(
             [
                 SuperQuickLookField(

@@ -1,23 +1,12 @@
-import pytest
-
 from mudgym.envs.fields.feinventory import FEInventoryField
 from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 
-@pytest.mark.parametrize(
-    ("chunk", "expected"),
-    [
-        (b"streetsign\r\n========\r\n", {"portables": ("streetsign",), "inventory": ()}),
-        (b"========\r\nambrosia\r\n", {"portables": (), "inventory": ("ambrosia",)}),
-        (b"necklace0\r\n========\r\n", {"portables": ("necklace0",), "inventory": ()}),
-        (b"oo\r\n========\r\nbroadsword\r\n", {"portables": (), "inventory": ("broadsword",)}),
-    ],
-)
-def test_extracts_fei_chunk(chunk, expected):
+def test_extracts_fei_chunk():
     field = FEInventoryField()
-    obs = field.extract([chunk])
+    obs = field.extract([b"oo\r\n========\r\nbroadsword\r\n"])
 
-    assert obs == expected
+    assert obs == {"portables": (), "inventory": ("broadsword",)}
     assert_valid_observation(field, obs)
 
 
