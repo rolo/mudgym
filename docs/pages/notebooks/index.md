@@ -1,7 +1,5 @@
 # Notebooks
 
-These run in your browser with JupyterLite, with nothing to install. Each one opens in a new tab.
-
 ## Quickstart
 
 Create an env and send an action.
@@ -12,7 +10,7 @@ Create an env and send an action.
 
 Train a deep Q network to reach the Woodsman's Hut.
 
-<a href="../lite/notebooks/index.html?path=goal_room_dqn.ipynb" target="_blank" rel="noopener">Open the Goal room DQN notebook</a> or <a href="../lite/files/goal_room_dqn.ipynb" download>download it</a>. It imports <a href="../lite/files/display.py" download>display.py</a> and <a href="../lite/files/numpy_torch.py" download>numpy_torch.py</a>, so save those in the same folder.
+<a href="../lite/notebooks/index.html?path=goal_room_dqn.ipynb" target="_blank" rel="noopener">Open the Goal room DQN notebook</a> or <a href="../lite/files/goal_room_dqn.ipynb" download>download it</a>.
 
 ## Run locally
 
