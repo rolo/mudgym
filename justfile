@@ -86,4 +86,4 @@ docs-build:
 
 # run every docs notebook in Chromium from the built site and fail on any cell error, as the docs workflow does
 docs-check: docs-build
-    uv run --with playwright==1.58.0 python docs/check_lite.py
+    uv run --with playwright==1.64.1 python docs/check_lite.py
