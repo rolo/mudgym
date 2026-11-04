@@ -34,7 +34,7 @@ env.close()
 
 ## Docs
 
-See the [docs](https://rolo.github.io/mudgym/) for more examples.
+See the [docs](https://rolo.github.io/mudgym/) for more examples, or open the [goal room DQN notebook](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=goal_room_dqn.ipynb), which trains an agent in your browser with nothing to install.
 
 ## Citing MudGym
 

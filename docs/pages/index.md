@@ -2,7 +2,7 @@
 
 A reinforcement learning environment for MUD2.
 
-The game engine is packaged as WebAssembly (WASM). Native Python runs it using `wasmtime`, while the [JupyterLite notebook](lite/notebooks/index.html) runs in your browser using Pyodide with no install required.
+The game engine is packaged as WebAssembly (WASM). Native Python runs it using `wasmtime`, while the [JupyterLite notebook](lite/notebooks/index.html?path=goal_room_dqn.ipynb) runs in your browser using Pyodide with no install required.
 
 ## Local Setup
 
