@@ -2,7 +2,7 @@
 
 A reinforcement learning environment for MUD2.
 
-The game engine is packaged as WASM. Native Python runs it using `wasmtime`, or you can run it in a [JupyterLite notebook in your browser](lite/notebooks/index.html) using `pyodide` and `WebAssembly`. This needs Chrome 137, Firefox 131, Safari 18.4 or later.
+The game engine is packaged as WebAssembly (WASM). Native Python runs it using `wasmtime`, while the [JupyterLite notebook](lite/notebooks/index.html) runs in your browser using Pyodide with no install required.
 
 ## Local Setup
 

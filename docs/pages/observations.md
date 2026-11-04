@@ -38,7 +38,7 @@ from mudgym.notebooks import show_ansi
 print(show_ansi(Path("docs/recordings/observations-parsed.ansi").read_bytes()).data)
 ```
 
-`available_exit_names` names the set bits of `available_exits`. `over` and `swampward` are the game's `jump` and `swamp`.
+`available_exit_names` lists the directions available according to the `exits` command.
 
 `vitals` is `[stamina, max_stamina, effective_strength, strength, effective_dexterity, dexterity, magic, max_magic]`, and `flags` is `[blind, deaf, crippled, dumb]`.
 

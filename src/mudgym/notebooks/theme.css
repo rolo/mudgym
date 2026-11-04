@@ -1,6 +1,3 @@
-/* MudGym's design tokens: the one place each colour, font, radius and shadow is
- * set. The docs load this file, and mudgym.notebooks.style reads it for the
- * fallbacks its inline styles carry into notebooks that never load it. */
 :root {
   --notebook-primary: #18352f;
   --notebook-secondary: #244c44;
