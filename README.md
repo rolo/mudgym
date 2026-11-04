@@ -2,23 +2,17 @@
 
 A Gymnasium reinforcement learning environment for MUD2. One of the first online multiplayer text adventure games.
 
-## Status
+Run in your browser:
+- [Quickstart](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=quickstart.ipynb).
+- [Goal room DQN](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=goal_room_dqn.ipynb).
 
-MudGym is a work in progress and very much under active development.
-
-I've been using most of what's in here myself for a while, but the process of putting it out for wider use, and seeing how it gets used for real, means I'm still refining and settling some of the interfaces and assumptions.
-
-So for now, be prepared for interfaces, APIs, specs and defaults to change, sometimes in breaking ways. If you're using MudGym, feedback and real-world use cases are very welcome.
-
-## Setup 
+## Local Setup 
 
 Install MudGym from PyPI:
 
 ```bash
 uv add mudgym
 ```
-
-By default, MudGym now runs the MUD2 game engine via WASM, which is installed as a dependency.
 
 ## Quickstart
 
@@ -34,13 +28,22 @@ env.close()
 
 ## Docs
 
-See the [docs](https://rolo.github.io/mudgym/) for more examples, or open the [goal room DQN notebook](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=goal_room_dqn.ipynb), which trains an agent in your browser with nothing to install.
+See the [docs](https://rolo.github.io/mudgym/).
 
-## Citing MudGym
+## Citation
 
-If you use MudGym in your research, please cite it using the metadata in [`CITATION.cff`](./CITATION.cff).
+```
+@misc{Mawlabaux2026MudGym,
+	author = {Mawlabaux, Rolo},
+	year = {2026},
+	month = {nov 4},
+	title = {MudGym},
+	url = {https://rolo.github.io/mudgym/},
+	howpublished = {https://rolo.github.io/mudgym/},
+}
+```
 
-Use **Cite this repository** in the GitHub sidebar to copy a citation in APA or BibTeX format. Please cite the version you used.
+Or use the GitHub sidebar link.
 
 ## License
 
