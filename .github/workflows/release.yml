@@ -61,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.13', '3.14']
+        python-version: ['3.13', '3.14', '3.15']
     steps:
       # The checkout supplies the smoke script. Isolated Python imports the installed wheel.
       - uses: actions/checkout@v5
