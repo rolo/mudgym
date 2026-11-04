@@ -14,14 +14,14 @@ def test_ansi_escapes_pass_through():
 
 
 def test_high_bytes_are_leaked_protocol_not_text():
-    # eg the fecode marker bytes \x9b\xff; decoding them as text would mask the leak
+    # eg the fecode marker bytes \x9b\xff, which decoding as text would mask
     with pytest.raises(ValueError, match="at byte 5"):
         decode_text_bytes(b"leak \x9b\xff here")
 
 
 def test_non_ascii_commands_fail_before_the_wire():
-    # the game transliterates high bytes rather than echoing them, so the exact-echo anchor would never match; fail
-    # clearly before sending instead
+    # the game transliterates high bytes rather than echoing them, so the exact-echo anchor would never match. Fail
+    # clearly before sending instead.
     with pytest.raises(ValueError, match="outside ASCII"):
         encode_command_bytes("say caf\xe9")
     with pytest.raises(ValueError, match="outside ASCII"):

@@ -61,7 +61,7 @@ def canonical_version(requested_version: str) -> str:
 def refuse_unless_on_a_clean_release_branch() -> None:
     branch = read(["git", "branch", "--show-current"])
     if branch != RELEASE_BRANCH:
-        raise SystemExit(f"Releases must start on {RELEASE_BRANCH}; currently on {branch or 'a detached HEAD'}.")
+        raise SystemExit(f"Releases must start on {RELEASE_BRANCH}, not {branch or 'a detached HEAD'}.")
 
     changes = read(["git", "status", "--porcelain"])
     if changes:
@@ -113,7 +113,7 @@ def write_version(version: str) -> None:
     changed_files = read(["git", "diff", "--name-only"]).split()
     if set(changed_files) != set(VERSIONED_FILES):
         listing = "\n".join(f"  {path}" for path in changed_files)
-        raise SystemExit(f"Versioning should change exactly {' '.join(VERSIONED_FILES)}; got:\n{listing}")
+        raise SystemExit(f"Versioning should change exactly {' '.join(VERSIONED_FILES)}, got:\n{listing}")
     run(["git", "diff", "--check"])
 
 
@@ -131,7 +131,7 @@ def push_atomically(tag: str) -> None:
     """
     push = subprocess.run(["git", "push", "--atomic", "origin", RELEASE_BRANCH, tag], cwd=REPOSITORY_ROOT, check=False)
     if push.returncode:
-        raise SystemExit(f"Nothing was pushed; the release commit and {tag} remain local for inspection.")
+        raise SystemExit(f"Nothing was pushed. The release commit and {tag} remain local for inspection.")
 
 
 def refuse_if_published(project: str, version: str, *, index_url: str = "https://pypi.org/pypi") -> None:

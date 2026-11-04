@@ -31,7 +31,7 @@ class LearningCurves:
         self.baseline_successes = baseline_successes
         self.eval_episodes = eval_episodes
         self.figure, self.axes = plt.subplots(1, 3, figsize=(15, 3), constrained_layout=True)
-        # closed so the cell doesn't show it again when it finishes, the handle shows it instead
+        # closed so the cell doesn't show it again when it finishes
         plt.close(self.figure)
         self.handle = display(HTML(""), display_id=True)
         # just the untrained check until the first one comes in

@@ -139,7 +139,7 @@ class WasmConnection(MudConnection):
 
     def _require_session(self) -> WasmSession:
         if self._session is None:
-            raise RuntimeError("WASM connection has no live session; call reset() first")
+            raise RuntimeError("WASM connection has no live session, call reset() first.")
         return self._session
 
     def _execute_line(self, command: str) -> WasmResponse:
@@ -193,7 +193,7 @@ class WasmConnection(MudConnection):
         if not self._started:
             raise RuntimeError("Connection has not been reset, call reset() first.")
         if self._invalidated:
-            raise ConnectionClosedError("WASM connection was invalidated; call reset() before sending")
+            raise ConnectionClosedError("WASM connection was invalidated, call reset() before sending.")
         if self._pending_responses:
             previous = self._pending_responses[-1]
             if previous.terminated or previous.incomplete:

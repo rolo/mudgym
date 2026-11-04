@@ -23,7 +23,7 @@ class DiscreteActions:
 
     def command(self, index):
         if not self.space.contains(index):
-            raise ValueError(f"Invalid discrete action {index!r}; expected {self.space}.")
+            raise ValueError(f"Invalid discrete action {index!r}, expected {self.space}.")
         return self.commands[index]
 
 

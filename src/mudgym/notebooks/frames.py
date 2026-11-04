@@ -194,7 +194,7 @@ def frame_html(inner_html: str, *, collapse: bool, lines: int | None = None) -> 
 def show_ansi(value: Any, *, scroll: bool = True) -> HTML:
     """Render ANSI text or bytes in the game-output frame.
 
-    Long output collapses to about a screen behind a ``show more`` toggle; ``scroll=False`` renders the frame at its
+    Long output collapses to about a screen behind a ``show more`` toggle. ``scroll=False`` renders the frame at its
     full height instead.
     """
     text = display_text(value)
@@ -279,7 +279,7 @@ def accordion_item_html(value: Any) -> str:
     module_root = type(value).__module__.split(".")[0]
     if module_root == "marimo":
         return str(value)
-    raise TypeError(f"Cannot render {type(value).__name__} in a game accordion; pass HTML or a marimo object.")
+    raise TypeError(f"Cannot render {type(value).__name__} in a game accordion. Pass HTML or a marimo object.")
 
 
 def show_frames(frames: Mapping[str, Any], *, label: str = "", selected: int = -1) -> HTML:

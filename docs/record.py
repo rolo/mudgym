@@ -47,7 +47,7 @@ def discover_examples() -> dict[str, Callable]:
         name = path.stem.replace("_", "-")
         if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", name):
             raise SystemExit(
-                f"{path.name} yields recording name {name!r}; example file stems must use only "
+                f"{path.name} yields recording name {name!r}. Example file stems must use only "
                 f"lowercase letters, digits and underscores."
             )
         spec = importlib.util.spec_from_file_location(f"docs_code_{path.stem}", path)
@@ -60,7 +60,7 @@ def discover_examples() -> dict[str, Callable]:
     for name in examples:
         clashes = [other for other in examples if other != name and other.startswith(f"{name}-")]
         if clashes:
-            raise SystemExit(f"Example name {name!r} is a dash-prefix of {clashes}; rename one of them.")
+            raise SystemExit(f"Example name {name!r} is a dash-prefix of {clashes}, rename one of them.")
     return examples
 
 
@@ -112,8 +112,8 @@ class FragmentWriters:
     def validated_fragment_name(self, name: str) -> str:
         if name != self.example_name and not name.startswith(f"{self.example_name}-"):
             raise SystemExit(
-                f"Fragment {name!r} does not belong to example {self.example_name!r}; "
-                f"name it {self.example_name!r} or prefix it with '{self.example_name}-'."
+                f"Fragment {name!r} does not belong to example {self.example_name!r}. "
+                f"Name it {self.example_name!r} or prefix it with '{self.example_name}-'."
             )
         return name
 
@@ -216,7 +216,7 @@ def record(name: str, version: str) -> None:
 
 def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
     if not capture_paths(name):
-        raise SystemExit(f"No connection capture for {name!r}; run `just docs-record {name}` first.")
+        raise SystemExit(f"No connection capture for {name!r}, run `just docs-record {name}` first.")
 
     # Clear the old fragments first, so ones the example stopped writing don't hang about.
     for stale in fragment_paths(name, fragments_dir):
@@ -252,7 +252,7 @@ def derive(name: str, fragments_dir: Path = RECORDINGS_DIR) -> None:
 def refresh_example(name: str) -> None:
     """Derive an example's fragments, recording it first if it has no recording yet or its commands changed."""
     if not capture_paths(name):
-        print(f"{name}: no capture yet; recording against the live game")
+        print(f"{name}: no capture yet, recording against the live game")
         record(name, describe_repository())
         derive(name)
         return
@@ -260,7 +260,7 @@ def refresh_example(name: str) -> None:
         derive(name)
     except ReplayMismatchError as error:
         print(f"{name}: {error}")
-        print(f"{name}: commands changed; re-recording against the live game")
+        print(f"{name}: commands changed, re-recording against the live game")
         record(name, describe_repository())
         derive(name)
 
@@ -283,12 +283,12 @@ def watch(poll_seconds: float = 0.5) -> None:
             time.sleep(poll_seconds)
             current = snapshot_mtimes()
             for path in sorted(set(seen) - set(current)):
-                print(f"{path.name} was removed; its captures and fragments remain until deleted")
+                print(f"{path.name} was removed, its captures and fragments remain until deleted")
             changed = [path for path, mtime in current.items() if seen.get(path) != mtime]
             seen = current
             for path in changed:
                 name = path.stem.replace("_", "-")
-                print(f"{path.name} changed; refreshing {name}")
+                print(f"{path.name} changed, refreshing {name}")
                 try:
                     EXAMPLES = discover_examples()
                     refresh_example(name)
@@ -300,7 +300,7 @@ def watch(poll_seconds: float = 0.5) -> None:
 
 def main(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(description="Capture and derive the documentation recordings.")
-    parser.add_argument("names", nargs="*", help="Recording names; defaults to all of them.")
+    parser.add_argument("names", nargs="*", help="Recording names, all of them by default.")
     parser.add_argument(
         "--derive-only",
         action="store_true",
@@ -315,7 +315,7 @@ def main(argv: list[str]) -> None:
 
     if args.watch:
         if args.names or args.derive_only:
-            parser.error("--watch watches every example and decides record vs derive itself; use it alone.")
+            parser.error("--watch watches every example and decides record vs derive itself, so use it alone.")
         RECORDINGS_DIR.mkdir(exist_ok=True)
         watch()
         return

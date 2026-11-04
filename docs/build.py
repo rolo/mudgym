@@ -39,7 +39,7 @@ def main() -> None:
     offending = pages_with_rendered_errors(pages)
     if offending:
         listing = ", ".join(str(path.relative_to(REPOSITORY_ROOT)) for path in offending)
-        raise SystemExit(f"A code block failed during the build; its traceback is rendered into: {listing}")
+        raise SystemExit(f"A code block failed during the build. Its traceback is rendered into: {listing}")
     print(f"No rendered code block errors in {len(pages)} pages.")
 
 

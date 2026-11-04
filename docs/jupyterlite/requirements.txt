@@ -1,3 +1,1 @@
-# What the docs notebooks import in the browser. docs/jupyterlite.py resolves mudgym to the wheel it builds from this
-# checkout and the engine to the version uv.lock names.
 mudgym

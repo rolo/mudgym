@@ -5,7 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 permissions:
-  contents: read # checkout only; nothing here writes back to the repo
+  contents: read # checkout only, nothing here writes back to the repo
 env:
   LOG_LEVEL: "DEBUG"
 concurrency:
@@ -59,7 +59,7 @@ jobs:
           token: ${{ secrets.GH_PAT || github.token }}
       - name: Run tests (with coverage)
         run: just test
-      # Only upload cover on GitHub
+      # Only upload coverage on GitHub.
       - name: Upload coverage data
         if: github.server_url == 'https://github.com'
         uses: actions/upload-artifact@v7

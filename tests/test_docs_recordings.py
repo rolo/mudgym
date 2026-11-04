@@ -16,7 +16,7 @@ spec.loader.exec_module(record_docs)
 def test_capture_replays_and_derives_fragments(name, tmp_path):
     assert record_docs.capture_paths(name), (
         f"No committed connection capture for {name!r}. Captures are the source of truth for the docs "
-        f"fragments; restore the deleted file or run `just docs-record {name}` and commit it."
+        f"fragments. Restore the deleted file or run `just docs-record {name}` and commit it."
     )
 
     record_docs.derive(name, fragments_dir=tmp_path)

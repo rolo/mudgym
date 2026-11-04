@@ -10,7 +10,7 @@ PROMPT = b"\r\n*"
 
 # The canned world is Dally Lane (room groad3), quoted from real captures: the room, fes, fex, and divider shapes are in
 # src/mudgym/envs/fields/tests/payloads.py, and the necklace visit with its sql listing is a captured episode of the
-# same room. Persona names are generated fresh each session; Alexander was the captured one.
+# same room. Persona names are generated fresh each session, and Alexander was the captured one.
 ROOM_TEXT = (
     b"\x1b[32mDally Lane\x1b[37m.\r\n"
     b"\x1b[0;32;40mYou are standing on a dusty road with rising ground both to the north and "
@@ -50,8 +50,7 @@ MGCHEATS_RESPONSE = (
     b"[mgcheats]room_id=groad3; room_name=dally lane; fighting=0; dark=0; glowing=0; "
     b"asleep=0; gifted=0; here=[necklace0, weather, road]; ticks=125; inventory=[][/mgcheats]\r\n"
 )
-# A canned transport answers every unscripted command the same way; the acknowledgment is the captured response to
-# "dance".
+# A canned transport answers every unscripted command the same way, with the captured response to "dance".
 OK_RESPONSE = b"\x1b[0;33;40mOK, Alexander the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n"
 
 OBSERVATION_COMMAND_RESPONSES = {

@@ -151,7 +151,7 @@ def data_of(value):
 
 
 def derived(data, parents, backward_step) -> Tensor:
-    """tensor made from parents."""
+    """A tensor made from its parents, in the graph only when one of them needs a gradient."""
     if _grad_enabled and any(parent.requires_grad for parent in parents):
         return Tensor(data, requires_grad=True, parents=parents, backward_step=backward_step)
     return Tensor(data)

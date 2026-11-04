@@ -6,7 +6,7 @@ SORCERISE_GAIN_BYTES = b"(Persona saved on +12,800 = \x1b[0;32;40m13,000\x1b[1;3
 # Captured from the live game: swearing kill during a probe run.
 SWEARING_LOSS_BYTES = b"(Persona saved on -11 = \x1b[0;31;40m189\x1b[1;37;40m).\r\n"
 
-# Captured from the live game: 'say' with raw ESC bytes in the message; the game strips the ESC from the spoken output,
+# Captured from the live game: 'say' with raw ESC bytes in the message. The game strips the ESC from the spoken output,
 # leaving the SGR body as plain text.
 ESC_STRIPPED_SPEECH_BYTES = (
     b'\x1b[0;33;40mRaymond the sorcerer says "\x1b[1;33;40m'

@@ -20,7 +20,7 @@ def test_actions_with_line_breaks_are_outside_the_action_space(scripted_env, act
     [(b"dusty road", b"caf\xe9 road"), (b"necklace0", b"necklace\xe9")],
 )
 def test_a_high_wire_byte_in_game_text_fails_loudly(scripted_env_factory, original_bytes, replacement_bytes):
-    # bytes above 0x7F are protocol codes, never text; silently decoding one would mask the leak
+    # bytes above 0x7F are protocol codes, never text, so silently decoding one would mask the leak
     env = scripted_env_factory(
         responses={"look": scripted_response(["look", "sql,fes,fex,fei"]).replace(original_bytes, replacement_bytes)}
     )

@@ -14,7 +14,7 @@ from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_env_factory):
     """A player-state refusal in an observation-command slot must not crash the parse.
 
-    The refusal chunk occupies the field's position in the tail split, so alignment holds; the field keeps its empty
+    The refusal chunk occupies the field's position in the tail split, so alignment holds. The field keeps its empty
     defaults for the turn, the refusal is recorded in the info dict, and the player-visible line stays in the text
     observation.
     """

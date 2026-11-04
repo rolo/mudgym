@@ -69,7 +69,7 @@ def env_setup_panel(
     Returns a marimo element whose ``.value`` holds ``players``, ``max_steps``, ``tearoom_commands`` (the comma-chained
     command line issued at episode start, ready to pass to ``make_env``), and a ``gather_on`` dropdown when that names a
     default mobile. With a ``submit_label`` the panel is a form, so ``.value`` stays ``None`` until the button is
-    pressed and expensive runs only start deliberately; ``None`` gives a live panel instead.
+    pressed and expensive runs only start deliberately. ``None`` gives a live panel instead.
     """
     # marimo ships with the examples, not the library, so this import stays local.
     import marimo as mo  # noqa: PLC0415

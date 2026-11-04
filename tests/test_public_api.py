@@ -9,7 +9,7 @@ API_PAGE_TARGETS = sorted(set(re.findall(r"^::: ([\w.]+)$", API_PAGE.read_text()
 
 
 def test_the_api_page_documents_something():
-    assert API_PAGE_TARGETS, f"no ::: targets found in {API_PAGE}; the pattern or the page has changed"
+    assert API_PAGE_TARGETS, f"no ::: targets found in {API_PAGE}, so the pattern or the page has changed"
 
 
 @pytest.mark.parametrize("target", API_PAGE_TARGETS)

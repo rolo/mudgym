@@ -21,7 +21,7 @@ class ObservationField(ABC):
 
     A `chunk` is the game's output bytes for a single game event delimited by a game prompt marker.
 
-    The abstract methods (``full_space()``, ``full_empty()``, ``full_extract()``) declare the parser's full capability;
+    The abstract methods (``full_space()``, ``full_empty()``, ``full_extract()``) declare the parser's full capability.
     ``space()``, ``empty()``, and ``extract()`` restrict that capability to ``include_keys`` and are what consumers
     read.
     """

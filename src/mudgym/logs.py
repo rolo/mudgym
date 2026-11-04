@@ -192,7 +192,7 @@ def setup_logging(
         # Use a simple time format: HH:MM:SS.ffffff
         timestamper = structlog.processors.TimeStamper(fmt="%H:%M:%S.%f")
 
-        # set_exc_info promotes a live exception onto the event; format_exc_info then renders it to text for the compact
+        # set_exc_info promotes a live exception onto the event, then format_exc_info renders it to text for the compact
         # renderer.
         exception_processors: list[Processor] = [
             structlog.dev.set_exc_info,

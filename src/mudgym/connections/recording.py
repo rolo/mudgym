@@ -125,7 +125,7 @@ class ReplayConnection(MudConnection):
 
     def _take(self, expected: str) -> dict[str, Any]:
         if self.cursor >= len(self.calls):
-            raise ReplayMismatchError(f"Replay of {self.path} is exhausted; expected {expected!r}.")
+            raise ReplayMismatchError(f"Replay of {self.path} is exhausted, expected {expected!r}.")
         call = self.calls[self.cursor]
         if call["call"] != expected:
             raise ReplayMismatchError(
@@ -206,7 +206,7 @@ class RecordingProvider(ConnectionProvider):
                 )
             return recorded_connections
         except BaseException:
-            # wrappers already built own their raw connection; the unwrapped suffix does not
+            # wrappers already built own their raw connection, the unwrapped rest don't
             for connection in [*recorded_connections, *connections[len(recorded_connections) :]]:
                 with suppress(Exception):
                     connection.close()
