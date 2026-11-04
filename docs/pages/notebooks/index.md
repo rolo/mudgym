@@ -4,7 +4,7 @@ These run in your browser with JupyterLite, with nothing to install. Each one op
 
 ## Quickstart
 
-Create a MudGym env and send an action.
+Create an env and send an action.
 
 <a href="../lite/notebooks/index.html?path=quickstart.ipynb" target="_blank" rel="noopener">Open the Quickstart notebook</a> or <a href="../lite/files/quickstart.ipynb" download>download it</a>.
 
