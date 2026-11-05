@@ -92,8 +92,6 @@ ignore = ["SIM300"]
 [tool.ruff.lint.per-file-ignores]
 # Teaching examples show the complete named return tuple.
 "docs/code/*.py" = ["RUF059"]
-# A browser overlay holds only the cells it swaps into a docs notebook, which define the names those cells use.
-"docs/jupyterlite/browser/*.ipynb" = ["F821"]
 
 # added to prevent tools which like to auto format with black
 [tool.black]

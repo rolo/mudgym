@@ -1,7 +1,7 @@
 """Build the JupyterLite site the docs notebooks run in, with `just docs-lite`.
 
 It uses this checkout's MudGym wheel and the engine version uv.lock has. A notebook's browser version is the recorded
-one with its outputs cleared and any cells from its overlay in `docs/jupyterlite/browser/` swapped in.
+one with its outputs cleared.
 """
 
 import json
@@ -15,7 +15,6 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOKS_DIR = REPOSITORY_ROOT / "docs" / "notebooks"
 LITE_SOURCE_DIR = REPOSITORY_ROOT / "docs" / "jupyterlite"
-OVERLAYS_DIR = LITE_SOURCE_DIR / "browser"
 OUTPUT_DIR = REPOSITORY_ROOT / "docs" / "pages" / "lite"
 ENGINE_PACKAGE = "mudgym-wasm-engine"
 JUPYTERLITE_VERSION = "0.8.3"
@@ -30,26 +29,16 @@ def cleared(cell: dict) -> dict:
     return cell
 
 
-def browser_notebook(source: dict, overlay: dict) -> dict:
-    replacements = {cell["id"]: cell for cell in overlay["cells"]}
-    unknown = sorted(set(replacements) - {cell["id"] for cell in source["cells"]})
-    if unknown:
-        raise ValueError(f"the overlay names cells the notebook does not have: {unknown}")
-    cells = [cleared(replacements.get(cell["id"], cell)) for cell in source["cells"]]
+def browser_notebook(source: dict) -> dict:
+    cells = [cleared(cell) for cell in source["cells"]]
     metadata = {"kernelspec": PYODIDE_KERNELSPEC, "language_info": {"name": "python"}}
     return {"cells": cells, "metadata": metadata, "nbformat": 4, "nbformat_minor": 5}
 
 
 def write_browser_notebooks(contents_dir: Path) -> None:
-    notebooks = sorted(NOTEBOOKS_DIR.glob("*.ipynb"))
-    orphans = sorted({path.name for path in OVERLAYS_DIR.glob("*.ipynb")} - {path.name for path in notebooks})
-    if orphans:
-        raise SystemExit(f"docs/jupyterlite/browser has overlays for notebooks docs/notebooks lacks: {orphans}")
     contents_dir.mkdir(parents=True)
-    for path in notebooks:
-        overlay_path = OVERLAYS_DIR / path.name
-        overlay = json.loads(overlay_path.read_text()) if overlay_path.is_file() else {"cells": []}
-        notebook = browser_notebook(json.loads(path.read_text()), overlay)
+    for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb")):
+        notebook = browser_notebook(json.loads(path.read_text()))
         (contents_dir / path.name).write_text(json.dumps(notebook, indent=1, ensure_ascii=False) + "\n")
     # The notebooks import the modules beside them.
     for helper in NOTEBOOKS_DIR.glob("*.py"):
