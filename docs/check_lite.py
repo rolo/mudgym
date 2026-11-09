@@ -23,6 +23,11 @@ NOTEBOOKS_DIR = REPOSITORY_ROOT / "docs" / "notebooks"
 KERNEL_START_SECONDS = 180
 NOTEBOOK_RUN_SECONDS = 900
 KERNEL_STATUS = "() => window.jupyterapp?.shell.currentWidget?.sessionContext?.session?.kernel?.status ?? null"
+# Every page reads as a background tab.
+BACKGROUND_TAB = """
+    Object.defineProperty(Document.prototype, "hidden", {get: () => true});
+    Object.defineProperty(Document.prototype, "visibilityState", {get: () => "hidden"});
+"""
 # Don't return the promise, or evaluate waits for the whole run and the deadline never fires.
 RUN_ALL_CELLS = """() => {
     window.runAllError = null;
@@ -86,8 +91,9 @@ def run_notebook(browser: Browser, base_url: str, name: str) -> None:
 
 
 def check_notebook_links(browser: Browser, base_url: str, names: list[str]) -> None:
-    """Reach the notebook index through the menu, then open each notebook in a new tab."""
+    """Reach the notebook index through the menu, then check each notebook starts its kernel in a background tab."""
     page = browser.new_page()
+    page.context.add_init_script(BACKGROUND_TAB)
     try:
         for docs_path in ("", "environments/"):
             page.goto(f"{base_url}/{docs_path}")
@@ -101,13 +107,19 @@ def check_notebook_links(browser: Browser, base_url: str, names: list[str]) -> N
             notebook = opened.value
             try:
                 notebook.wait_for_url(f"{base_url}/lite/notebooks/index.html?path={name}")
-                notebook.wait_for_function(f"({KERNEL_STATUS})() === 'idle'", timeout=KERNEL_START_SECONDS * 1000)
+                notebook.wait_for_function(
+                    f"({KERNEL_STATUS})() === 'idle' || document.querySelector('.jp-Dialog') !== null",
+                    timeout=KERNEL_START_SECONDS * 1000,
+                )
+                dialog = notebook.locator(".jp-Dialog")
+                if dialog.count():
+                    raise AssertionError(f"{name} asked for a kernel rather than starting one: {dialog.inner_text()}")
                 assert page.url == f"{base_url}/notebooks/"
             finally:
                 notebook.close()
     finally:
         page.close()
-    print("Notebook links: menu opens the index, and each notebook opens JupyterLite in a new tab", flush=True)
+    print("Notebook links: menu opens the index, and each notebook starts its kernel in a background tab", flush=True)
 
 
 def check_wheel_install(browser: Browser, base_url: str) -> None:

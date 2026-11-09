@@ -20,6 +20,9 @@ ENGINE_PACKAGE = "mudgym-wasm-engine"
 JUPYTERLITE_VERSION = "0.8.3"
 # Naming the kernel saves JupyterLite asking which one to start.
 PYODIDE_KERNELSPEC = {"display_name": "Python (Pyodide)", "language": "python", "name": "python"}
+# Read the kernel list straight away as the refresh poll doesn't run in a background tab.
+KERNEL_LIST_REFRESH = "r&&r.changed.connect(()=>{s.refreshSpecs()})"
+KERNEL_LIST_READ = "r&&r.changed.connect(()=>{s.requestSpecs()})"
 
 
 def cleared(cell: dict) -> dict:
@@ -102,6 +105,17 @@ def build_workspace(workspace: Path, lite_dir: Path, contents_dir: Path) -> None
         bundler_config.unlink()
 
 
+def read_kernel_list_when_hidden() -> None:
+    patched = 0
+    for chunk in (OUTPUT_DIR / "build").glob("*.js"):
+        source = chunk.read_text(encoding="utf-8")
+        if KERNEL_LIST_REFRESH in source:
+            chunk.write_text(source.replace(KERNEL_LIST_REFRESH, KERNEL_LIST_READ), encoding="utf-8")
+            patched += 1
+    if not patched:
+        raise SystemExit(f"JupyterLite {JUPYTERLITE_VERSION} has no refreshSpecs call to patch.")
+
+
 def main() -> None:
     shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
     with tempfile.TemporaryDirectory(prefix="mudgym-lite-") as workspace_name:
@@ -112,6 +126,7 @@ def main() -> None:
         write_browser_notebooks(contents_dir)
         configure(lite_dir, build_wheel(workspace / "wheels"))
         build_workspace(workspace, lite_dir, contents_dir)
+    read_kernel_list_when_hidden()
     print(f"built the browser notebooks into {OUTPUT_DIR.relative_to(REPOSITORY_ROOT)}")
 
 
