@@ -48,7 +48,7 @@ FEX_RESPONSE = b"up out swampward southwest south west east north\r\n"
 FEI_RESPONSE = b"necklace0\r\n" + INVENTORY_DIVIDER + b"\r\n\r\n"
 MGCHEATS_RESPONSE = (
     b"[mgcheats]room_id=groad3; room_name=dally lane; fighting=0; dark=0; glowing=0; "
-    b"asleep=0; gifted=0; here=[necklace0, weather, road]; ticks=125; inventory=[][/mgcheats]\r\n"
+    b"asleep=0; gifted=0; here=[necklace0, weather, road]; players=[]; mobiles=[]; ticks=125; inventory=[][/mgcheats]\r\n"
 )
 # A canned transport answers every unscripted command the same way, with the captured response to "dance".
 OK_RESPONSE = b"\x1b[0;33;40mOK, Alexander the protector \x1b[1;33;40mdances.\x1b[0;33;40m\x1b[1;37;40m\r\n"

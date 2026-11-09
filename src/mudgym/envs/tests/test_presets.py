@@ -56,6 +56,8 @@ PRESET_KEYS = {
         "asleep",
         "gifted",
         "here",
+        "players",
+        "mobiles",
     },
 }
 

@@ -29,12 +29,13 @@ class MGCheatsField(ObservationField):
     Missing data uses index 0. Supplied room values must be recognised.
 
     Sample game response:
-    `[mgcheats]room_id=mtrack1; room_name=beaten track near cliff; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; here=[rain, cliff, road]; inventory=[][/mgcheats]`
+    `[mgcheats]room_id=mcellar; room_name=cellar; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; here=[visitor, door, wall, rat16, brand40]; players=[visitor]; mobiles=[rat16]; inventory=[][/mgcheats]`
     """
 
     command = "mgcheats"
 
     BIT_KEYS = ("fighting", "dark", "glowing", "asleep", "gifted")
+    LIST_KEYS = ("here", "players", "mobiles")
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {
@@ -47,7 +48,7 @@ class MGCheatsField(ObservationField):
             "glowing": spaces.Discrete(2, dtype=BIT_DTYPE),
             "asleep": spaces.Discrete(2, dtype=BIT_DTYPE),
             "gifted": spaces.Discrete(2, dtype=BIT_DTYPE),
-            "here": ITEM_SPACE,
+            **dict.fromkeys(self.LIST_KEYS, ITEM_SPACE),
         }
 
     def full_empty(self) -> dict[str, Any]:
@@ -57,7 +58,7 @@ class MGCheatsField(ObservationField):
             "room_name": UNKNOWN,
             "room_name_index": INDEX_DTYPE(0),
             **{k: BIT_DTYPE(0) for k in self.BIT_KEYS},
-            "here": (),
+            **dict.fromkeys(self.LIST_KEYS, ()),
         }
 
     def matches(self, chunk: bytes) -> bool:
@@ -89,10 +90,13 @@ class MGCheatsField(ObservationField):
             if value not in ("0", "1"):
                 raise ValueError(f"mgcheats {key}={value!r} is not a 0 or 1 flag")
             bits[key] = BIT_DTYPE(value)
-        here = parsed["here"]
-        if not here.startswith("[") or not here.endswith("]"):
-            raise ValueError(f"mgcheats here={here!r} is not a bracketed list")
-        inner = here[1:-1].lower()
+        lists = {}
+        for key in self.LIST_KEYS:
+            value = parsed[key]
+            if not value.startswith("[") or not value.endswith("]"):
+                raise ValueError(f"mgcheats {key}={value!r} is not a bracketed list")
+            inner = value[1:-1].lower()
+            lists[key] = tuple(inner.split(", ")) if inner else ()
 
         return {
             "room_id": room_id,
@@ -100,5 +104,5 @@ class MGCheatsField(ObservationField):
             "room_name": room_name,
             "room_name_index": INDEX_DTYPE(room_name_to_index(room_name)),
             **bits,
-            "here": tuple(inner.split(", ")) if inner else (),
+            **lists,
         }

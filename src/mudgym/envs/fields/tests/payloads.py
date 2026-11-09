@@ -71,7 +71,7 @@ DRUNKEN_WAKE_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40moo\n========\nslipper\n"
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
     b"[mgcheats]room_id=towrm2; room_name=landing in tower; fighting=0; dark=1; glowing=0; asleep=0; gifted=0; "
-    b"here=[wall]; inventory=[slipper][/mgcheats]\n"
+    b"here=[wall]; players=[]; mobiles=[]; inventory=[slipper][/mgcheats]\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
@@ -88,7 +88,7 @@ SMALL_ROOM_WAKE_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40moo\n========\n"
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
     b"[mgcheats]room_id=npass1; room_name=narrow passage; fighting=0; dark=1; glowing=0; asleep=0; gifted=0; "
-    b"here=[winerack]; inventory=[][/mgcheats]\n"
+    b"here=[winerack]; players=[]; mobiles=[]; inventory=[][/mgcheats]\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 

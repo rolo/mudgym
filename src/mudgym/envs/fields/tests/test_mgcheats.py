@@ -8,7 +8,7 @@ from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 MGCHEATS_BEATEN_TRACK = (
     b"[mgcheats]room_id=mtrack2; room_name=beaten track; fighting=0; dark=0; glowing=0; "
-    b"asleep=0; gifted=0; here=[necklace0, road]; ticks=0; inventory=[][/mgcheats]\r\n"
+    b"asleep=0; gifted=0; here=[necklace0, road]; players=[]; mobiles=[]; ticks=0; inventory=[][/mgcheats]\r\n"
 )
 
 
@@ -53,6 +53,8 @@ def test_missing_mgcheats_returns_empty_defaults():
         "asleep": 0,
         "gifted": 0,
         "here": (),
+        "players": (),
+        "mobiles": (),
     }
 
     np.testing.assert_equal(field.empty(), expected)
@@ -76,8 +78,28 @@ def test_extracts_mgcheats_chunk_with_or_without_ticks():
             "asleep": 0,
             "gifted": 0,
             "here": ("necklace0", "road"),
+            "players": (),
+            "mobiles": (),
         },
     )
+    assert_valid_observation(field, obs)
+
+
+# Captured from mud2-embedded seed 1234 with Tester observing and Visitor beside them.
+MGCHEATS_CELLAR = (
+    b"[mgcheats]room_id=mcellar; room_name=cellar; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; "
+    b"here=[visitor, door, wall, rat16, rat17, rat18, brand40]; players=[visitor]; mobiles=[rat16, rat17, rat18]; "
+    b"inventory=[][/mgcheats]\n"
+)
+
+
+def test_players_and_mobiles_repeat_the_creatures_in_here():
+    field = MGCheatsField()
+    obs = field.extract([MGCHEATS_CELLAR])
+
+    assert obs["here"] == ("visitor", "door", "wall", "rat16", "rat17", "rat18", "brand40")
+    assert obs["players"] == ("visitor",)
+    assert obs["mobiles"] == ("rat16", "rat17", "rat18")
     assert_valid_observation(field, obs)
 
 
@@ -106,9 +128,18 @@ def test_flags_are_read_as_bits():
     assert_valid_observation(field, obs)
 
 
-def test_here_must_be_a_bracketed_list():
-    raw = MGCHEATS_BEATEN_TRACK.replace(b"here=[necklace0, road]", b"here=rain")
-    with pytest.raises(ValueError, match="here"):
+@pytest.mark.parametrize(
+    ("listed", "bare"),
+    [
+        (b"here=[necklace0, road]", b"here=rain"),
+        (b"players=[]", b"players=visitor"),
+        (b"mobiles=[]", b"mobiles=rat16"),
+    ],
+    ids=["here", "players", "mobiles"],
+)
+def test_lists_must_be_bracketed(listed, bare):
+    raw = MGCHEATS_BEATEN_TRACK.replace(listed, bare)
+    with pytest.raises(ValueError, match=bare.split(b"=")[0].decode()):
         MGCheatsField().extract([raw])
 
 
@@ -136,7 +167,7 @@ def test_room_names_are_lowercased_to_match_the_room_tables():
 def test_orangery_colours_are_removed_before_room_name_lookup():
     raw = (
         b"[mgcheats]room_id=gorange; room_name=\x1b[0;33;40morange\x1b[1;37;40mry; fighting=0; "
-        b"dark=0; glowing=0; asleep=0; gifted=0; here=[rain]; inventory=[][/mgcheats]\n"
+        b"dark=0; glowing=0; asleep=0; gifted=0; here=[rain]; players=[]; mobiles=[]; inventory=[][/mgcheats]\n"
     )
     field = MGCheatsField()
     obs = field.extract([raw])
