@@ -129,7 +129,7 @@ def test_orangery_colours_are_removed_without_losing_content_classification():
 
     assert obs["room_name"] == "orangery"
     assert obs["room_name_index"] == room_name_to_index("orangery") > 0
-    assert obs["here"] == ("Abbie the protector", "rain")
+    assert obs["here"] == ("rain",)
     assert obs["features"] == ("rain",)
     assert obs["players"] == ()
     assert obs["inventory"] == ()
@@ -216,19 +216,30 @@ def test_classifies_captured_room_contents_and_player_inventory(raw, expected):
 
 
 @pytest.mark.parametrize(
-    ("raw", "persona", "observer", "remaining"),
+    ("raw", "persona", "here", "players"),
     [
         pytest.param(
-            TWO_MORTALS_CHUNK, "David", "David the sorcerer", "Jessica the protector", id="ordinary-title-David"
+            TWO_MORTALS_CHUNK,
+            "David",
+            ("door", "Jessica the protector", "4 rats", "coal"),
+            ("Jessica the protector",),
+            id="ordinary-title-David",
         ),
-        pytest.param(REVERSED_TITLES_CHUNK, "Jessica", "Sister Jessica", "Sir David", id="title-first-Jessica"),
+        pytest.param(REVERSED_TITLES_CHUNK, "Jessica", ("door", "Sir David"), ("Sir David",), id="title-first-Jessica"),
+        pytest.param(
+            COAL_BUNKER_CHUNK,
+            "Abbie",
+            ("coal", "door", "Juan the protector", "4 rats"),
+            ("Juan the protector",),
+            id="observer-not-listed",
+        ),
     ],
 )
-def test_persona_exclusion_only_removes_the_observer_from_players(raw, persona, observer, remaining):
+def test_persona_exclusion_removes_only_the_observer_from_here_and_players(raw, persona, here, players):
     obs = SuperQuickLookField().extract([raw], persona=persona)
 
-    assert obs["players"] == (remaining,)
-    assert observer in obs["here"]
+    assert obs["here"] == here
+    assert obs["players"] == players
 
 
 def test_missing_room_view_returns_empty_defaults():

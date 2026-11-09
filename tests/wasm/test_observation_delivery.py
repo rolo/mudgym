@@ -47,9 +47,10 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
                 [child.session.observation_line] if preset == "parsed" else [],
             ]
             if preset == "parsed":
-                np.testing.assert_array_equal(
-                    player_obs["players"], ["Abbie the protector" if index == 0 else "Aaron the protector"]
-                )
+                observer, other = ("Aaron the protector", "Abbie the protector")[:: 1 if index == 0 else -1]
+                np.testing.assert_array_equal(player_obs["players"], [other])
+                assert other in player_obs["here"]
+                assert observer not in player_obs["here"]
 
         actions = {"player_0": "dance", "player_1": "dance"}
         obs, _, terminates, truncates, _ = env.step(actions)

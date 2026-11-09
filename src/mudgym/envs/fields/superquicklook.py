@@ -81,7 +81,9 @@ def empty_classified() -> dict[str, list[str]]:
     return {key: [] for key in CLASSIFIED_KEYS}
 
 
-def parse_room_contents(contents_chunk: str) -> tuple[tuple[str, ...], dict[str, list[str]]]:
+def parse_room_contents(
+    contents_chunk: str, persona: str | None = None
+) -> tuple[tuple[str, ...], dict[str, list[str]]]:
     classified = empty_classified()
     contents_chunk = contents_chunk.strip()
     if not contents_chunk or contents_chunk.lower() == "nothing":
@@ -97,8 +99,12 @@ def parse_room_contents(contents_chunk: str) -> tuple[tuple[str, ...], dict[str,
         if not name:
             continue
 
-        here.append(name)
         category = FG_TO_CATEGORY.get(sgr_foreground(sgr))
+        # the room lists the observer too, by name with level (which isn't always first, eg, Sir Dave)
+        if category == "players" and persona is not None and bare_persona_name(name) == persona:
+            continue
+
+        here.append(name)
         if category in classified:
             classified[category].append(name)
 
@@ -160,6 +166,7 @@ class SuperQuickLookField(ObservationField):
     Parses room contents and inventory from the superquicklook command.
 
     Missing views use index 0. Supplied room names must be recognised. Inside a vehicle only the room name is read.
+    Given the observer's persona, `here` and `players` both leave the observer out.
     """
 
     command = "sql"
@@ -222,7 +229,7 @@ class SuperQuickLookField(ObservationField):
         _, room_name = parse_token(room_match.group("place"))
         room_name = room_name.lower()
 
-        here, classified = parse_room_contents(room_match.group("contents"))
+        here, classified = parse_room_contents(room_match.group("contents"), persona)
 
         clean_text = decode_text_bytes(strip_ansi(raw_bytes))
         block_start = clean_text.rfind(ROOM_MARKER)
@@ -230,10 +237,6 @@ class SuperQuickLookField(ObservationField):
             block_start = 0
 
         inventory = parse_inventory(clean_text, block_start)
-
-        # exclude the current persona from the players list, since we don't want to include ourselves in the
-        # observation. the listing gives name with level (which isn't always first, eg, Sir Dave)
-        players = tuple(name for name in classified["players"] if persona is None or bare_persona_name(name) != persona)
 
         return {
             "room_name": room_name,
@@ -243,5 +246,5 @@ class SuperQuickLookField(ObservationField):
             "features": tuple(classified["features"]),
             "portables": tuple(classified["portables"]),
             "mobiles": tuple(classified["mobiles"]),
-            "players": players,
+            "players": tuple(classified["players"]),
         }
