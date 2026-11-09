@@ -166,7 +166,8 @@ class WasmWorld:
             raise RuntimeError("Unsupported embedded asset version. Install a compatible mudgym-wasm-engine wheel.")
         if self._call("mud2_seed_world", float(seed)) != 1:
             raise RuntimeError(f"WASI engine refused world seed {seed}")
-        if self._call("mud2_shared_init_with_options", max_players, 0, unix_seconds, utc_offset_seconds, 1) != 1:
+        # The 1 after max_players leaves layout to MudGym, so the game doesn't wrap lines or expand tabs, whatever /t says.
+        if self._call("mud2_shared_init_with_options", max_players, 1, unix_seconds, utc_offset_seconds, 1) != 1:
             raise RuntimeError("WASI shared world refused to start")
         self.closed = False
 

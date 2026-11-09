@@ -59,6 +59,19 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
         assert all("Badly-paved road" not in text for text in texts)
 
 
+@pytest.mark.parametrize("preset", ["parsed", "cheats"])
+def test_a_narrow_terminal_width_leaves_observations_whole(wasm_runtime, preset):
+    with closing(make_env(observation=preset, connection="wasm", connection_kwargs={"runtime": wasm_runtime})) as env:
+        reset_obs, _ = env.reset(seed=0)
+        env.step("/t 40")
+        obs, _, terminated, truncated, _ = env.step("look")
+
+    assert not terminated and not truncated
+    assert obs["room_name"] == reset_obs["room_name"]
+    assert "\t" not in obs["text"]
+    assert max(len(line) for line in obs["text"].splitlines()) > 40
+
+
 def test_conversation_keeps_structured_observations(wasm_runtime):
     with closing(make_env(connection="wasm", connection_kwargs={"runtime": wasm_runtime})) as env:
         env.reset(seed=0)

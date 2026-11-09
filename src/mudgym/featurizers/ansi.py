@@ -22,3 +22,30 @@ ansi_escape_bytes = re.compile(
 def strip_ansi(data: bytes) -> bytes:
     """Remove ANSI escape sequences from a byte string."""
     return ansi_escape_bytes.sub(b"", data)
+
+
+TAB_STOP = 8
+
+
+def expand_tabs(data: bytes) -> bytes:
+    """Expand tabs to 8-column stops as the game would, giving ANSI escapes no width."""
+    return b"\n".join(expand_line_tabs(line) for line in data.split(b"\n"))
+
+
+def expand_line_tabs(line: bytes) -> bytes:
+    expanded = bytearray()
+    column = 0
+    position = 0
+    for escape in [*ansi_escape_bytes.finditer(line), None]:
+        for byte in line[position : escape.start() if escape else len(line)]:
+            if byte == 0x09:
+                padding = TAB_STOP - column % TAB_STOP
+                expanded += b" " * padding
+                column += padding
+            else:
+                expanded.append(byte)
+                column += 1
+        if escape:
+            expanded += escape.group()
+            position = escape.end()
+    return bytes(expanded)
