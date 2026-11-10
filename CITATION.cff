@@ -10,8 +10,8 @@ authors:
     given-names: "Rolo"
     email: "rolo@kingrolo.com"
 
-version: "0.7.0"
-date-released: "2026-11-04"
+version: "0.7.1"
+date-released: "2026-11-10"
 
 license: MIT
 doi: "10.5281/zenodo.22730678"
