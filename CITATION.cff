@@ -14,6 +14,7 @@ version: "0.7.0"
 date-released: "2026-11-04"
 
 license: MIT
+doi: "10.5281/zenodo.22730678"
 url: "https://rolo.github.io/mudgym/"
 repository-code: "https://github.com/rolo/mudgym"
 

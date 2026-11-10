@@ -36,14 +36,13 @@ See the [docs](https://rolo.github.io/mudgym/).
 @misc{Mawlabaux2026MudGym,
 	author = {Mawlabaux, Rolo},
 	year = {2026},
-	month = {nov 4},
 	title = {MudGym},
+	doi = {10.5281/zenodo.22730678},
 	url = {https://rolo.github.io/mudgym/},
-	howpublished = {https://rolo.github.io/mudgym/},
 }
 ```
 
-Or use the GitHub sidebar link.
+To cite a specific release, use its version DOI from [Zenodo](https://doi.org/10.5281/zenodo.22730678). You can also use GitHub's sidebar link.
 
 ## License
 
