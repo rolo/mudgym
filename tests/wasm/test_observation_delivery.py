@@ -11,7 +11,7 @@ from mudgym.connections.recording import RecordingConnection, RecordingProvider,
 from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.fields import SuperQuickLookField
 
-# Each preset's name for Aaron and Abbie: the room's own listing in parsed, the word a player types in cheats.
+# Each preset's name for Aaron and Abbie: the room's own listing in parsed, the persona alone in cheats.
 PEER_NAMES = {"parsed": ("Aaron the protector", "Abbie the protector"), "cheats": ("aaron", "abbie")}
 
 

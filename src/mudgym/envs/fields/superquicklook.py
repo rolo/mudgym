@@ -8,6 +8,7 @@ from mudgym.connections.prompts import SGR_ONE_PLUS_STR
 from mudgym.db.index import ROOM_NAME_COUNT, UNKNOWN, room_name_to_index
 from mudgym.envs.specs import INDEX_DTYPE, ITEM_SPACE, ROOM_NAME_MAX_LENGTH, SINGLE_LINE_CHARSET
 from mudgym.featurizers.ansi import strip_ansi
+from mudgym.featurizers.listed_names import split_listed_names
 from mudgym.featurizers.persona_names import bare_persona_name
 from mudgym.featurizers.strings import decode_text_bytes
 
@@ -90,7 +91,7 @@ def parse_room_contents(
         return (), classified
 
     normalized = re.sub(r"\s+and\s+", ", ", contents_chunk)
-    parts = [part.strip() for part in normalized.split(",") if part.strip()]
+    parts = [part.strip() for part in split_listed_names(normalized, ",") if part.strip()]
 
     here: list[str] = []
     for part in parts:

@@ -242,6 +242,25 @@ def test_persona_exclusion_removes_only_the_observer_from_here_and_players(raw, 
     assert obs["players"] == players
 
 
+GIANT_SITTING_ROOM_CHUNK = (
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40mgiant sitting room\x1b[0;37;40m" contains '
+    b"\x1b[32mthe wall\x1b[37m, \x1b[36mthe sturdy, giant door\x1b[37m, \x1b[31mDumbo\x1b[37m "
+    b"and \x1b[32mthe sofa\x1b[37m.\r\n"
+    b"You are carrying the following:\r\n"
+    b"        nothing.\r\n"
+)
+
+
+def test_the_one_name_holding_a_comma_stays_one_thing():
+    field = SuperQuickLookField()
+    obs = field.extract([GIANT_SITTING_ROOM_CHUNK])
+
+    assert obs["here"] == ("wall", "sturdy, giant door", "Dumbo", "sofa")
+    assert obs["portables"] == ("sturdy, giant door",)
+    assert obs["features"] == ("wall", "sofa")
+    assert_valid_observation(field, obs)
+
+
 def test_missing_room_view_returns_empty_defaults():
     raw = b"It's too dark for you to see anything."
     field = SuperQuickLookField()

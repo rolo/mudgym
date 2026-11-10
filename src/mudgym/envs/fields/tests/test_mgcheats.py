@@ -112,6 +112,15 @@ def test_printable_names_fit_the_mgcheats_here_space():
     assert_valid_observation(field, obs)
 
 
+def test_the_one_name_holding_a_comma_stays_one_thing():
+    raw = MGCHEATS_BEATEN_TRACK.replace(b"necklace0, road", b"sturdy, giant door, wall, sofa")
+    field = MGCheatsField()
+    obs = field.extract([raw])
+
+    assert obs["here"] == ("sturdy, giant door", "wall", "sofa")
+    assert_valid_observation(field, obs)
+
+
 def test_a_flag_that_is_not_exactly_0_or_1_fails_loudly():
     # the game prints a flag as the literal 0 or 1, so anything else is a parse fault, not a number to coerce
     raw = MGCHEATS_BEATEN_TRACK.replace(b"fighting=0", b"fighting=01")

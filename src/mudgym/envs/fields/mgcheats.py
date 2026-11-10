@@ -15,6 +15,7 @@ from mudgym.envs.specs import (
     SINGLE_LINE_CHARSET,
 )
 from mudgym.featurizers.ansi import strip_ansi
+from mudgym.featurizers.listed_names import split_listed_names
 from mudgym.featurizers.strings import decode_text_bytes
 
 from .field import ObservationField
@@ -96,7 +97,7 @@ class MGCheatsField(ObservationField):
             if not value.startswith("[") or not value.endswith("]"):
                 raise ValueError(f"mgcheats {key}={value!r} is not a bracketed list")
             inner = value[1:-1].lower()
-            lists[key] = tuple(inner.split(", ")) if inner else ()
+            lists[key] = tuple(split_listed_names(inner, ", ")) if inner else ()
 
         return {
             "room_id": room_id,
