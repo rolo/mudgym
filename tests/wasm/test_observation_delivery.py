@@ -11,8 +11,11 @@ from mudgym.connections.recording import RecordingConnection, RecordingProvider,
 from mudgym.connections.wasm import WasmProvider
 from mudgym.envs.fields import SuperQuickLookField
 
+# Each preset's name for Aaron and Abbie: the room's own listing in parsed, the word a player types in cheats.
+PEER_NAMES = {"parsed": ("Aaron the protector", "Abbie the protector"), "cheats": ("aaron", "abbie")}
 
-@pytest.mark.parametrize("preset", ["text", "parsed"])
+
+@pytest.mark.parametrize("preset", ["text", "parsed", "cheats"])
 def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, preset, tmp_path):
 
     def capture_path(index):
@@ -39,16 +42,17 @@ def test_shared_reset_keeps_each_arrival_and_the_final_peer_state(wasm_runtime, 
             assert b"move north\r\n" not in raw
             calls = [json.loads(line) for line in capture_path(index).read_text().splitlines()[1:]]
             sent = [call["line"] for call in calls if call["call"] == "send_line"]
-            assert sent == ["qs", "move north", *([child.session.observation_line] if preset == "parsed" else [])]
+            assert sent == ["qs", "move north", *([child.session.observation_line] if preset != "text" else [])]
             reads = [call for call in calls if call["call"] == "read_response"]
             assert [read["sent_lines"] for read in reads] == [
                 ["qs"],
                 ["move north"],
-                [child.session.observation_line] if preset == "parsed" else [],
+                [child.session.observation_line] if preset != "text" else [],
             ]
-            if preset == "parsed":
-                observer, other = ("Aaron the protector", "Abbie the protector")[:: 1 if index == 0 else -1]
+            if preset != "text":
+                observer, other = PEER_NAMES[preset][:: 1 if index == 0 else -1]
                 np.testing.assert_array_equal(player_obs["players"], [other])
+                np.testing.assert_array_equal(player_obs["mobiles"], [])
                 assert other in player_obs["here"]
                 assert observer not in player_obs["here"]
 
