@@ -25,7 +25,7 @@ const text = (value) => {
 }
 const output = (length) => Buffer.from(engine.memory.buffer, engine.mud2_shared_output(), length).toString("latin1")
 engine._initialize()
-const started = engine.mud2_seed_world(7) === 1 && engine.mud2_shared_init_with_options(1, 0, 1767225600, 0, 1) === 1
+const started = engine.mud2_seed_world(7) === 1 && engine.mud2_shared_init_with_options(1, 1767225600, 0, 1) === 1
 const name = text("Freya")
 const player = engine.mud2_shared_add_session(name, 0, 1, 0, 0, 0, 0, 0, 0, 5000)
 engine.free(name)
@@ -47,7 +47,7 @@ const instantiate = (0, eval)(readFileSync(shimPath, "utf8"))
 const engine = instantiate(new WebAssembly.Module(readFileSync(modulePath))).exports
 engine._initialize()
 engine.mud2_seed_world(7)
-engine.mud2_shared_init_with_options(1, 0, 1767225600, 0, 1)
+engine.mud2_shared_init_with_options(1, 1767225600, 0, 1)
 let status = 0
 let ticks = 0
 while (status === 0 && ticks < 10000) {

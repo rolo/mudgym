@@ -11,7 +11,7 @@ from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.envs.fields import FieldSpec, ObservationField, instantiate_field
 from mudgym.envs.specs import ACTION_CHARSET, ACTION_MAX_LENGTH, INT_DTYPE, TEXT_CHARSET, TEXT_MAX_LENGTH
-from mudgym.featurizers.ansi import expand_tabs, strip_ansi
+from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.points import parse_points_changes
 from mudgym.featurizers.responses import (
     normalise_lines,
@@ -170,8 +170,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         # keeps the game's ANSI colour - text observation space doesn't.
         render_payload = b"\n".join(text_chunks)
         render_payload = DATABASE_BROADCAST_RE.sub(b"", render_payload)
-        # The game leaves its tabs for us to expand.
-        render_bytes = expand_tabs(normalise_lines(render_payload))
+        render_bytes = normalise_lines(render_payload)
         text = decode_text_bytes(strip_ansi(render_bytes))
 
         if len(text) > TEXT_MAX_LENGTH:

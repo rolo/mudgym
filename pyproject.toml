@@ -40,7 +40,7 @@ dependencies = [
     # The engine module runs under wasmtime natively. Wasmtime cannot load in Pyodide, where the same module runs on the
     # browser's own WebAssembly instead.
     "wasmtime>=48.0.0,<49; sys_platform != 'emscripten'",
-    "mudgym-wasm-engine~=0.1.6",
+    "mudgym-wasm-engine~=0.2.0",
 ]
 
 [project.urls]

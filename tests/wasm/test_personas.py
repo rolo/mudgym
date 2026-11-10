@@ -5,7 +5,7 @@ import pytest
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.persona import Persona
 from mudgym.connections.wasm import WasmProvider
-from mudgym.featurizers.ansi import expand_tabs, strip_ansi
+from mudgym.featurizers.ansi import strip_ansi
 
 
 @pytest.mark.parametrize("sex", ["male", "female"])
@@ -111,8 +111,7 @@ def test_replacement_keeps_female_identity_in_existing_world(wasm_runtime):
         assert peer._session is peer_session
         assert connection._session.persona == previous.persona == Persona("Freya", "female")
         connection.send_line("score")
-        # The score's columns arrive as tabs.
-        assert b"sex:            female" in expand_tabs(strip_ansi(connection.read_response()[0]))
+        assert b"sex:            female" in strip_ansi(connection.read_response()[0])
 
 
 def test_persona_count_must_match_connection_count(wasm_runtime):
