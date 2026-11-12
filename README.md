@@ -2,7 +2,13 @@
 
 A Gymnasium reinforcement learning environment for MUD2. One of the first online multiplayer text adventure games.
 
-Run in your browser:
+## Browser Quickstart
+
+No install needed, through the magic of WebAssembly.
+
+See the game and env in action at the [MudGym Playground](https://mudgym.kingrolo.com/).
+
+Or run and train against the game in JupyterLite notebooks:
 - [Quickstart](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=quickstart.ipynb).
 - [Goal room DQN](https://rolo.github.io/mudgym/lite/notebooks/index.html?path=goal_room_dqn.ipynb).
 
