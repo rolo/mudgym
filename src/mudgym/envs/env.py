@@ -384,11 +384,15 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             terminated, truncated = True, False
         reward = float(self.points - points_before_step)
 
-        obs, render_bytes, field_refusals = self.bytes_to_observation(
-            raw_bytes,
-            sent_lines=debug_info["sent_lines"],
-            response_complete=response_complete,
-        )
+        try:
+            obs, render_bytes, field_refusals = self.bytes_to_observation(
+                raw_bytes,
+                sent_lines=debug_info["sent_lines"],
+                response_complete=response_complete,
+            )
+        except Exception as error:
+            error.add_note(f"step raw_bytes={raw_bytes!r}, transport={debug_info!r}")
+            raise
         self.last_render_bytes = render_bytes
         info = self.make_info(
             raw_bytes=raw_bytes,
