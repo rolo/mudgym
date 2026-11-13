@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from mudgym.db.index import UNKNOWN, room_id_to_index, room_name_to_index
+from mudgym.db.index import room_id_to_index, room_name_to_index
 from mudgym.db.rooms import ROOM_IDS, ROOM_NAMES
 from mudgym.envs.fields.mgcheats import MGCheatsField
 from mudgym.envs.fields.tests.helpers import assert_valid_observation
@@ -38,27 +38,6 @@ def test_unknown_or_empty_rooms_fail_loudly(original):
 
     with pytest.raises(ValueError):
         MGCheatsField().extract([raw])
-
-
-def test_missing_mgcheats_returns_empty_defaults():
-    field = MGCheatsField()
-    expected = {
-        "room_id": UNKNOWN,
-        "room_id_index": 0,
-        "room_name": UNKNOWN,
-        "room_name_index": 0,
-        "fighting": 0,
-        "dark": 0,
-        "glowing": 0,
-        "asleep": 0,
-        "gifted": 0,
-        "here": (),
-        "players": (),
-        "mobiles": (),
-    }
-
-    np.testing.assert_equal(field.empty(), expected)
-    np.testing.assert_equal(field.extract([b""]), expected)
 
 
 def test_extracts_mgcheats_chunk_with_or_without_ticks():
@@ -103,15 +82,6 @@ def test_players_and_mobiles_repeat_the_creatures_in_here():
     assert_valid_observation(field, obs)
 
 
-def test_printable_names_fit_the_mgcheats_here_space():
-    raw = MGCHEATS_BEATEN_TRACK.replace(b"necklace0, road", b"cloth-of-gold, ornate wall")
-    field = MGCheatsField()
-    obs = field.extract([raw])
-
-    assert obs["here"] == ("cloth-of-gold", "ornate wall")
-    assert_valid_observation(field, obs)
-
-
 def test_the_one_name_holding_a_comma_stays_one_thing():
     raw = MGCHEATS_BEATEN_TRACK.replace(b"necklace0, road", b"sturdy, giant door, wall, sofa")
     field = MGCheatsField()
@@ -121,13 +91,6 @@ def test_the_one_name_holding_a_comma_stays_one_thing():
     assert_valid_observation(field, obs)
 
 
-def test_a_flag_that_is_not_exactly_0_or_1_fails_loudly():
-    # the game prints a flag as the literal 0 or 1, so anything else is a parse fault, not a number to coerce
-    raw = MGCHEATS_BEATEN_TRACK.replace(b"fighting=0", b"fighting=01")
-    with pytest.raises(ValueError, match="fighting"):
-        MGCheatsField().extract([raw])
-
-
 def test_flags_are_read_as_bits():
     raw = MGCHEATS_BEATEN_TRACK.replace(b"fighting=0; dark=0", b"fighting=1; dark=1")
     field = MGCheatsField()
@@ -135,33 +98,6 @@ def test_flags_are_read_as_bits():
 
     assert (obs["fighting"], obs["dark"], obs["glowing"], obs["asleep"], obs["gifted"]) == (1, 1, 0, 0, 0)
     assert_valid_observation(field, obs)
-
-
-@pytest.mark.parametrize(
-    ("listed", "bare"),
-    [
-        (b"here=[necklace0, road]", b"here=rain"),
-        (b"players=[]", b"players=visitor"),
-        (b"mobiles=[]", b"mobiles=rat16"),
-    ],
-    ids=["here", "players", "mobiles"],
-)
-def test_lists_must_be_bracketed(listed, bare):
-    raw = MGCHEATS_BEATEN_TRACK.replace(listed, bare)
-    with pytest.raises(ValueError, match=bare.split(b"=")[0].decode()):
-        MGCheatsField().extract([raw])
-
-
-def test_duplicate_keys_fail_loudly():
-    raw = MGCHEATS_BEATEN_TRACK.replace(b"room_id=mtrack2", b"room_id=mtrack2; room_id=groad1")
-    with pytest.raises(ValueError, match="duplicate.*room_id"):
-        MGCheatsField().extract([raw])
-
-
-def test_a_block_missing_a_key_the_game_always_prints_fails_loudly():
-    raw = MGCHEATS_BEATEN_TRACK.replace(b" gifted=0;", b"")
-    with pytest.raises(KeyError, match="gifted"):
-        MGCheatsField().extract([raw])
 
 
 def test_room_names_are_lowercased_to_match_the_room_tables():

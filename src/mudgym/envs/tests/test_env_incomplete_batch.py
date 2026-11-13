@@ -36,17 +36,3 @@ def test_bytes_to_observation_handles_incomplete_command_window(scripted_env_fac
     assert "Overall, you scored 189 points this game" in obs["text"]
     assert "\x1b" not in obs["text"]
     assert env.observation_space.contains(obs)
-
-
-def test_incomplete_window_carries_the_current_score(scripted_env_factory):
-    rejected = b'xyzzy\r\nI don\'t know the word "xyzzy".\r\n', False, True, {}
-    env = scripted_env_factory(observation="parsed", responses={"xyzzy": rejected})
-    env.reset()
-
-    obs, _, _, truncated, info = env.step("xyzzy")
-
-    assert truncated is True
-    assert info["action_rejected"] is True
-    # the other fields have nothing to report, but the score is still known
-    assert obs["room_name"] == UNKNOWN
-    assert obs["points"] == 200

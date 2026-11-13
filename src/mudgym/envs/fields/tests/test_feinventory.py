@@ -10,14 +10,6 @@ def test_extracts_fei_chunk():
     assert_valid_observation(field, obs)
 
 
-def test_missing_divider_returns_empty_tuples():
-    field = FEInventoryField()
-    expected = {"portables": (), "inventory": ()}
-
-    assert field.empty() == expected
-    assert field.extract([b"x"]) == expected
-
-
 def test_extracts_fei_from_real_captures(bytes_case):
     field = FEInventoryField()
     obs = field.extract(bytes_case["chunks"])

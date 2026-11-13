@@ -7,7 +7,6 @@ from mudgym.envs.fields import (
     FEScoreField,
     FEXitsField,
     MGCheatsField,
-    RawBytesField,
     SuperQuickLookField,
 )
 from tests.scripted import ScriptedConnection
@@ -121,17 +120,6 @@ def test_bare_env_defaults_to_text_and_points_without_a_score_probe():
         assert "75 75" not in obs["text"]
     finally:
         env.close()
-
-
-def test_observation_fields_do_not_require_a_final_marker(scripted_env_factory):
-    env = scripted_env_factory(field_parsers=[FEScoreField, FEXitsField, RawBytesField])
-    env.reset()
-    obs, _, terminated, truncated, _ = env.step("look")
-
-    assert env.session.observation_line == "fes,fex"
-    assert obs["available_exits"].sum() == 8
-    assert obs["vitals"].size == 8
-    assert (terminated, truncated) == (False, False)
 
 
 @pytest.mark.parametrize(

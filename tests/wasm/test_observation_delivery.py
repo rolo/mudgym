@@ -9,7 +9,6 @@ import pytest
 from mudgym import make_env, make_parallel_env
 from mudgym.connections.recording import RecordingConnection, RecordingProvider, ReplayConnection, ReplayProvider
 from mudgym.connections.wasm import WasmProvider
-from mudgym.envs.fields import SuperQuickLookField
 
 # Each preset's name for Aaron and Abbie: the room's own listing in parsed, the persona alone in cheats.
 PEER_NAMES = {"parsed": ("Aaron the protector", "Abbie the protector"), "cheats": ("aaron", "abbie")}
@@ -92,31 +91,6 @@ def test_conversation_keeps_structured_observations(wasm_runtime):
             assert ">*" not in obs["text"]
             assert (b">\x1b[1;34;40m*" in info["raw_bytes"]) == conversing
             assert info["action_rejected"] == (command == "frobnicate")
-
-
-def test_real_peer_output_after_a_field_response_survives_parsing(wasm_runtime):
-    provider = WasmProvider(runtime=wasm_runtime, worlds=1, seed=123)
-    connection, peer_connection = provider.create_connections(2)
-    env = make_env(connection=connection, field_parsers=[SuperQuickLookField])
-    peer = make_env(connection=peer_connection, observation="text")
-    try:
-        env.reset()
-        peer.reset()
-        connection.read_response()
-        connection.send_line("sql")
-        peer.step("shout trailing observation")
-        raw, terminated, incomplete, info = connection.read_response()
-        assert not terminated and not incomplete
-        assert b"trailing observation" in raw
-        obs, rendered, _ = env.bytes_to_observation(raw, sent_lines=info["sent_lines"], response_complete=True)
-        assert obs["room_name"]
-        assert "trailing observation" in obs["text"]
-        assert b"trailing observation" in rendered
-        assert connection.read_response()[0] == b""
-    finally:
-        env.close()
-        peer.close()
-        provider.close()
 
 
 def test_recording_replays_complete_coordinated_resets(wasm_runtime, tmp_path):

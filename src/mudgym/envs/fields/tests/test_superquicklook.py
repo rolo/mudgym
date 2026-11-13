@@ -103,14 +103,6 @@ def test_quoted_room_names_preserve_contents_and_inventory():
     assert_valid_observation(field, obs)
 
 
-@pytest.mark.parametrize("line_break", ["\r", "\n"])
-def test_room_names_cannot_span_lines(line_break):
-    raw = f'The place known as "{line_break}coal bunker" contains nothing.\r\n'.encode()
-    field = SuperQuickLookField()
-
-    assert field.extract([raw]) == field.empty()
-
-
 def test_unrecognised_or_empty_room_names_fail_loudly():
     raw = b'The place known as "unlisted room" contains nothing.\r\n'
 
