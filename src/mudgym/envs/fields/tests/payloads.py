@@ -1,6 +1,3 @@
-"""Captured real game bytes with documented expected parsed values."""
-
-# SQL refusals captured after collapsing in the flooded ford and being blinded by the vampire.
 FORD_COLLAPSE_BYTES = (
     b"\x1b[1;37;40mmove swampward\r\n"
     b"\x1b[32mFord across river\x1b[37m.\r\n"
@@ -48,7 +45,6 @@ VAMPIRE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
-# Captured from native seed 3 when sql wakes a blind player after the vampire's sleep spell.
 VAMPIRE_WAKE_BLIND_BYTES = (
     b"move southwest\r\nYou can't wake yourself up yet!\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei\r\n"
@@ -60,7 +56,6 @@ VAMPIRE_WAKE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
-# Captured from WASM seed 10028 when sql wakes a player who fell asleep drunk in a four-player combat match.
 DRUNKEN_WAKE_BYTES = (
     b"move north\r\nYou can't wake yourself up yet!\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
@@ -75,7 +70,6 @@ DRUNKEN_WAKE_BYTES = (
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
-# Captured from WASM seed 10330 when sql wakes a player knocked out by a winerack in a small room.
 SMALL_ROOM_WAKE_BYTES = (
     b"kill winerack\r\n\x1b[0;31;40mYou hit the winerack nice and hard...\x1b[1;37;40m\n"
     b"OOYAH! That was painful!\nYou feel unbearably giddy.\nYou collapse, unconscious.\n"

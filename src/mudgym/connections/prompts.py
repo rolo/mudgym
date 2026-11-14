@@ -1,5 +1,3 @@
-"""Patterns for parsing MUD2 game output and recorded transcripts."""
-
 import enum
 import re
 
@@ -64,8 +62,6 @@ GAME_OVER_PROMPTS = [
 ]
 
 
-# The parser's replies to a line it cannot read. Each is the game's own line, so it starts a line (optionally
-# colour-wrapped), while a spoken copy sits mid-line behind the speech quoting.
 COMMAND_REJECTION_LINES = [
     re.compile(rb"(?m)^" + SGR + message)
     for message in (
