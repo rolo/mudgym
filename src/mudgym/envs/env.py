@@ -6,7 +6,7 @@ from typing import Any
 import gymnasium as gym
 
 from mudgym.connections.connection import MudConnection
-from mudgym.connections.prompts import COMMAND_REJECTION_LINES
+from mudgym.connections.prompts import COMMAND_REJECTION_LINES, PLAYER_STATE_REFUSALS
 from mudgym.connections.termination import is_permadeath
 from mudgym.db.levels import WIZARD_POINTS
 from mudgym.envs.fields import FieldSpec, ObservationField, instantiate_field
@@ -118,7 +118,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         *,
         sent_lines: Sequence[str],
         response_complete: bool,
-    ) -> tuple[dict[str, Any], bytes, dict[str, bytes]]:
+    ) -> tuple[dict[str, Any], bytes, tuple[str, ...]]:
         """Turn a step's response payload into an observation and its renderable bytes."""
 
         # deepcopy so we don't accidentally mutate
@@ -127,45 +127,34 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         # split the response into pre and post echo
         segments = split_on_echo_lines(raw_bytes, sent_lines) or [raw_bytes]
         # anything that came from the game before our echo we don't try and parse into observation fields
-        pre_echo_render_chunks = [
-            chunk for segment in segments[:-1] for chunk in split_on_prompt(segment, preserve_ansi=True)
-        ]
-        chunks = split_on_prompt(segments[-1])
-        render_chunks = split_on_prompt(segments[-1], preserve_ansi=True)
+        text_chunks = [chunk for segment in segments[:-1] for chunk in split_on_prompt(segment, preserve_ansi=True)]
+        chunks = split_on_prompt(segments[-1], preserve_ansi=True)
 
         # fields with no command set use the whole step's bytes.
         for field in (field for field in self.fields if field.command is None):
             obs.update(field.extract([raw_bytes], persona=self.persona))
 
-        payload_text_chunks: list[bytes] = []
-        field_refusals: dict[str, bytes] = {}
-        if response_complete:
-            # claim in the same order commands were sent. A refusal still consumes, eg, asleep
-            pending_fields = list(self.observation_command_fields)
-            for chunk, render_chunk in zip(chunks, render_chunks, strict=True):
-                field = pending_fields[0] if pending_fields else None
-                if field is not None and field.is_refusal(chunk):
-                    field_refusals[field.__class__.__name__] = chunk
-                    payload_text_chunks.append(render_chunk)
-                    pending_fields.pop(0)
-                elif field is not None and field.matches(chunk):
-                    obs.update(field.extract([chunk], persona=self.persona))
-                    if not field.remove_on_match:
-                        payload_text_chunks.append(render_chunk)
-                    pending_fields.pop(0)
-                else:
-                    payload_text_chunks.append(render_chunk)
-            if pending_fields:
-                raise RuntimeError(
-                    f"response completed but fields {[f.__class__.__name__ for f in pending_fields]} "
-                    f"found no matching response among {len(chunks)} window chunks"
-                )
+        # each chunk goes to the first field that it matches
+        matched_fields: list[ObservationField] = []
+        unmatched_chunks: list[bytes] = []
+        for chunk in chunks:
+            field = next((field for field in self.observation_command_fields if field.matches(chunk)), None)
+            if field is None:
+                unmatched_chunks.append(chunk)
+                text_chunks.append(chunk)
+                continue
+            obs.update(field.extract([chunk], persona=self.persona))
+            matched_fields.append(field)
 
-        text_chunks = [*pre_echo_render_chunks, *payload_text_chunks]
-        if not response_complete:
-            # Without a complete response we cannot safely line chunks up with fields. Preserve the bytes as text rather
-            # than pretending the structured observation is complete.
-            text_chunks.extend(render_chunks)
+        # we use the refusal patterns just to try and help us trap unknowns for logging, they aren't strictly necessary
+        refused = any(strip_ansi(chunk).lstrip().startswith(PLAYER_STATE_REFUSALS) for chunk in unmatched_chunks)
+        unmatched_fields: list[str] = []
+        if response_complete and not refused:
+            unmatched_fields = [
+                field.__class__.__name__ for field in self.observation_command_fields if field not in matched_fields
+            ]
+            if unmatched_fields:
+                logger.warning(f"no reply for {', '.join(unmatched_fields)} in this step's chunks: {chunks!r}")
 
         # keeps the game's ANSI colour - text observation space doesn't.
         render_payload = b"\n".join(text_chunks)
@@ -179,7 +168,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         obs["text"] = text[:TEXT_MAX_LENGTH]
         if self.points is not None:
             obs["points"] = INT_DTYPE(self.points)
-        return obs, render_bytes, field_refusals
+        return obs, render_bytes, tuple(unmatched_fields)
 
     def clean_tearoom_exit(self, raw_bytes: bytes) -> bytes:
         """Drop the tearoom setup through the exit narration."""
@@ -203,7 +192,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         *,
         raw_bytes: bytes,
         render_bytes: bytes,
-        field_refusals: dict[str, bytes],
+        unmatched_fields: tuple[str, ...],
         transport: dict[str, Any],
     ) -> dict[str, Any]:
         info: dict[str, Any] = {
@@ -213,8 +202,8 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             "persona": self.persona,
             "action_rejected": command_rejected(raw_bytes, transport["sent_lines"]),
         }
-        if field_refusals:
-            info["field_refusals"] = field_refusals
+        if unmatched_fields:
+            info["unmatched_fields"] = unmatched_fields
         if persona := transport.get("persona"):
             info["persona_sex"] = persona["sex"]
         return info
@@ -277,7 +266,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
             )
         transport = {**transport, "bytes_length": len(raw_bytes)}
         try:
-            observation, render_bytes, field_refusals = self.bytes_to_observation(
+            observation, render_bytes, unmatched_fields = self.bytes_to_observation(
                 raw_bytes,
                 sent_lines=transport["sent_lines"],
                 response_complete=True,
@@ -288,7 +277,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         info = self.make_info(
             raw_bytes=raw_bytes,
             render_bytes=render_bytes,
-            field_refusals=field_refusals,
+            unmatched_fields=unmatched_fields,
             transport=transport,
         )
         info["transport"] = {**transport, "incomplete": incomplete}
@@ -385,7 +374,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         reward = float(self.points - points_before_step)
 
         try:
-            obs, render_bytes, field_refusals = self.bytes_to_observation(
+            obs, render_bytes, unmatched_fields = self.bytes_to_observation(
                 raw_bytes,
                 sent_lines=debug_info["sent_lines"],
                 response_complete=response_complete,
@@ -397,7 +386,7 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         info = self.make_info(
             raw_bytes=raw_bytes,
             render_bytes=render_bytes,
-            field_refusals=field_refusals,
+            unmatched_fields=unmatched_fields,
             transport=debug_info,
         )
         info["transport"] = {**debug_info, "incomplete": incomplete}

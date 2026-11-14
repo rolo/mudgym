@@ -72,3 +72,10 @@ COMMAND_REJECTION_LINES = [
         b"Your command is too long for me, sorry!",
     )
 ]
+
+# Game replies for when player can't see
+PLAYER_STATE_REFUSALS = (
+    b"You can't wake yourself up yet!",
+    b"You can't see a thing, you're blind.",
+    b"It's too dark for you to see anything.",
+)

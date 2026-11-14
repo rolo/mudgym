@@ -28,23 +28,6 @@ class ObservationField(ABC):
 
     command: str | None = None
 
-    # When True (the default), the chunk this field claims is considered consumed and not included in the observation
-    # `text` key.
-    remove_on_match: bool = True
-
-    # Messages the game emits in place of a command's real output when the persona cannot act (unconscious, asleep,
-    # ...). A refusal claims the field's slot but carries no data. Unknown responses keep failing loudly in MudEnv's
-    # observation parser.
-    PLAYER_STATE_REFUSALS: tuple[re.Pattern[bytes], ...] = (
-        re.compile(rb"You can't wake yourself up yet!"),
-        re.compile(rb"You can't see a thing, you're blind\."),
-        # Waking up spends the command, so its output is only the wake-up lines.
-        re.compile(
-            rb"You wake up(?:!| from your drunken stupor\.\.\.)\r?\nYour stamina is [0-9]+\."
-            rb"(?:\r?\nThe room was too small for you to rest properly\.)?"
-        ),
-    )
-
     def __init__(self, include_keys: Sequence[str] | None = None):
         """
         Args:
@@ -102,17 +85,8 @@ class ObservationField(ABC):
         ...
 
     def matches(self, chunk: bytes) -> bool:
-        """Whether `chunk` is a valid output of this field's command.
-
-        By default we return True. Subclasses can override this to make matching more robust, but should accept every
-        output the command can produce, including when the persona is in the dark, asleep or blind.
-        """
-        return True
-
-    def is_refusal(self, chunk: bytes) -> bool:
-        """Whether ``chunk`` is a player-state refusal instead of this command's real output."""
-        response = strip_ansi(chunk).strip()
-        return any(refusal.fullmatch(response) for refusal in self.PLAYER_STATE_REFUSALS)
+        """Whether ``chunk`` is a valid output for this field's command."""
+        raise NotImplementedError(f"{self.__class__.__name__} sends {self.command!r} but does not define matches()")
 
     def lines(self, raw_bytes: bytes) -> list[str]:
         """The chunk's text lines: ANSI stripped, decoded, split on line breaks and stripped of whitespace."""

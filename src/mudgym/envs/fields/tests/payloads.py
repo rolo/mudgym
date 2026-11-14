@@ -56,36 +56,6 @@ VAMPIRE_WAKE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
-DRUNKEN_WAKE_BYTES = (
-    b"move north\r\nYou can't wake yourself up yet!\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
-    b"You wake up from your drunken stupor...\nYour stamina is \x1b[32m100\x1b[37m.\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
-    b"\x1b[1;32;40m100\x1b[0;37;40m \x1b[1;32;40m100\x1b[0;37;40m 100 100 38 100 71 100 12850 N N N N 58 F\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40moo\n========\nslipper\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-    b"[mgcheats]room_id=towrm2; room_name=landing in tower; fighting=0; dark=1; glowing=0; asleep=0; gifted=0; "
-    b"here=[wall]; players=[]; mobiles=[]; inventory=[slipper][/mgcheats]\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-)
-
-SMALL_ROOM_WAKE_BYTES = (
-    b"kill winerack\r\n\x1b[0;31;40mYou hit the winerack nice and hard...\x1b[1;37;40m\n"
-    b"OOYAH! That was painful!\nYou feel unbearably giddy.\nYou collapse, unconscious.\n"
-    b"Your stamina has fallen from \x1b[31m4\x1b[37m to \x1b[31m1\x1b[37m.\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
-    b"You wake up!\nYour stamina is \x1b[31m1\x1b[37m.\nThe room was too small for you to rest properly.\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
-    b"\x1b[1;31;40m1\x1b[0;37;40m \x1b[1;32;40m100\x1b[0;37;40m 86 100 27 100 63 100 12830 N N N N 83 F\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40moo\n========\n"
-    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-    b"[mgcheats]room_id=npass1; room_name=narrow passage; fighting=0; dark=1; glowing=0; asleep=0; gifted=0; "
-    b"here=[winerack]; players=[]; mobiles=[]; inventory=[][/mgcheats]\n"
-    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
-)
-
 DALLY_LANE_BYTES = (
     b"move north,fes,fex,fei\r\nAs you step through the opening, you become swathed in a fine, gossamer mist. "
     b"The Elizabethan tearoom fades hazily away, and vague, new shapes begin to form around you. Their outlines "

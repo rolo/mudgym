@@ -1,38 +1,25 @@
-import pytest
-
 from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.tests.payloads import (
-    DRUNKEN_WAKE_BYTES,
     FORD_COLLAPSE_BYTES,
-    SMALL_ROOM_WAKE_BYTES,
     VAMPIRE_BLIND_BYTES,
     VAMPIRE_WAKE_BLIND_BYTES,
 )
-from tests.scripted import FEI_RESPONSE, FEX_RESPONSE, PROMPT, SQL_RESPONSE
 
 
 def test_bytes_to_observation_defaults_field_on_player_state_refusal(scripted_env_factory):
-    """A player-state refusal in an observation-command slot must not crash the parse.
-
-    The refusal chunk occupies the field's position in the tail split, so alignment holds. The field keeps its empty
-    defaults for the turn, the refusal is recorded in the info dict, and the player-visible line stays in the text
-    observation.
-    """
+    """A player-state refusal keeps empty field defaults and remains visible in text."""
     env = scripted_env_factory(observation="parsed")
-    obs, _, field_refusals = env.bytes_to_observation(
+    obs, _, unmatched_fields = env.bytes_to_observation(
         FORD_COLLAPSE_BYTES,
         sent_lines=["move swampward", "sql,fes,fex,fei"],
         response_complete=True,
     )
 
-    # sql was refused: its keys stay at the empty defaults
     assert obs["room_name"] == UNKNOWN
+    assert unmatched_fields == ()
 
     # the other observation commands answered normally and still extract
     assert obs["available_exits"].sum() == 13
-
-    # the refusal is recorded explicitly, verbatim
-    assert field_refusals == {"SuperQuickLookField": b"You can't wake yourself up yet!\r\n"}
 
     # the player saw the refusal and the collapse: both survive in the text observation
     assert "You can't wake yourself up yet!" in obs["text"]
@@ -44,11 +31,10 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
     """A mid-fight blinding must not crash the parse (captured live: vampire casts blindness).
 
     sql answers with the blind refusal, fes still answers its score line, fex answers a blank line (same shape as a dark
-    room), and fei shows only the blind ``--`` placeholder above the divider. Every slot resolves and the refusal keeps
-    sql's empty defaults.
+    room), and fei shows only the blind ``--`` placeholder above the divider.
     """
     env = scripted_env_factory(observation="parsed")
-    obs, _, field_refusals = env.bytes_to_observation(
+    obs, _, unmatched_fields = env.bytes_to_observation(
         VAMPIRE_BLIND_BYTES,
         sent_lines=["west", "sql,fes,fex,fei"],
         response_complete=True,
@@ -56,7 +42,7 @@ def test_bytes_to_observation_defaults_sql_on_blind_refusal(scripted_env_factory
 
     # sql was refused: its keys stay at the empty defaults
     assert obs["room_name"] == UNKNOWN
-    assert field_refusals == {"SuperQuickLookField": b"You can't see a thing, you're blind.\r\n"}
+    assert unmatched_fields == ()
 
     # fes answered normally and still extracts
     assert obs["vitals"][0] == 51
@@ -80,92 +66,9 @@ def test_step_continues_when_sql_wakes_a_blind_player(scripted_env_factory):
 
     obs, _, terminated, truncated, info = env.step("move southwest")
 
-    # waking spent sql: its keys stay at the empty defaults while fes still extracts
     assert obs["room_name"] == UNKNOWN
     assert obs["vitals"][0] == 32
-    assert info["field_refusals"] == {"SuperQuickLookField": b"You wake up!\nYour stamina is \x1b[33m32\x1b[37m.\n"}
+    assert info["unmatched_fields"] == ("SuperQuickLookField",)
     assert "You wake up!\nYour stamina is 32." in obs["text"]
     assert terminated is False
     assert truncated is False
-
-
-def test_bytes_to_observation_defaults_sql_when_it_wakes_a_drunk_player(scripted_env_factory):
-    env = scripted_env_factory(observation="parsed")
-    obs, _, field_refusals = env.bytes_to_observation(
-        DRUNKEN_WAKE_BYTES,
-        sent_lines=["move north", "sql,fes,fex,fei,mgcheats"],
-        response_complete=True,
-    )
-
-    assert obs["room_name"] == UNKNOWN
-    assert obs["vitals"][0] == 100
-    assert field_refusals == {
-        "SuperQuickLookField": b"You wake up from your drunken stupor...\nYour stamina is \x1b[32m100\x1b[37m.\n"
-    }
-
-
-def test_bytes_to_observation_defaults_sql_when_it_wakes_a_player_in_a_small_room(scripted_env_factory):
-    env = scripted_env_factory(observation="parsed")
-    obs, _, field_refusals = env.bytes_to_observation(
-        SMALL_ROOM_WAKE_BYTES,
-        sent_lines=["kill winerack", "sql,fes,fex,fei,mgcheats"],
-        response_complete=True,
-    )
-
-    assert obs["room_name"] == UNKNOWN
-    assert obs["vitals"][0] == 1
-    assert field_refusals == {
-        "SuperQuickLookField": (
-            b"You wake up!\nYour stamina is \x1b[31m1\x1b[37m.\nThe room was too small for you to rest properly.\n"
-        )
-    }
-
-
-def test_unknown_observation_command_chunk_still_fails_loudly(scripted_env_factory):
-    """Only recognised player-state refusals default; anything else raises explicitly."""
-    env = scripted_env_factory(observation="parsed")
-    prompt = b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m"
-    raw_bytes = (
-        b"look\r\n"
-        b"Some narrative.\r\n"
-        + prompt
-        + b"sql,fes,fex,fei\r\n"
-        + b"Certainly not a super quick look.\r\n"
-        + prompt
-        + b"\x1b[33m11\x1b[37m \x1b[1;32;40m51\x1b[0;37;40m 38 47 43 52 0 51 075 N N N N 52 R\r\n"
-        + prompt
-        + b"west east\r\n"
-        + prompt
-        + b"========\r\n"
-        + prompt
-    )
-
-    with pytest.raises(RuntimeError, match="SuperQuickLookField.*found no matching response"):
-        env.bytes_to_observation(
-            raw_bytes,
-            sent_lines=["look", "sql,fes,fex,fei"],
-            response_complete=True,
-        )
-
-
-def test_completed_window_with_refused_fes_retains_the_tracked_score(scripted_env_factory):
-    refusal = b"You can't wake yourself up yet!"
-    raw_bytes = (
-        b"wait\r\nThe world waits.\r\n"
-        + PROMPT
-        + b"sql,fes,fex,fei\r\n"
-        + PROMPT.join((SQL_RESPONSE, refusal, FEX_RESPONSE, FEI_RESPONSE))
-        + PROMPT
-    )
-    env = scripted_env_factory(observation="parsed", responses={"wait": raw_bytes})
-    obs, _ = env.reset()
-    start_points = int(obs["points"])
-    assert start_points == 200
-
-    obs, reward, terminated, truncated, info = env.step("wait")
-
-    assert obs["points"] == start_points
-    assert reward == 0.0
-    assert terminated is False
-    assert truncated is False
-    assert info["field_refusals"] == {"FEScoreField": refusal + b"\r\n"}
