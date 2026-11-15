@@ -95,6 +95,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
         command_fields = tuple(field for field in self.fields if field.command is not None)
         commands = tuple(field.command for field in command_fields)
 
+        # dupe commands not allowed, because I can't think of a good use case and it's complicated
+        duplicates = {command for command in commands if commands.count(command) > 1}
+        if duplicates:
+            raise ValueError(f"Duplicate observation commands: {sorted(duplicates)}")
+
         self.observation_command_fields: tuple[ObservationField, ...] = command_fields
         observation_line = ",".join(commands)
 
