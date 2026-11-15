@@ -4,7 +4,7 @@ from typing import Any
 
 from gymnasium import spaces
 
-from mudgym.connections.prompts import SGR_ONE_PLUS_STR
+from mudgym.connections.prompts import SGR, SGR_ONE_PLUS_STR
 from mudgym.db.index import ROOM_NAME_COUNT, UNKNOWN, room_name_to_index
 from mudgym.envs.specs import INDEX_DTYPE, ITEM_SPACE, ROOM_NAME_MAX_LENGTH, SINGLE_LINE_CHARSET
 from mudgym.featurizers.ansi import strip_ansi
@@ -19,12 +19,12 @@ ROOM_MARKER_BYTES = ROOM_MARKER.encode("ascii")
 
 SGR_RE = re.compile(SGR_ONE_PLUS_STR)
 ROOM_LINE_RE = re.compile(
-    rf'{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
+    rf'(?m)^(?:{SGR_ONE_PLUS_STR})?{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
 )
-# Inside a vehicle, sql describes the vehicle and names the room around it only while the vehicle is open.
+# Inside a vehicle, sql describes the vehicle and names the room around it while open.
 VEHICLE_VIEW_RE = re.compile(
-    rb"Inside the (?P<vehicle>[^\r\n]+?)"
+    rb"(?m)^" + SGR + rb"Inside the (?P<vehicle>[^\r\n]+?)"
     rb'(?: in the place known as (?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)"\.\r?\n|\. )'
     rb"The following are also inside the (?P=vehicle):"
 )
@@ -197,11 +197,7 @@ class SuperQuickLookField(ObservationField):
         }
 
     def matches(self, chunk: bytes) -> bool:
-        return (
-            ROOM_MARKER_BYTES in chunk
-            or b"It's too dark for you to see anything." in chunk
-            or VEHICLE_VIEW_RE.search(chunk) is not None
-        )
+        return ROOM_LINE_RE.search(decode_text_bytes(chunk)) is not None or VEHICLE_VIEW_RE.search(chunk) is not None
 
     def vehicle_view(self, raw_bytes: bytes) -> dict[str, Any]:
         """Name the room around an open vehicle, or return the empty default."""

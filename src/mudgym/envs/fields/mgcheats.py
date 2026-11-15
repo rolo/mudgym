@@ -4,6 +4,7 @@ from typing import Any
 
 from gymnasium import spaces
 
+from mudgym.connections.prompts import SGR
 from mudgym.db.index import ROOM_ID_COUNT, ROOM_NAME_COUNT, UNKNOWN, room_id_to_index, room_name_to_index
 from mudgym.envs.specs import (
     BIT_DTYPE,
@@ -20,7 +21,7 @@ from mudgym.featurizers.strings import decode_text_bytes
 
 from .field import ObservationField
 
-MGCHEATS_BLOCK = re.compile(rb"\[mgcheats\](.*?)\[/mgcheats\]", re.DOTALL)
+MGCHEATS_BLOCK = re.compile(rb"(?m)^" + SGR + rb"\[mgcheats\]([^\r\n]*?)\[/mgcheats\]" + SGR + rb"\r?$")
 
 
 class MGCheatsField(ObservationField):
