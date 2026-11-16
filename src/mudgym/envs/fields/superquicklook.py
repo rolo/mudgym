@@ -199,6 +199,15 @@ class SuperQuickLookField(ObservationField):
     def matches(self, chunk: bytes) -> bool:
         return ROOM_LINE_RE.search(decode_text_bytes(chunk)) is not None or VEHICLE_VIEW_RE.search(chunk) is not None
 
+    def split_reply(self, chunk: bytes) -> tuple[bytes, bytes]:
+        """If sql woke us up, the wake-up lines come before the view. Keep them in the text observation."""
+        lines = chunk.splitlines(keepends=True)
+        start = 0
+        # drop lines from the front for as long as the view is still in what's left
+        while self.matches(b"".join(lines[start + 1 :])):
+            start += 1
+        return b"".join(lines[start:]), b"".join(lines[:start])
+
     def vehicle_view(self, raw_bytes: bytes) -> dict[str, Any]:
         """Name the room around an open vehicle, or return the empty default."""
         vehicle_match = VEHICLE_VIEW_RE.search(raw_bytes)

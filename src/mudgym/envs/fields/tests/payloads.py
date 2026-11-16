@@ -56,6 +56,23 @@ VAMPIRE_WAKE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
+LIT_ROOM_WAKE_BYTES = (
+    b"sleep\r\nZZZzzz...\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
+    b"You wake up!\nYour stamina is \x1b[0;33;40m21\x1b[1;37;40m.\n"
+    b'\x1b[0;37;40mThe place known as "\x1b[1;32;40munder well\x1b[0;37;40m" contains '
+    b"\x1b[31mAmelie the yeowoman\x1b[37m and \x1b[32mthe well\x1b[37m.\n"
+    b"You are carrying the following:\n        nothing.\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+    b"\x1b[33m21\x1b[37m \x1b[1;32;40m63\x1b[0;37;40m 60 64 77 83 0 63 0501 N N N N 3 R\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40min down out swampward west north\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m========\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"[mgcheats]room_id=uwell1; room_name=under well; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; "
+    b"here=[well]; players=[]; mobiles=[]; inventory=[][/mgcheats]\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+)
+
 DALLY_LANE_BYTES = (
     b"move north,fes,fex,fei\r\nAs you step through the opening, you become swathed in a fine, gossamer mist. "
     b"The Elizabethan tearoom fades hazily away, and vague, new shapes begin to form around you. Their outlines "

@@ -1,6 +1,7 @@
 from mudgym.db.index import UNKNOWN
 from mudgym.envs.fields.tests.payloads import (
     FORD_COLLAPSE_BYTES,
+    LIT_ROOM_WAKE_BYTES,
     VAMPIRE_BLIND_BYTES,
     VAMPIRE_WAKE_BLIND_BYTES,
 )
@@ -72,3 +73,17 @@ def test_step_continues_when_sql_wakes_a_blind_player(scripted_env_factory):
     assert "You wake up!\nYour stamina is 32." in obs["text"]
     assert terminated is False
     assert truncated is False
+
+
+def test_sql_finds_its_room_line_after_wake_up_lines(scripted_env_factory):
+    env = scripted_env_factory(observation="parsed")
+    obs, render_bytes, _ = env.bytes_to_observation(
+        LIT_ROOM_WAKE_BYTES,
+        sent_lines=["sleep", "sql,fes,fex,fei,mgcheats"],
+        response_complete=True,
+    )
+
+    assert obs["room_name"] == "under well"
+    assert "You wake up!\nYour stamina is 21." in obs["text"]
+    assert b"\x1b[1;37;40mYou wake up!\nYour stamina is \x1b[0;33;40m21\x1b[1;37;40m." in render_bytes
+    assert "The place known as" not in obs["text"]

@@ -148,8 +148,11 @@ class MudEnv(gym.Env[dict[str, Any], str]):
                 unmatched_chunks.append(chunk)
                 text_chunks.append(chunk)
                 continue
-            obs.update(field.extract([chunk], persona=self.persona))
+            reply, text = field.split_reply(chunk)
+            obs.update(field.extract([reply], persona=self.persona))
             matched_fields.append(field)
+            if text:
+                text_chunks.append(text)
 
         # we use the refusal patterns just to try and help us trap unknowns for logging, they aren't strictly necessary
         refused = any(strip_ansi(chunk).lstrip().startswith(PLAYER_STATE_REFUSALS) for chunk in unmatched_chunks)

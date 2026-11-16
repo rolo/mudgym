@@ -88,6 +88,14 @@ class ObservationField(ABC):
         """Whether ``chunk`` is a valid output for this field's command."""
         raise NotImplementedError(f"{self.__class__.__name__} sends {self.command!r} but does not define matches()")
 
+    def split_reply(self, chunk: bytes) -> tuple[bytes, bytes]:
+        """Split a matched chunk into this field's reply and anything else in it which we might want to stay in the
+        text observation. This is for things like "You wake up!" followed by the output.
+
+        By default the whole chunk is the reply.
+        """
+        return chunk, b""
+
     def lines(self, raw_bytes: bytes) -> list[str]:
         """The chunk's text lines: ANSI stripped, decoded, split on line breaks and stripped of whitespace."""
         return decode_text_lines(strip_ansi(bytes(raw_bytes)))
