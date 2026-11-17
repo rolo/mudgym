@@ -56,6 +56,21 @@ VAMPIRE_WAKE_BLIND_BYTES = (
     b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
 )
 
+BLIZZARD_BYTES = (
+    b"move in\r\n\x1b[32mYou are stumbling around in a blizzard\x1b[37m.\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"
+    b"\x1b[32mYou are stumbling around in a blizzard\x1b[37m.\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+    b"\x1b[1;33;40m72\x1b[0;37;40m \x1b[1;32;40m100\x1b[0;37;40m 100 100 100 100 64 100 13363 N N N N 29 F\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m"
+    b"up in over down out swampward southwest south southeast northeast northwest west east north\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m\x1b[0;37;40m========\n"
+    b"\x1b[1;37;40m\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+    b"[mgcheats]room_id=tbliz2; room_name=blizzard; fighting=0; dark=0; glowing=0; asleep=0; gifted=0; "
+    b"here=[snow]; players=[]; mobiles=[]; inventory=[][/mgcheats]\n"
+    b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40m"
+)
+
 LIT_ROOM_WAKE_BYTES = (
     b"sleep\r\nZZZzzz...\n"
     b"\x1b[0;34;40m\x1b[1;34;40m*\x1b[0;34;40m\x1b[1;37;40msql,fes,fex,fei,mgcheats\r\n"

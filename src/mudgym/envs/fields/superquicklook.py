@@ -22,6 +22,8 @@ ROOM_LINE_RE = re.compile(
     rf'(?m)^(?:{SGR_ONE_PLUS_STR})?{ROOM_MARKER}(?:\[[^\]]+\]\s*)?"(?P<place>[^\r\n]*?)" contains '
     r"(?P<contents>[^\r\n]*?)\.(?:\r?\n|$)"
 )
+BLIZZARD_ROOM_NAME = "blizzard"
+BLIZZARD_LINE_RE = re.compile(r"(?:\[[^\]]+\] )?You are stumbling around in a blizzard\.")
 # Inside a vehicle, sql describes the vehicle and names the room around it while open.
 VEHICLE_VIEW_RE = re.compile(
     rb"(?m)^" + SGR + rb"Inside the (?P<vehicle>[^\r\n]+?)"
@@ -197,7 +199,11 @@ class SuperQuickLookField(ObservationField):
         }
 
     def matches(self, chunk: bytes) -> bool:
-        return ROOM_LINE_RE.search(decode_text_bytes(chunk)) is not None or VEHICLE_VIEW_RE.search(chunk) is not None
+        return (
+            ROOM_LINE_RE.search(decode_text_bytes(chunk)) is not None
+            or VEHICLE_VIEW_RE.search(chunk) is not None
+            or any(BLIZZARD_LINE_RE.fullmatch(line) for line in self.lines(chunk))
+        )
 
     def split_reply(self, chunk: bytes) -> tuple[bytes, bytes]:
         """If sql woke us up, the wake-up lines come before the view. Keep them in the text observation."""
@@ -224,6 +230,12 @@ class SuperQuickLookField(ObservationField):
     def full_extract(self, chunks: Sequence[bytes], *, persona: str | None = None, **context: Any) -> dict[str, Any]:
         """Parse the latest superquicklook room view, or the empty default if none is present."""
         raw_bytes = b"".join(chunks)
+        if any(BLIZZARD_LINE_RE.fullmatch(line) for line in self.lines(raw_bytes)):
+            return {
+                **self.full_empty(),
+                "room_name": BLIZZARD_ROOM_NAME,
+                "room_name_index": INDEX_DTYPE(room_name_to_index(BLIZZARD_ROOM_NAME)),
+            }
         if ROOM_MARKER_BYTES not in raw_bytes:
             return self.vehicle_view(raw_bytes)
 
