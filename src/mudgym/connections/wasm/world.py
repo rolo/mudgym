@@ -102,8 +102,6 @@ class WasmSession:
             elif result == SessionResultCode.GAME_HALTED:
                 status = CommandTicketStatus.HALTED
                 output = self.receive()
-            elif result == SessionResultCode.INPUT_REQUIRED:
-                output = self.receive()
             elif result == SessionResultCode.GAME_INDETERMINATE:
                 # Preserve the transition for truncation. This return carries no trustworthy output.
                 output = b""

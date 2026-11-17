@@ -25,7 +25,6 @@ class SessionResultCode(IntEnum):
     PLAYER_GONE = -3
     GAME_HALTED = -4
     GAME_INDETERMINATE = -5
-    INPUT_REQUIRED = -6
     SESSION_GONE = -7
     WORLD_GONE = -8
 
@@ -45,6 +44,5 @@ class CommandTicketStatus(IntEnum):
 
     COMPLETED = 0
     HALTED = 1
-    INPUT_REQUIRED = 2
     PLAYER_DEPARTED = 3
     FAILED = 4

@@ -173,11 +173,9 @@ class WasmConnection(MudConnection):
             or session.departed
             or has_game_over_prompt(game_bytes)
         )
-        incomplete = ticket.status is CommandTicketStatus.INPUT_REQUIRED
-        if ticket.world_indeterminate:
-            # An indeterminate world also returns FAILED, but must preserve the transition for truncation.
-            incomplete = True
-        elif ticket.status is CommandTicketStatus.FAILED:
+        # An indeterminate world also returns FAILED, but must preserve the transition for truncation.
+        incomplete = ticket.world_indeterminate
+        if ticket.status is CommandTicketStatus.FAILED and not incomplete:
             raise RuntimeError(f"WASI command {command!r} returned FAILED")
         if not terminated and not incomplete and not session.world.is_alive():
             incomplete = True
