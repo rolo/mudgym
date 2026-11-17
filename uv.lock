@@ -1012,10 +1012,10 @@ notebooks = [
 
 [[package]]
 name = "mudgym-wasm-engine"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/2a/371c7491d0e1f6540a34741e150ebcdfcfddb8898587ee4b49f76b5f843f/mudgym_wasm_engine-0.2.0-py3-none-any.whl", hash = "sha256:cc8fe764c7bc6a1cb5cf5b885c9335b5f90b4dba127f141fa706a99ca09d95e2", size = 1501527, upload-time = "2026-11-10T15:05:48.334Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/84/58fb6b7ae8069eb8dc22c4e9010698931c0aa39b200fba31a2c7e7fb57b3/mudgym_wasm_engine-0.2.1-py3-none-any.whl", hash = "sha256:7a1388264a4ca0e7a3bf0fd1e996d3dffbb453095786947db0113463abc3255f", size = 1479512, upload-time = "2026-11-17T17:27:17.528Z" },
 ]
 
 [[package]]

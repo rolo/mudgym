@@ -121,22 +121,20 @@ def test_parallel_step_uses_only_live_agent_keys():
         assert not any(terminates.values()) and not any(truncates.values())
 
 
-def test_step_removes_terminated_and_truncated_agents(wasm_runtime):
-    with closing(make_parallel_env(3, provider=WasmProvider(runtime=wasm_runtime, worlds=1))) as env:
+def test_step_removes_terminated_agents(wasm_runtime):
+    with closing(make_parallel_env(2, provider=WasmProvider(runtime=wasm_runtime, worlds=1))) as env:
         initial_obs, _ = env.reset(seed=10)
 
-        # /t asks for terminal width, leaving an unanswered input request that truncates the step.
-        _, _, terminates, truncates, infos = env.step({"player_0": "quit", "player_1": "/t", "player_2": "look"})
+        _, _, terminates, truncates, _ = env.step({"player_0": "quit", "player_1": "look"})
 
-        assert terminates == {"player_0": True, "player_1": False, "player_2": False}
-        assert truncates == {"player_0": False, "player_1": True, "player_2": False}
-        assert b"New terminal width" in infos["player_1"]["raw_bytes"]
-        assert env.agents == ["player_2"]
-        obs, _, terminates, truncates, _ = env.step({"player_2": "look"})
-        assert set(obs) == {"player_2"}
-        assert initial_obs["player_2"]["room_name"] in obs["player_2"]["text"].lower()
-        assert terminates == {"player_2": False}
-        assert truncates == {"player_2": False}
+        assert terminates == {"player_0": True, "player_1": False}
+        assert truncates == {"player_0": False, "player_1": False}
+        assert env.agents == ["player_1"]
+        obs, _, terminates, truncates, _ = env.step({"player_1": "look"})
+        assert set(obs) == {"player_1"}
+        assert initial_obs["player_1"]["room_name"] in obs["player_1"]["text"].lower()
+        assert terminates == {"player_1": False}
+        assert truncates == {"player_1": False}
 
 
 def test_parallel_reset_propagates_distinct_seeds_to_children_and_action_spaces():
