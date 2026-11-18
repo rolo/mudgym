@@ -3,7 +3,7 @@ from typing import Any
 
 from gymnasium import spaces
 
-from mudgym.envs.specs import IDENTIFIER_SPACE
+from mudgym.envs.specs import ITEM_SPACE
 from mudgym.featurizers.ansi import strip_ansi
 from mudgym.featurizers.strings import decode_text_lines
 
@@ -33,10 +33,9 @@ class FEInventoryField(ObservationField):
 
     def full_space(self) -> dict[str, spaces.Space]:
         return {
-            # the real fei grammar emits identifiers only ("brand39", "cloth-of-gold", "key50" in the live captures),
-            # never descriptive phrases
-            "portables": IDENTIFIER_SPACE,
-            "inventory": IDENTIFIER_SPACE,
+            # fei mixes instance ids ("glass1") with names that contain spaces ("piano stool")
+            "portables": ITEM_SPACE,
+            "inventory": ITEM_SPACE,
         }
 
     def full_empty(self) -> dict[str, Any]:

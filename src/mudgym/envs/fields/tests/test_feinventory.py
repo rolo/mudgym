@@ -4,9 +4,9 @@ from mudgym.envs.fields.tests.helpers import assert_valid_observation
 
 def test_extracts_fei_chunk():
     field = FEInventoryField()
-    obs = field.extract([b"oo\r\n========\r\nbroadsword\r\n"])
+    obs = field.extract([b"oo\r\n========\r\ndaisy chain\r\n"])
 
-    assert obs == {"portables": (), "inventory": ("broadsword",)}
+    assert obs == {"portables": (), "inventory": ("daisy chain",)}
     assert_valid_observation(field, obs)
 
 

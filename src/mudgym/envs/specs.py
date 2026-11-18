@@ -23,11 +23,9 @@ SINGLE_LINE_CHARSET = PRINTABLE_ASCII
 ACTION_CHARSET = PRINTABLE_ASCII
 
 # Game identifiers are single tokens: room ids ("groad1", "((store))", "Limbo", at most 9 chars, enumerated from the
-# room db), object instance ids ("necklace0", "key22", a vocabulary word of at most 14 chars plus an instance number),
-# and direction words. Persona names are also identifiers (alphabetic, at most 10 chars) but their limit lives with the
-# persona logic in connections.persona.
+# room db) and direction words. Persona names are also identifiers (alphabetic, at most 10 chars) but their limit lives
+# with the persona logic in connections.persona.
 IDENTIFIER_CHARSET = string.ascii_letters + string.digits + "()-"
-IDENTIFIER_MAX_LENGTH = 17
 
 # a sequence of printable game entities, eg in an inventory or room contents
 ITEM_MAX_LENGTH = 96
@@ -36,11 +34,6 @@ ITEM_SPACE = spaces.Sequence(
     stack=False,
 )
 
-# a sequence of machine-readable game identifiers, eg the fei inventory ids ("brand39", "cloth-of-gold")
-IDENTIFIER_SPACE = spaces.Sequence(
-    spaces.Text(max_length=IDENTIFIER_MAX_LENGTH, min_length=0, charset=IDENTIFIER_CHARSET),
-    stack=False,
-)
 ROOM_ID_MAX_LENGTH = 9
 ROOM_NAME_MAX_LENGTH = 60
 
