@@ -520,21 +520,22 @@ class WasmProvider:
                 raise RuntimeError("connection does not belong to this provider")
             if not self._ordered_worlds:
                 self.reset(seed=seed)
-                return
+            world_index = self.world_for_connection(connection.connection_index)
+            shared = len(self._world_slots[world_index]) > 1
             if not connection._started:
+                # A provider reset has bound a fresh session, but another connection may have chosen its world's seed.
+                if seed is not None and not shared and seed != self._world_seeds[world_index]:
+                    self._replace_world(world_index, seed=seed)
                 return
 
-            world_index = self.world_for_connection(connection.connection_index)
             if seed is not None:
-                if len(self._world_slots[world_index]) > 1:
+                if shared:
                     raise ValueError("Cannot reseed one player in a shared world. Reset the whole provider instead.")
                 self._replace_world(world_index, seed=seed)
                 return
             world = self._ordered_worlds[world_index]
             session = connection._require_session()
-            if world.is_alive() and (
-                len(self._world_slots[world_index]) > 1 or connection._invalidated or session.departed
-            ):
+            if world.is_alive() and (shared or connection._invalidated or session.departed):
                 self._replace_connection_session(connection, world_index)
                 return
             self._replace_world(world_index)
