@@ -56,12 +56,15 @@ def test_provider_offsets_each_world_from_its_resolved_seed(wasm_runtime, seed):
 def test_a_connection_seed_picks_its_world_whichever_connection_resets_first(wasm_runtime):
     with closing(WasmProvider(runtime=wasm_runtime, worlds=2, seed=0)) as provider:
         first, second = provider.create_connections(2)
-        seeds = []
         for connection, seed in ((second, 456), (first, 123)):
-            connection.reset(seed=seed)
-            connection.send_line("look")
-            seeds.append(connection.read_response()[3]["world_seed"])
-        assert seeds == [456, 123]
+            starts = []
+            for repeat in range(2):
+                connection.reset(seed=seed)
+                connection.send_line("look")
+                response = connection.read_response()
+                starts.append((response[3]["world_seed"], response[0]))
+            assert starts[0] == starts[1]
+            assert starts[0][0] == seed
 
 
 @pytest.mark.parametrize("seed", [-1, True, 1.5, MAX_SAFE_INTEGER + 1])
